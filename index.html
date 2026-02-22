@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlanIt - Login</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div class="login-container">
+    <div class="login-box">
+
+        <div class="login-logo">PlanIt</div>
+        <div class="login-subtitle">Schichtplanung & Team-Organisation</div>
+
+        <!-- TABS -->
+        <div class="login-tabs">
+            <button class="login-tab active" onclick="switchLoginTab('employee')">Mitarbeiter</button>
+            <button class="login-tab" onclick="switchLoginTab('admin')">Admin</button>
+        </div>
+
+        <!-- MITARBEITER LOGIN -->
+        <div id="employee-login">
+            <div class="form-group">
+                <label>Mitarbeiter-Nummer</label>
+                <input type="text" id="emp-number" placeholder="z.B. 1001">
+            </div>
+            <div class="form-group">
+                <label>Passwort</label>
+                <input type="password" id="emp-password" placeholder="Passwort">
+            </div>
+            <div id="emp-error" style="color: var(--color-red); font-size: 0.85rem; margin-bottom: 1rem; display: none;"></div>
+            <button class="btn-primary" onclick="loginEmployee()">Einloggen</button>
+        </div>
+
+        <!-- ADMIN LOGIN -->
+        <div id="admin-login" style="display: none;">
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="admin-email" placeholder="admin@restaurant.de">
+            </div>
+            <div class="form-group">
+                <label>Passwort</label>
+                <input type="password" id="admin-password" placeholder="Passwort">
+            </div>
+            <div id="admin-error" style="color: var(--color-red); font-size: 0.85rem; margin-bottom: 1rem; display: none;"></div>
+            <button class="btn-primary" onclick="loginAdmin()">Admin Einloggen</button>
+        </div>
+
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js"></script>
+
+</body>
+</html>

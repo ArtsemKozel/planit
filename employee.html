@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlanIt - Mitarbeiter</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+    <div class="header-logo">PlanIt</div>
+    <div style="display:flex; align-items:center; gap:1rem;">
+        <span class="header-user" id="employee-name">...</span>
+        <button class="btn-logout" onclick="logout()">Logout</button>
+    </div>
+</div>
+
+<!-- NAVIGATION -->
+<div class="nav-tabs">
+    <button class="nav-tab active" onclick="switchTab('schichtplan')">Schichtplan</button>
+    <button class="nav-tab" onclick="switchTab('urlaub')">Urlaub</button>
+    <button class="nav-tab" onclick="switchTab('verfuegbarkeit')">Verfügbarkeit</button>
+    <button class="nav-tab" onclick="switchTab('lohn')">Lohnabrechnung</button>
+    <button class="nav-tab" onclick="switchTab('tausch')">Schichttausch</button>
+</div>
+
+<!-- MAIN -->
+<div class="main-content">
+
+    <!-- TAB 1: SCHICHTPLAN -->
+    <div id="tab-schichtplan" class="tab-content active">
+        <div class="month-selector">
+            <button onclick="changeMonth(-1)">◀</button>
+            <span id="calendar-month-label"></span>
+            <button onclick="changeMonth(1)">▶</button>
+        </div>
+        <div class="calendar-grid">
+            <div class="calendar-day-header">Mo</div>
+            <div class="calendar-day-header">Di</div>
+            <div class="calendar-day-header">Mi</div>
+            <div class="calendar-day-header">Do</div>
+            <div class="calendar-day-header">Fr</div>
+            <div class="calendar-day-header">Sa</div>
+            <div class="calendar-day-header">So</div>
+        </div>
+        <div id="calendar-days" class="calendar-grid" style="margin-top:4px;"></div>
+
+        <!-- Schicht-Detail -->
+        <div id="shift-detail" class="card" style="margin-top:1.5rem; display:none;">
+            <div class="section-title" id="shift-detail-date"></div>
+            <p id="shift-detail-time" style="margin-bottom:0.5rem;"></p>
+            <p id="shift-detail-break" style="color:var(--color-text-light); font-size:0.85rem;"></p>
+            <p id="shift-detail-notes" style="color:var(--color-text-light); font-size:0.85rem;"></p>
+        </div>
+    </div>
+
+    <!-- TAB 2: URLAUB -->
+    <div id="tab-urlaub" class="tab-content">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+            <div class="section-title" style="margin-bottom:0;">Meine Urlaubsanträge</div>
+            <button class="btn-primary" style="width:auto;" onclick="openVacationModal()">+ Neu</button>
+        </div>
+        <div id="vacation-list">
+            <div class="empty-state"><p>Keine Anträge vorhanden.</p></div>
+        </div>
+    </div>
+
+    <!-- TAB 3: VERFÜGBARKEIT -->
+    <div id="tab-verfuegbarkeit" class="tab-content">
+        <div class="section-title">Verfügbarkeit eingeben</div>
+        <div class="month-selector">
+            <button onclick="changeAvailMonth(-1)">◀</button>
+            <span id="avail-month-label"></span>
+            <button onclick="changeAvailMonth(1)">▶</button>
+        </div>
+        <p class="section-subtitle">Tippe auf Tage an denen du verfügbar bist:</p>
+        <div id="avail-grid" class="availability-grid"></div>
+        <button class="btn-primary" style="margin-top:1.5rem;" onclick="saveAvailability()">Speichern</button>
+    </div>
+
+    <!-- TAB 4: LOHNABRECHNUNG -->
+    <div id="tab-lohn" class="tab-content">
+        <div class="section-title">Lohnabrechnungen</div>
+        <div id="payroll-list">
+            <div class="empty-state"><p>Keine Abrechnungen vorhanden.</p></div>
+        </div>
+    </div>
+
+    <!-- TAB 5: SCHICHTTAUSCH -->
+    <div id="tab-tausch" class="tab-content">
+        <div class="section-title">Schichttausch</div>
+        <p class="section-subtitle">Wähle eine Schicht zum Tauschen:</p>
+        <div id="swap-shifts-list">
+            <div class="empty-state"><p>Keine Schichten vorhanden.</p></div>
+        </div>
+        <div style="margin-top:1.5rem;">
+            <div class="section-title">Meine Tausch-Requests</div>
+            <div id="swap-requests-list">
+                <div class="empty-state"><p>Keine Requests vorhanden.</p></div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- MODAL: URLAUB BEANTRAGEN -->
+<div id="vacation-modal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">Urlaub beantragen</div>
+            <button class="modal-close" onclick="closeVacationModal()">✕</button>
+        </div>
+        <div class="form-group">
+            <label>Von</label>
+            <input type="date" id="vacation-start">
+        </div>
+        <div class="form-group">
+            <label>Bis</label>
+            <input type="date" id="vacation-end">
+        </div>
+        <div class="form-group">
+            <label>Grund (optional)</label>
+            <textarea id="vacation-reason" rows="3" placeholder="z.B. Familienurlaub"></textarea>
+        </div>
+        <div id="vacation-error" style="color:var(--color-red); font-size:0.85rem; margin-bottom:1rem; display:none;"></div>
+        <button class="btn-primary" onclick="submitVacation()">Antrag senden</button>
+    </div>
+</div>
+
+<!-- MODAL: SCHICHTTAUSCH -->
+<div id="swap-modal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">Schicht tauschen</div>
+            <button class="modal-close" onclick="closeSwapModal()">✕</button>
+        </div>
+        <p style="margin-bottom:1rem; font-size:0.9rem;" id="swap-shift-info"></p>
+        <div class="form-group">
+            <label>Tauschen mit:</label>
+            <select id="swap-colleague"></select>
+        </div>
+        <div id="swap-error" style="color:var(--color-red); font-size:0.85rem; margin-bottom:1rem; display:none;"></div>
+        <button class="btn-primary" onclick="submitSwap()">Request senden</button>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/employee.js"></script>
+
+</body>
+</html>

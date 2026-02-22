@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlanIt - Admin</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+    <div class="header-logo">PlanIt Admin</div>
+    <div style="display:flex; align-items:center; gap:0.75rem;">
+        <button class="btn-logout" onclick="window.location.href='../index.html'">← GastroHub</button>
+        <button class="btn-logout" onclick="logout()">Logout</button>
+    </div>
+</div>
+
+<!-- NAVIGATION -->
+<div class="nav-tabs">
+    <button class="nav-tab active" onclick="switchTab('schichtplanung')">Schichtplanung</button>
+    <button class="nav-tab" onclick="switchTab('urlaub')">Urlaub</button>
+    <button class="nav-tab" onclick="switchTab('verfuegbarkeit')">Verfügbarkeiten</button>
+    <button class="nav-tab" onclick="switchTab('team')">Team</button>
+    <button class="nav-tab" onclick="switchTab('tausch')">Schichttausch</button>
+</div>
+
+<!-- MAIN -->
+<div class="main-content" style="max-width:900px;">
+
+    <!-- TAB 1: SCHICHTPLANUNG -->
+    <div id="tab-schichtplanung" class="tab-content active">
+        <div class="month-selector">
+            <button onclick="changeWeek(-1)">◀</button>
+            <span id="week-label"></span>
+            <button onclick="changeWeek(1)">▶</button>
+        </div>
+        <div style="overflow-x:auto;">
+            <div id="week-grid" class="week-grid"></div>
+        </div>
+    </div>
+
+    <!-- TAB 2: URLAUB -->
+    <div id="tab-urlaub" class="tab-content">
+        <div class="section-title">Urlaubsanträge</div>
+        <div id="admin-vacation-list">
+            <div class="empty-state"><p>Keine Anträge vorhanden.</p></div>
+        </div>
+    </div>
+
+    <!-- TAB 3: VERFÜGBARKEITEN -->
+    <div id="tab-verfuegbarkeit" class="tab-content">
+        <div class="section-title">Verfügbarkeiten</div>
+        <div class="form-group" style="max-width:300px;">
+            <label>Mitarbeiter</label>
+            <select id="avail-employee-select" onchange="loadAdminAvailability()"></select>
+        </div>
+        <div class="month-selector">
+            <button onclick="changeAdminAvailMonth(-1)">◀</button>
+            <span id="admin-avail-month-label"></span>
+            <button onclick="changeAdminAvailMonth(1)">▶</button>
+        </div>
+        <div id="admin-avail-grid" class="availability-grid"></div>
+    </div>
+
+    <!-- TAB 4: TEAM -->
+    <div id="tab-team" class="tab-content">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+            <div class="section-title" style="margin-bottom:0;">Team-Übersicht</div>
+            <button class="btn-primary" style="width:auto;" onclick="openNewEmployeeModal()">+ Mitarbeiter</button>
+        </div>
+        <div id="team-list">
+            <div class="empty-state"><p>Keine Mitarbeiter vorhanden.</p></div>
+        </div>
+    </div>
+
+    <!-- TAB 5: SCHICHTTAUSCH -->
+    <div id="tab-tausch" class="tab-content">
+        <div class="section-title">Schichttausch-Requests</div>
+        <div id="admin-swap-list">
+            <div class="empty-state"><p>Keine Requests vorhanden.</p></div>
+        </div>
+    </div>
+
+</div>
+
+<!-- MODAL: SCHICHT ERSTELLEN -->
+<div id="shift-modal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title" id="shift-modal-title">Schicht erstellen</div>
+            <button class="modal-close" onclick="closeShiftModal()">✕</button>
+        </div>
+        <div class="form-group">
+            <label>Mitarbeiter</label>
+            <select id="shift-employee"></select>
+        </div>
+        <div class="form-group">
+            <label>Datum</label>
+            <input type="date" id="shift-date">
+        </div>
+        <div class="form-group">
+            <label>Von</label>
+            <input type="time" id="shift-start">
+        </div>
+        <div class="form-group">
+            <label>Bis</label>
+            <input type="time" id="shift-end">
+        </div>
+        <div class="form-group">
+            <label>Pause (Minuten)</label>
+            <input type="number" id="shift-break" placeholder="z.B. 30" min="0">
+        </div>
+        <div class="form-group">
+            <label>Notizen (optional)</label>
+            <textarea id="shift-notes" rows="2"></textarea>
+        </div>
+        <div id="shift-error" style="color:var(--color-red); font-size:0.85rem; margin-bottom:1rem; display:none;"></div>
+        <button class="btn-primary" onclick="submitShift()">Schicht speichern</button>
+    </div>
+</div>
+
+<!-- MODAL: NEUER MITARBEITER -->
+<div id="employee-modal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">Neuer Mitarbeiter</div>
+            <button class="modal-close" onclick="closeNewEmployeeModal()">✕</button>
+        </div>
+        <div class="form-group">
+            <label>Name</label>
+            <input type="text" id="new-emp-name" placeholder="Max Mustermann">
+        </div>
+        <div class="form-group">
+            <label>Mitarbeiter-Nummer</label>
+            <input type="text" id="new-emp-number" placeholder="z.B. 1002">
+        </div>
+        <div class="form-group">
+            <label>Passwort</label>
+            <input type="text" id="new-emp-password" placeholder="Initial-Passwort">
+        </div>
+        <div id="emp-modal-error" style="color:var(--color-red); font-size:0.85rem; margin-bottom:1rem; display:none;"></div>
+        <button class="btn-primary" onclick="submitNewEmployee()">Mitarbeiter anlegen</button>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js"></script>
+<script src="js/admin.js"></script>
+
+</body>
+</html>
