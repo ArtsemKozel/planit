@@ -117,11 +117,12 @@ label {
 /* HEADER */
 .header {
     background: var(--color-white);
-    padding: 1rem 1.5rem;
+    padding: 1rem 1.5rem 0.75rem;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: space-between;
     border-bottom: 2px solid var(--color-primary);
+    position: relative;
 }
 
 .header-logo {
@@ -132,17 +133,21 @@ label {
 }
 
 .header-user {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     color: var(--color-text-light);
+    margin-top: 0.2rem;
 }
 
 .btn-logout {
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
     background: none;
     border: none;
     color: var(--color-text-light);
     cursor: pointer;
-    font-size: 0.9rem;
-    padding: 0.4rem 0.8rem;
+    padding: 0.4rem;
     border-radius: 8px;
 }
 
@@ -519,4 +524,63 @@ label {
 .login-tab.active {
     background: white;
     color: var(--color-text);
+}
+
+/* BOTTOM NAVIGATION */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    border-top: 1px solid #E0E0E0;
+    display: flex;
+    z-index: 100;
+}
+
+.bottom-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.6rem 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--color-text-light);
+    font-size: 0.7rem;
+    gap: 0.2rem;
+}
+
+.bottom-nav-item.active {
+    color: var(--color-primary);
+}
+
+/* MEHR LIST */
+.mehr-list {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.mehr-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 1rem;
+    border-bottom: 1px solid #F0F0F0;
+    cursor: pointer;
+    font-size: 0.95rem;
+}
+
+.mehr-item:last-child {
+    border-bottom: none;
+}
+
+.mehr-item:hover {
+    background: var(--color-gray);
+}
+
+/* MAIN CONTENT PADDING für Bottom Nav */
+.main-content {
+    padding-bottom: 5rem;
 }

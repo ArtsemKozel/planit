@@ -22,9 +22,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ── TAB WECHSEL ───────────────────────────────────────────
 function switchTab(tab) {
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.bottom-nav-item').forEach(t => t.classList.remove('active'));
     document.getElementById('tab-' + tab).classList.add('active');
-    event.target.classList.add('active');
+    const navBtn = document.getElementById('nav-' + tab);
+    if (navBtn) navBtn.classList.add('active');
 }
 
 // ── KALENDER ─────────────────────────────────────────────
