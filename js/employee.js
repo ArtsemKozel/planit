@@ -13,10 +13,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('employee-name').textContent = currentEmployee.name;
 
     await loadCalendar();
+    renderCalendar(calendarDate.getFullYear(), calendarDate.getMonth(), myShifts);
     await loadVacations();
     await loadAvailability();
     await loadPayroll();
     await loadSwaps();
+    await loadOverview();
 });
 
 // ── TAB WECHSEL ───────────────────────────────────────────
@@ -26,6 +28,9 @@ function switchTab(tab) {
     document.getElementById('tab-' + tab).classList.add('active');
     const navBtn = document.getElementById('nav-' + tab);
     if (navBtn) navBtn.classList.add('active');
+    if (tab === 'schichtplan') {
+        setTimeout(() => renderCalendar(calendarDate.getFullYear(), calendarDate.getMonth(), myShifts), 50);
+    }
 }
 
 // ── KALENDER ─────────────────────────────────────────────
@@ -50,10 +55,13 @@ async function loadCalendar() {
         .lte('shift_date', lastDay);
 
     myShifts = shifts || [];
-    renderCalendar(year, month, myShifts);
+    if (document.getElementById('tab-schichtplan').classList.contains('active')) {
+        renderCalendar(year, month, myShifts);
+    }
 }
 
 function renderCalendar(year, month, shifts) {
+    console.log('renderCalendar aufgerufen', year, month, shifts);
     const container = document.getElementById('calendar-days');
     container.innerHTML = '';
 
@@ -205,7 +213,7 @@ async function loadAvailability() {
         .select('*')
         .eq('employee_id', currentEmployee.id)
         .eq('month', monthStr)
-        .single();
+        .maybeSingle();
 
     selectedAvailDays = data ? data.available_days : [];
     renderAvailGrid(year, month);
@@ -396,6 +404,38 @@ async function submitSwap() {
 
     closeSwapModal();
     await loadSwaps();
+}
+
+// ── ÜBERSICHT ─────────────────────────────────────────────
+async function loadOverview() {
+    const today = new Date().toISOString().split('T')[0];
+
+    // Alle zukünftigen Schichten laden
+    const { data: shifts } = await db
+        .from('shifts')
+        .select('*')
+        .eq('employee_id', currentEmployee.id)
+        .gte('shift_date', today)
+        .order('shift_date')
+        .limit(5);
+
+    const todayShift = shifts ? shifts.find(s => s.shift_date === today) : null;
+    const nextShift = shifts ? shifts.find(s => s.shift_date > today) : null;
+
+    const todayEl = document.getElementById('today-shift-info');
+    const nextEl = document.getElementById('next-shift-info');
+
+    if (todayShift) {
+        todayEl.textContent = `${todayShift.start_time.slice(0,5)} – ${todayShift.end_time.slice(0,5)} Uhr`;
+    } else {
+        todayEl.textContent = 'Keine Schicht heute';
+    }
+
+    if (nextShift) {
+        nextEl.textContent = `${formatDate(nextShift.shift_date)} | ${nextShift.start_time.slice(0,5)} – ${nextShift.end_time.slice(0,5)} Uhr`;
+    } else {
+        nextEl.textContent = '–';
+    }
 }
 
 // ── HELPER ────────────────────────────────────────────────
