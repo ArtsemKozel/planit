@@ -183,8 +183,6 @@ async function submitVacation() {
     const start = document.getElementById('vacation-start').value;
     const end = document.getElementById('vacation-end').value;
     const days = document.getElementById('vacation-days').value;
-    const department = document.querySelector('input[name="department"]:checked');
-    const leaveType = document.querySelector('input[name="leave-type"]:checked');
     const errorDiv = document.getElementById('vacation-error');
 
     errorDiv.style.display = 'none';
@@ -194,26 +192,54 @@ async function submitVacation() {
         errorDiv.style.display = 'block';
         return;
     }
-    if (!department) {
-        errorDiv.textContent = 'Bitte Abteilung auswählen.';
-        errorDiv.style.display = 'block';
-        return;
-    }
-    if (!leaveType) {
-        errorDiv.textContent = 'Bitte Art des Urlaubs auswählen.';
+    if (!days) {
+        errorDiv.textContent = 'Bitte Anzahl Urlaubstage eingeben.';
         errorDiv.style.display = 'block';
         return;
     }
 
     const canvas = document.getElementById('signature-canvas');
-    const signature = canvas.toDataURL();
+    const signature = canvas.toDataURL('image/png');
 
+    // PDF generieren
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Urlaubsantrag', 20, 20);
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Mitarbeiter:', 20, 40);
+    doc.setFont('helvetica', 'bold');
+    doc.text(currentEmployee.name, 70, 40);
+
+    doc.setFont('helvetica', 'normal');
+    doc.text('Datum des Antrags:', 20, 52);
+    doc.text(new Date().toLocaleDateString('de-DE'), 70, 52);
+
+    doc.text('Von:', 20, 64);
+    doc.text(formatDate(start), 70, 64);
+
+    doc.text('Bis:', 20, 76);
+    doc.text(formatDate(end), 70, 76);
+
+    doc.text('Urlaubstage:', 20, 88);
+    doc.text(days + ' Tage', 70, 88);
+
+    doc.text('Unterschrift:', 20, 110);
+    doc.addImage(signature, 'PNG', 20, 115, 60, 25);
+
+    doc.save(`Urlaubsantrag_${currentEmployee.name}_${start}.pdf`);
+
+    // In Supabase speichern
     const { error } = await db.from('vacation_requests').insert({
         user_id: currentEmployee.user_id,
         employee_id: currentEmployee.id,
         start_date: start,
         end_date: end,
-        reason: leaveType.value,
+        reason: `${days} Tage`,
         status: 'pending'
     });
 
