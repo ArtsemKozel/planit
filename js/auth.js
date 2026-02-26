@@ -49,13 +49,12 @@ async function loginAdmin() {
 
 // ── MITARBEITER LOGIN ─────────────────────────────────────
 async function loginEmployee() {
-    const empNumber = document.getElementById('emp-number').value.trim();
+    const loginCode = document.getElementById('emp-number').value.trim();
     const password = document.getElementById('emp-password').value;
     const errorDiv = document.getElementById('emp-error');
-
     errorDiv.style.display = 'none';
 
-    if (!empNumber || !password) {
+    if (!loginCode || !password) {
         errorDiv.textContent = 'Bitte alle Felder ausfüllen.';
         errorDiv.style.display = 'block';
         return;
@@ -64,12 +63,12 @@ async function loginEmployee() {
     const { data: employee, error } = await db
         .from('employees_planit')
         .select('*')
-        .eq('employee_number', empNumber)
+        .eq('login_code', loginCode)
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
     if (error || !employee) {
-        errorDiv.textContent = 'Mitarbeiter-Nummer nicht gefunden.';
+        errorDiv.textContent = 'Kürzel nicht gefunden.';
         errorDiv.style.display = 'block';
         return;
     }
@@ -83,10 +82,9 @@ async function loginEmployee() {
     localStorage.setItem('planit_employee', JSON.stringify({
         id: employee.id,
         name: employee.name,
-        employee_number: employee.employee_number,
+        login_code: employee.login_code,
         user_id: employee.user_id
     }));
-
     window.location.href = 'employee.html';
 }
 

@@ -399,7 +399,7 @@ async function loadTeam() {
         <div class="list-item">
             <div class="list-item-info">
                 <h4>${e.name}</h4>
-                <p>Nr. ${e.employee_number} · ${e.department || 'Allgemein'}</p>
+                <p>${e.login_code} · ${e.department || 'Allgemein'}</p>
             </div>
             <span class="badge badge-approved">Aktiv</span>
         </div>
