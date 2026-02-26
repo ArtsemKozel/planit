@@ -611,4 +611,6 @@ input[type="date"] {
     -webkit-appearance: none;
     appearance: none;
     text-align: left;
+    min-height: 48px;
+    line-height: 48px;
 }
