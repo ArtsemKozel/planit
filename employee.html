@@ -132,7 +132,35 @@
                 <span>Schichttausch</span>
                 <span>›</span>
             </div>
+            <div class="mehr-item" onclick="switchTab('profil')">
+                <span>Profil</span>
+                <span>›</span>
+            </div>
         </div>
+    </div>
+
+    <!-- TAB: PROFIL -->
+    <div id="tab-profil" class="tab-content">
+        <div class="section-title">Mein Profil</div>
+        <div class="card" style="margin-bottom:1.5rem;">
+            <div style="font-size:0.8rem; color:var(--color-text-light); margin-bottom:0.4rem;">NAME</div>
+            <div id="profil-name" style="font-size:1rem; font-weight:600;"></div>
+            <div style="font-size:0.8rem; color:var(--color-text-light); margin-top:0.75rem; margin-bottom:0.4rem;">MITARBEITER-NR.</div>
+            <div id="profil-number" style="font-size:1rem; font-weight:600;"></div>
+        </div>
+
+        <div class="section-title">Passwort ändern</div>
+        <div class="form-group">
+            <label>Neues Passwort</label>
+            <input type="password" id="new-password" placeholder="Neues Passwort">
+        </div>
+        <div class="form-group">
+            <label>Passwort bestätigen</label>
+            <input type="password" id="confirm-password" placeholder="Passwort wiederholen">
+        </div>
+        <div id="profil-error" style="color:var(--color-red); font-size:0.85rem; margin-bottom:1rem; display:none;"></div>
+        <div id="profil-success" style="color:var(--color-green); font-size:0.85rem; margin-bottom:1rem; display:none;"></div>
+        <button class="btn-primary" onclick="changePassword()">Passwort speichern</button>
     </div>
 
 </div>

@@ -28,6 +28,7 @@ function switchTab(tab) {
     const navBtn = document.getElementById('nav-' + tab);
     if (navBtn) navBtn.classList.add('active');
     if (tab === 'schichtplan') loadWeekGrid();
+    if (tab === 'profil') loadProfil();
 }
 
 // ── KALENDER ─────────────────────────────────────────────
@@ -506,4 +507,52 @@ function formatMonthYear(dateStr) {
     return new Date(dateStr).toLocaleDateString('de-DE', {
         month: 'long', year: 'numeric'
     });
+}
+
+// ── PROFIL ────────────────────────────────────────────────
+function loadProfil() {
+    document.getElementById('profil-name').textContent = currentEmployee.name;
+    document.getElementById('profil-number').textContent = currentEmployee.employee_number;
+}
+
+async function changePassword() {
+    const newPass = document.getElementById('new-password').value;
+    const confirmPass = document.getElementById('confirm-password').value;
+    const errorDiv = document.getElementById('profil-error');
+    const successDiv = document.getElementById('profil-success');
+
+    errorDiv.style.display = 'none';
+    successDiv.style.display = 'none';
+
+    if (!newPass || !confirmPass) {
+        errorDiv.textContent = 'Bitte beide Felder ausfüllen.';
+        errorDiv.style.display = 'block';
+        return;
+    }
+    if (newPass !== confirmPass) {
+        errorDiv.textContent = 'Passwörter stimmen nicht überein.';
+        errorDiv.style.display = 'block';
+        return;
+    }
+    if (newPass.length < 4) {
+        errorDiv.textContent = 'Passwort muss mindestens 4 Zeichen haben.';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    const { error } = await db
+        .from('employees_planit')
+        .update({ password_hash: newPass })
+        .eq('id', currentEmployee.id);
+
+    if (error) {
+        errorDiv.textContent = 'Fehler beim Speichern.';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    successDiv.textContent = 'Passwort erfolgreich geändert! ✅';
+    successDiv.style.display = 'block';
+    document.getElementById('new-password').value = '';
+    document.getElementById('confirm-password').value = '';
 }
