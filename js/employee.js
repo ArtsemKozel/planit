@@ -249,6 +249,17 @@ async function submitVacation() {
         return;
     }
 
+    // E-Mail an Manager senden
+    await db.functions.invoke('send-vacation-email', {
+        body: {
+            employeeName: currentEmployee.name,
+            startDate: formatDate(start),
+            endDate: formatDate(end),
+            days: days,
+            managerEmail: 'artsem86@gmail.com'
+        }
+    });
+
     closeVacationModal();
     await loadVacations();
 }

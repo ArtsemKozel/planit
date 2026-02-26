@@ -246,6 +246,41 @@ async function reviewVacation(id, status) {
     await loadAdminVacations();
 }
 
+async function downloadAllVacations() {
+    const { data: vacations } = await db
+        .from('vacation_requests')
+        .select('*, employees_planit(name)')
+        .eq('user_id', adminSession.user.id)
+        .order('created_at', { ascending: false });
+
+    if (!vacations || vacations.length === 0) {
+        alert('Keine Anträge vorhanden.');
+        return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Alle Urlaubsanträge', 20, 20);
+
+    let y = 35;
+    vacations.forEach(v => {
+        if (y > 270) { doc.addPage(); y = 20; }
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text(v.employees_planit?.name || 'Unbekannt', 20, y);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`${formatDate(v.start_date)} – ${formatDate(v.end_date)}`, 70, y);
+        const status = v.status === 'pending' ? 'Ausstehend' : v.status === 'approved' ? 'Genehmigt' : 'Abgelehnt';
+        doc.text(status, 160, y);
+        y += 10;
+    });
+
+    doc.save('Urlaubsantraege.pdf');
+}
+
 // ── VERFÜGBARKEITEN ───────────────────────────────────────
 function populateAvailEmployeeSelect() {
     const select = document.getElementById('avail-employee-select');
