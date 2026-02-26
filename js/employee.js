@@ -204,47 +204,7 @@ async function submitVacation() {
         return;
     }
 
-    const canvas = document.getElementById('signature-canvas');
-    let signature = null;
-    try {
-        signature = canvas.toDataURL('image/png');
-    } catch(e) {
-        signature = null;
-    }
-
-    // PDF generieren
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Urlaubsantrag', 20, 20);
-
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Mitarbeiter:', 20, 40);
-    doc.setFont('helvetica', 'bold');
-    doc.text(currentEmployee.name, 70, 40);
-
-    doc.setFont('helvetica', 'normal');
-    doc.text('Datum des Antrags:', 20, 52);
-    doc.text(new Date().toLocaleDateString('de-DE'), 70, 52);
-
-    doc.text('Von:', 20, 64);
-    doc.text(formatDate(start), 70, 64);
-
-    doc.text('Bis:', 20, 76);
-    doc.text(formatDate(end), 70, 76);
-
-    doc.text('Urlaubstage:', 20, 88);
-    doc.text(days + ' Tage', 70, 88);
-
-    doc.text('Unterschrift:', 20, 110);
-    doc.addImage(signature, 'PNG', 20, 115, 60, 25);
-
-    doc.save(`Urlaubsantrag_${currentEmployee.name}_${start}.pdf`);
-
-    // In Supabase speichern
+    // ERST Supabase speichern
     const { error } = await db.from('vacation_requests').insert({
         user_id: currentEmployee.user_id,
         employee_id: currentEmployee.id,
@@ -260,16 +220,35 @@ async function submitVacation() {
         return;
     }
 
-    // E-Mail an Manager senden
-    await db.functions.invoke('send-vacation-email', {
-        body: {
-            employeeName: currentEmployee.name,
-            startDate: formatDate(start),
-            endDate: formatDate(end),
-            days: days,
-            managerEmail: 'artsem86@gmail.com'
-        }
-    });
+    // DANN PDF
+    const canvas = document.getElementById('signature-canvas');
+    let signature = null;
+    try { signature = canvas.toDataURL('image/png'); } catch(e) {}
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Urlaubsantrag', 20, 20);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Mitarbeiter:', 20, 40);
+    doc.setFont('helvetica', 'bold');
+    doc.text(currentEmployee.name, 70, 40);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Datum des Antrags:', 20, 52);
+    doc.text(new Date().toLocaleDateString('de-DE'), 70, 52);
+    doc.text('Von:', 20, 64);
+    doc.text(formatDate(start), 70, 64);
+    doc.text('Bis:', 20, 76);
+    doc.text(formatDate(end), 70, 76);
+    doc.text('Urlaubstage:', 20, 88);
+    doc.text(days + ' Tage', 70, 88);
+    if (signature) {
+        doc.text('Unterschrift:', 20, 110);
+        doc.addImage(signature, 'PNG', 20, 115, 60, 25);
+    }
+    doc.save(`Urlaubsantrag_${currentEmployee.name}_${start}.pdf`);
 
     closeVacationModal();
     await loadVacations();
