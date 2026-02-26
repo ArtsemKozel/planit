@@ -255,7 +255,7 @@ async function submitVacation() {
     });
 
     if (error) {
-        errorDiv.textContent = 'Fehler beim Senden.';
+        errorDiv.textContent = 'Fehler: ' + error.message;
         errorDiv.style.display = 'block';
         return;
     }
