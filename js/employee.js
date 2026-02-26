@@ -205,7 +205,12 @@ async function submitVacation() {
     }
 
     const canvas = document.getElementById('signature-canvas');
-    const signature = canvas.toDataURL('image/png');
+    let signature = null;
+    try {
+        signature = canvas.toDataURL('image/png');
+    } catch(e) {
+        signature = null;
+    }
 
     // PDF generieren
     const { jsPDF } = window.jspdf;
