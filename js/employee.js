@@ -249,9 +249,9 @@ async function submitVacation() {
         doc.addImage(signature, 'PNG', 20, 115, 60, 25);
     }
     doc.save(`Urlaubsantrag_${currentEmployee.name}_${start}.pdf`);
-
+    
     closeVacationModal();
-    await loadVacations();
+    setTimeout(() => loadVacations(), 500);
 }
 
 // ── VERFÜGBARKEIT ─────────────────────────────────────────
