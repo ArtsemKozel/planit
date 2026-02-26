@@ -237,7 +237,40 @@ async function loadAdminVacations() {
     `).join('');
 }
 
+let rejectVacationId = null;
+
+function openRejectModal(id) {
+    rejectVacationId = id;
+    document.getElementById('reject-reason').value = '';
+    document.getElementById('reject-modal').classList.add('open');
+}
+
+function closeRejectModal() {
+    document.getElementById('reject-modal').classList.remove('open');
+    rejectVacationId = null;
+}
+
+async function submitReject() {
+    const reason = document.getElementById('reject-reason').value.trim();
+    if (!reason) {
+        alert('Bitte Grund eingeben.');
+        return;
+    }
+    await db.from('vacation_requests').update({
+        status: 'rejected',
+        rejection_reason: reason,
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: adminSession.user.id
+    }).eq('id', rejectVacationId);
+    closeRejectModal();
+    await loadAdminVacations();
+}
+
 async function reviewVacation(id, status) {
+    if (status === 'rejected') {
+        openRejectModal(id);
+        return;
+    }
     await db.from('vacation_requests').update({
         status,
         reviewed_at: new Date().toISOString(),
