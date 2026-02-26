@@ -372,9 +372,20 @@ label {
 /* WEEK VIEW (Admin) */
 .week-grid {
     display: grid;
-    grid-template-columns: 120px repeat(7, 1fr);
-    gap: 4px;
-    overflow-x: auto;
+    grid-template-columns: 80px repeat(7, 1fr);
+    gap: 3px;
+}
+.week-employee {
+    font-size: 0.75rem;
+}
+.week-cell {
+    min-height: 50px;
+    font-size: 0.7rem;
+    padding: 0.3rem;
+}
+.week-header {
+    font-size: 0.72rem;
+    padding: 0.4rem 0.2rem;
 }
 
 .week-header {

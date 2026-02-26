@@ -118,7 +118,11 @@ function renderWeekGrid(days, shifts) {
         deptEmployees.forEach(emp => {
             const empCell = document.createElement('div');
             empCell.className = 'week-employee';
-            empCell.textContent = emp.name.split(' ')[0];
+            const parts = emp.name.trim().split(' ');
+            const displayName = parts.length > 1 
+                ? `${parts[0]} ${parts[1][0]}.` 
+                : parts[0];
+            empCell.textContent = displayName;
             grid.appendChild(empCell);
 
             days.forEach(d => {
