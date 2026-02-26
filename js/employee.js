@@ -146,6 +146,7 @@ async function loadVacations() {
             <div class="list-item-info">
                 <h4>${formatDate(v.start_date)} – ${formatDate(v.end_date)}</h4>
                 <p>${v.reason || 'Kein Grund angegeben'}</p>
+                ${v.status === 'rejected' && v.rejection_reason ? `<p style="color:var(--color-red); font-size:0.85rem; margin-top:0.3rem;">Grund: ${v.rejection_reason}</p>` : ''}
             </div>
             <span class="badge badge-${v.status}">
                 ${v.status === 'pending' ? 'Ausstehend' : v.status === 'approved' ? 'Genehmigt' : 'Abgelehnt'}
