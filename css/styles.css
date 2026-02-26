@@ -606,3 +606,9 @@ label {
     width: auto;
     margin: 0;
 }
+
+input[type="date"] {
+    -webkit-appearance: none;
+    appearance: none;
+    text-align: left;
+}
