@@ -58,31 +58,16 @@
     </div>
 
     <!-- TAB 1: SCHICHTPLAN -->
-    <div id="tab-schichtplan" class="tab-content">
-        <div class="month-selector">
-            <button onclick="changeMonth(-1)">◀</button>
-            <span id="calendar-month-label"></span>
-            <button onclick="changeMonth(1)">▶</button>
-        </div>
-        <div class="calendar-grid">
-            <div class="calendar-day-header">Mo</div>
-            <div class="calendar-day-header">Di</div>
-            <div class="calendar-day-header">Mi</div>
-            <div class="calendar-day-header">Do</div>
-            <div class="calendar-day-header">Fr</div>
-            <div class="calendar-day-header">Sa</div>
-            <div class="calendar-day-header">So</div>
-        </div>
-        <div id="calendar-days" class="calendar-grid" style="margin-top:4px;"></div>
-
-        <!-- Schicht-Detail -->
-        <div id="shift-detail" class="card" style="margin-top:1.5rem; display:none;">
-            <div class="section-title" id="shift-detail-date"></div>
-            <p id="shift-detail-time" style="margin-bottom:0.5rem;"></p>
-            <p id="shift-detail-break" style="color:var(--color-text-light); font-size:0.85rem;"></p>
-            <p id="shift-detail-notes" style="color:var(--color-text-light); font-size:0.85rem;"></p>
-        </div>
+<div id="tab-schichtplan" class="tab-content">
+    <div class="month-selector">
+        <button onclick="changeWeek(-1)">◀</button>
+        <span id="week-label"></span>
+        <button onclick="changeWeek(1)">▶</button>
     </div>
+    <div style="overflow-x:auto;">
+        <div id="emp-week-grid" class="week-grid"></div>
+    </div>
+</div>
 
     <!-- TAB 2: URLAUB -->
     <div id="tab-urlaub" class="tab-content">

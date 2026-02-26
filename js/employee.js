@@ -12,8 +12,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('employee-name').textContent = currentEmployee.name;
 
-    await loadCalendar();
-    renderCalendar(calendarDate.getFullYear(), calendarDate.getMonth(), myShifts);
+    await loadWeekGrid();
     await loadVacations();
     await loadAvailability();
     await loadPayroll();
@@ -28,97 +27,103 @@ function switchTab(tab) {
     document.getElementById('tab-' + tab).classList.add('active');
     const navBtn = document.getElementById('nav-' + tab);
     if (navBtn) navBtn.classList.add('active');
-    if (tab === 'schichtplan') {
-        setTimeout(() => renderCalendar(calendarDate.getFullYear(), calendarDate.getMonth(), myShifts), 50);
-    }
+    if (tab === 'schichtplan') loadWeekGrid();
 }
 
 // ── KALENDER ─────────────────────────────────────────────
-async function loadCalendar() {
-    const year = calendarDate.getFullYear();
-    const month = calendarDate.getMonth();
+let empWeekDate = new Date();
 
-    const monthNames = ['Januar','Februar','März','April','Mai','Juni',
-                        'Juli','August','September','Oktober','November','Dezember'];
-    document.getElementById('calendar-month-label').textContent = 
-        `${monthNames[month]} ${year}`;
+async function loadWeekGrid() {
+    const monday = getMonday(empWeekDate);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
 
-    // Schichten laden
-    const firstDay = `${year}-${String(month+1).padStart(2,'0')}-01`;
-    const lastDay = `${year}-${String(month+1).padStart(2,'0')}-${new Date(year, month+1, 0).getDate()}`;
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        days.push(d);
+    }
 
+    document.getElementById('week-label').textContent =
+        `${monday.toLocaleDateString('de-DE', {day:'numeric', month:'short'})} – ${sunday.toLocaleDateString('de-DE', {day:'numeric', month:'short', year:'numeric'})}`;
+
+    const firstDay = monday.toISOString().split('T')[0];
+    const lastDay = sunday.toISOString().split('T')[0];
+
+    // Alle Schichten der Woche laden (alle Mitarbeiter)
     const { data: shifts } = await db
         .from('shifts')
-        .select('*')
-        .eq('employee_id', currentEmployee.id)
+        .select('*, employees_planit(name)')
+        .eq('user_id', currentEmployee.user_id)
         .gte('shift_date', firstDay)
         .lte('shift_date', lastDay);
 
-    myShifts = shifts || [];
-    if (document.getElementById('tab-schichtplan').classList.contains('active')) {
-        renderCalendar(year, month, myShifts);
-    }
+    // Alle Mitarbeiter laden
+    const { data: colleagues } = await db
+        .from('employees_planit')
+        .select('*')
+        .eq('user_id', currentEmployee.user_id)
+        .eq('is_active', true)
+        .order('name');
+
+    renderWeekGrid(days, shifts || [], colleagues || []);
 }
 
-function renderCalendar(year, month, shifts) {
-    console.log('renderCalendar aufgerufen', year, month, shifts);
-    const container = document.getElementById('calendar-days');
-    container.innerHTML = '';
+function renderWeekGrid(days, shifts, colleagues) {
+    const grid = document.getElementById('emp-week-grid');
+    grid.innerHTML = '';
+    const dayNames = ['Mo','Di','Mi','Do','Fr','Sa','So'];
 
-    const firstDay = new Date(year, month, 1);
-    // Montag = 0
-    let startOffset = firstDay.getDay() - 1;
-    if (startOffset < 0) startOffset = 6;
+    // Leere Ecke
+    const corner = document.createElement('div');
+    corner.className = 'week-header';
+    grid.appendChild(corner);
 
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const today = new Date();
+    // Tag-Header
+    days.forEach((d, i) => {
+        const header = document.createElement('div');
+        header.className = 'week-header';
+        header.innerHTML = `${dayNames[i]}<br><small>${d.getDate()}.${d.getMonth()+1}.</small>`;
+        grid.appendChild(header);
+    });
 
-    // Leere Zellen
-    for (let i = 0; i < startOffset; i++) {
-        const empty = document.createElement('div');
-        empty.className = 'calendar-day empty';
-        container.appendChild(empty);
-    }
-
-    for (let d = 1; d <= daysInMonth; d++) {
-        const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-        const shift = shifts.find(s => s.shift_date === dateStr);
-
-        const day = document.createElement('div');
-        day.className = 'calendar-day';
-        day.textContent = d;
-
-        if (today.getDate() === d && today.getMonth() === month && today.getFullYear() === year) {
-            day.classList.add('today');
+    // Mitarbeiter-Zeilen
+    colleagues.forEach(emp => {
+        const empCell = document.createElement('div');
+        empCell.className = 'week-employee';
+        empCell.textContent = emp.name.split(' ')[0];
+        if (emp.id === currentEmployee.id) {
+            empCell.style.color = 'var(--color-primary)';
+            empCell.style.fontWeight = '700';
         }
+        grid.appendChild(empCell);
 
-        if (shift) {
-            day.classList.add('has-shift');
-            day.onclick = () => showShiftDetail(shift, dateStr);
-        }
-
-        container.appendChild(day);
-    }
+        days.forEach(d => {
+            const dateStr = d.toISOString().split('T')[0];
+            const shift = shifts.find(s => s.employee_id === emp.id && s.shift_date === dateStr);
+            const cell = document.createElement('div');
+            const isOwn = emp.id === currentEmployee.id;
+            cell.className = 'week-cell' + (shift ? ' has-shift' : '');
+            if (shift && isOwn) cell.style.background = 'var(--color-primary)';
+            cell.textContent = shift ? `${shift.start_time.slice(0,5)}\n${shift.end_time.slice(0,5)}` : '';
+            cell.style.whiteSpace = 'pre';
+            grid.appendChild(cell);
+        });
+    });
 }
 
-function showShiftDetail(shift, dateStr) {
-    const detail = document.getElementById('shift-detail');
-    detail.style.display = 'block';
-
-    document.getElementById('shift-detail-date').textContent = 
-        new Date(dateStr).toLocaleDateString('de-DE', {weekday:'long', day:'numeric', month:'long'});
-    document.getElementById('shift-detail-time').textContent = 
-        `🕐 ${shift.start_time.slice(0,5)} – ${shift.end_time.slice(0,5)} Uhr`;
-    document.getElementById('shift-detail-break').textContent = 
-        shift.break_minutes ? `☕ Pause: ${shift.break_minutes} Min` : '';
-    document.getElementById('shift-detail-notes').textContent = 
-        shift.notes ? `📝 ${shift.notes}` : '';
+function changeWeek(dir) {
+    empWeekDate.setDate(empWeekDate.getDate() + dir * 7);
+    loadWeekGrid();
 }
 
-function changeMonth(dir) {
-    calendarDate.setMonth(calendarDate.getMonth() + dir);
-    document.getElementById('shift-detail').style.display = 'none';
-    loadCalendar();
+function getMonday(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    d.setDate(diff);
+    return d;
 }
 
 // ── URLAUB ────────────────────────────────────────────────
