@@ -149,19 +149,42 @@ async function loadVacations() {
     `).join('');
 }
 
+let signaturePad = null;
+
 function openVacationModal() {
     document.getElementById('vacation-modal').classList.add('open');
     document.getElementById('vacation-error').style.display = 'none';
+    initSignaturePad();
 }
 
 function closeVacationModal() {
     document.getElementById('vacation-modal').classList.remove('open');
 }
 
+function initSignaturePad() {
+    const canvas = document.getElementById('signature-canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth;
+    canvas.height = 120;
+    let drawing = false;
+
+    canvas.addEventListener('pointerdown', e => { drawing = true; ctx.beginPath(); ctx.moveTo(e.offsetX, e.offsetY); });
+    canvas.addEventListener('pointermove', e => { if (!drawing) return; ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke(); });
+    canvas.addEventListener('pointerup', () => drawing = false);
+}
+
+function clearSignature() {
+    const canvas = document.getElementById('signature-canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
 async function submitVacation() {
     const start = document.getElementById('vacation-start').value;
     const end = document.getElementById('vacation-end').value;
-    const reason = document.getElementById('vacation-reason').value;
+    const days = document.getElementById('vacation-days').value;
+    const department = document.querySelector('input[name="department"]:checked');
+    const leaveType = document.querySelector('input[name="leave-type"]:checked');
     const errorDiv = document.getElementById('vacation-error');
 
     errorDiv.style.display = 'none';
@@ -171,24 +194,31 @@ async function submitVacation() {
         errorDiv.style.display = 'block';
         return;
     }
-
-    if (new Date(end) < new Date(start)) {
-        errorDiv.textContent = 'Enddatum muss nach Startdatum liegen.';
+    if (!department) {
+        errorDiv.textContent = 'Bitte Abteilung auswählen.';
         errorDiv.style.display = 'block';
         return;
     }
+    if (!leaveType) {
+        errorDiv.textContent = 'Bitte Art des Urlaubs auswählen.';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    const canvas = document.getElementById('signature-canvas');
+    const signature = canvas.toDataURL();
 
     const { error } = await db.from('vacation_requests').insert({
         user_id: currentEmployee.user_id,
         employee_id: currentEmployee.id,
         start_date: start,
         end_date: end,
-        reason: reason || null,
+        reason: leaveType.value,
         status: 'pending'
     });
 
     if (error) {
-        errorDiv.textContent = 'Fehler beim Senden. Bitte nochmal versuchen.';
+        errorDiv.textContent = 'Fehler beim Senden.';
         errorDiv.style.display = 'block';
         return;
     }
