@@ -231,7 +231,7 @@ label {
     top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(0,0,0,0.5);
     z-index: 1000;
-    align-items: flex-end;
+    align-items: center;
     justify-content: center;
 }
 
@@ -241,11 +241,12 @@ label {
 
 .modal {
     background: white;
-    border-radius: 16px 16px 0 0;
+    border-radius: 16px;
     padding: 1.5rem;
-    width: 100%;
+    padding-bottom: 2rem;
+    width: 90%;
     max-width: 600px;
-    max-height: 90vh;
+    max-height: 85vh;
     overflow-y: auto;
 }
 
@@ -612,4 +613,13 @@ input[type="date"] {
     appearance: none;
     text-align: left;
     padding: 0.75rem 1rem;
+}
+
+select {
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    padding-right: 2.5rem;
 }

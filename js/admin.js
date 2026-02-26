@@ -87,6 +87,7 @@ function renderWeekGrid(days, shifts) {
     });
 
     // Mitarbeiter-Zeilen
+    // Mitarbeiter-Zeilen gruppiert nach Abteilung
     if (employees.length === 0) {
         const empty = document.createElement('div');
         empty.style.gridColumn = '1 / -1';
@@ -96,22 +97,41 @@ function renderWeekGrid(days, shifts) {
         return;
     }
 
-    employees.forEach(emp => {
-        const empCell = document.createElement('div');
-        empCell.className = 'week-employee';
-        empCell.textContent = emp.name.split(' ')[0];
-        grid.appendChild(empCell);
+    // Abteilungen sammeln
+    const departments = [...new Set(employees.map(e => e.department || 'Allgemein'))];
 
-        days.forEach(d => {
-            const dateStr = d.toISOString().split('T')[0];
-            const shift = shifts.find(s => s.employee_id === emp.id && s.shift_date === dateStr);
+    departments.forEach(dept => {
+        // Abteilungs-Trennzeile
+        const deptRow = document.createElement('div');
+        deptRow.style.gridColumn = '1 / -1';
+        deptRow.style.padding = '0.4rem 0.5rem';
+        deptRow.style.fontSize = '0.75rem';
+        deptRow.style.fontWeight = '600';
+        deptRow.style.color = 'var(--color-primary)';
+        deptRow.style.borderTop = '1px solid var(--color-border)';
+        deptRow.style.marginTop = '0.25rem';
+        deptRow.textContent = dept.toUpperCase();
+        grid.appendChild(deptRow);
 
-            const cell = document.createElement('div');
-            cell.className = 'week-cell' + (shift ? ' has-shift' : '');
-            cell.textContent = shift ? `${shift.start_time.slice(0,5)}\n${shift.end_time.slice(0,5)}` : '+';
-            cell.style.whiteSpace = 'pre';
-            cell.onclick = () => openShiftModal(emp.id, dateStr, shift);
-            grid.appendChild(cell);
+        const deptEmployees = employees.filter(e => (e.department || 'Allgemein') === dept);
+
+        deptEmployees.forEach(emp => {
+            const empCell = document.createElement('div');
+            empCell.className = 'week-employee';
+            empCell.textContent = emp.name.split(' ')[0];
+            grid.appendChild(empCell);
+
+            days.forEach(d => {
+                const dateStr = d.toISOString().split('T')[0];
+                const shift = shifts.find(s => s.employee_id === emp.id && s.shift_date === dateStr);
+
+                const cell = document.createElement('div');
+                cell.className = 'week-cell' + (shift ? ' has-shift' : '');
+                cell.textContent = shift ? `${shift.start_time.slice(0,5)}\n${shift.end_time.slice(0,5)}` : '+';
+                cell.style.whiteSpace = 'pre';
+                cell.onclick = () => openShiftModal(emp.id, dateStr, shift);
+                grid.appendChild(cell);
+            });
         });
     });
 }
@@ -375,7 +395,7 @@ async function loadTeam() {
         <div class="list-item">
             <div class="list-item-info">
                 <h4>${e.name}</h4>
-                <p>Nr. ${e.employee_number}</p>
+                <p>Nr. ${e.employee_number} · ${e.department || 'Allgemein'}</p>
             </div>
             <span class="badge badge-approved">Aktiv</span>
         </div>
@@ -408,11 +428,14 @@ async function submitNewEmployee() {
         return;
     }
 
+    const department = document.getElementById('new-emp-department').value;
+
     const { error } = await db.from('employees_planit').insert({
         user_id: adminSession.user.id,
         name,
         employee_number: number,
         password_hash: password,
+        department: department,
         is_active: true
     });
 
