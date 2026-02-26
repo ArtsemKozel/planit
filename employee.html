@@ -154,26 +154,57 @@
 
 <!-- MODAL: URLAUB BEANTRAGEN -->
 <div id="vacation-modal" class="modal-overlay">
-    <div class="modal">
-        <div class="modal-header">
-            <div class="modal-title">Urlaub beantragen</div>
-            <button class="modal-close" onclick="closeVacationModal()">✕</button>
-        </div>
-        <div class="form-group">
-            <label>Von</label>
-            <input type="date" id="vacation-start">
-        </div>
-        <div class="form-group">
-            <label>Bis</label>
-            <input type="date" id="vacation-end">
-        </div>
-        <div class="form-group">
-            <label>Grund (optional)</label>
-            <textarea id="vacation-reason" rows="3" placeholder="z.B. Familienurlaub"></textarea>
-        </div>
-        <div id="vacation-error" style="color:var(--color-red); font-size:0.85rem; margin-bottom:1rem; display:none;"></div>
-        <button class="btn-primary" onclick="submitVacation()">Antrag senden</button>
-    </div>
+<div class="modal">
+<div class="modal-header">
+<div class="modal-title">Urlaubsantrag</div>
+<button class="modal-close" onclick="closeVacationModal()">✕</button>
+</div>
+
+<!-- 
+<div class="form-group">
+<label>Abteilung</label>
+<div class="checkbox-group">
+<label class="checkbox-label"><input type="radio" name="department" value="West"> West</label>
+<label class="checkbox-label"><input type="radio" name="department" value="Ost"> Ost</label>
+<label class="checkbox-label"><input type="radio" name="department" value="Bakery"> Bakery</label>
+<label class="checkbox-label"><input type="radio" name="department" value="Office"> Office</label>
+</div>
+</div>
+-->
+
+<div class="form-group">
+<label>Von</label>
+<input type="date" id="vacation-start">
+</div>
+<div class="form-group">
+<label>Bis</label>
+<input type="date" id="vacation-end">
+</div>
+<div class="form-group">
+<label>Anzahl bezahlter Urlaubstage</label>
+<input type="number" id="vacation-days" min="1" placeholder="z.B. 5">
+</div>
+
+<!--
+<div class="form-group">
+<label>Art des Urlaubs</label>
+<div class="checkbox-group">
+<label class="checkbox-label"><input type="radio" name="leave-type" value="Holidays"> Urlaub</label>
+<label class="checkbox-label"><input type="radio" name="leave-type" value="Health"> Krankenstand</label>
+<label class="checkbox-label"><input type="radio" name="leave-type" value="Other"> Sonstiges</label>
+</div>
+</div>
+-->
+
+<div class="form-group">
+<label>Unterschrift</label>
+<canvas id="signature-canvas" style="border:1px solid #E0E0E0; border-radius:8px; width:100%; height:120px; touch-action:none;"></canvas>
+<button onclick="clearSignature()" style="margin-top:0.4rem; background:none; border:none; color:var(--color-text-light); font-size:0.85rem; cursor:pointer;">✕ Löschen</button>
+</div>
+
+<div id="vacation-error" style="color:var(--color-red); font-size:0.85rem; margin-bottom:1rem; display:none;"></div>
+<button class="btn-primary" onclick="submitVacation()">Antrag senden</button>
+</div>
 </div>
 
 <!-- MODAL: SCHICHTTAUSCH -->
