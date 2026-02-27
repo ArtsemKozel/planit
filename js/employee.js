@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadPayroll();
     await loadSwaps();
     await loadOverview();
+    await loadVacationCalendar();
 });
 
 // ── TAB WECHSEL ───────────────────────────────────────────
@@ -125,6 +126,143 @@ function getMonday(date) {
     const diff = d.getDate() - day + (day === 0 ? -6 : 1);
     d.setDate(diff);
     return d;
+}
+
+// ── URLAUBSKALENDER ───────────────────────────────────────
+let vacCalDate = new Date();
+
+async function loadVacationCalendar() {
+    const year = vacCalDate.getFullYear();
+    const month = vacCalDate.getMonth();
+    const monthStr = `${year}-${String(month+1).padStart(2,'0')}`;
+    const monthNames = ['Januar','Februar','März','April','Mai','Juni',
+                        'Juli','August','September','Oktober','November','Dezember'];
+    document.getElementById('vac-cal-month-label').textContent = `${monthNames[month]} ${year}`;
+
+    const firstDay = `${monthStr}-01`;
+    const lastDay = `${year}-${String(month+1).padStart(2,'0')}-${new Date(year, month+1, 0).getDate()}`;
+
+    const { data: vacations } = await db
+        .from('vacation_requests')
+        .select('*, employees_planit(name)')
+        .eq('user_id', currentEmployee.user_id)
+        .eq('status', 'approved')
+        .lte('start_date', lastDay)
+        .gte('end_date', firstDay);
+
+    renderVacationCalendar(year, month, vacations || []);
+}
+
+function renderVacationCalendar(year, month, vacations) {
+    const container = document.getElementById('vac-calendar');
+    container.innerHTML = '';
+
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstWeekday = new Date(year, month, 1).getDay();
+    const offset = firstWeekday === 0 ? 6 : firstWeekday - 1;
+
+    // Farben pro Mitarbeiter
+    const colors = ['#C9A24D','#7EB8C9','#A8C97E','#C97E9A','#9A7EC9','#C9A87E','#7EC9B8'];
+    const empColors = {};
+    let colorIdx = 0;
+
+    vacations.forEach(v => {
+        const empId = v.employee_id;
+        if (!empColors[empId]) {
+            if (empId === currentEmployee.id) {
+                empColors[empId] = '#C9A24D';
+            } else {
+                // skip gold for others
+                const c = colors.filter(x => x !== '#C9A24D')[colorIdx % (colors.length - 1)];
+                empColors[empId] = c;
+                colorIdx++;
+            }
+        }
+    });
+
+    // Wochentag-Header
+    const dayHeaders = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+    const grid = document.createElement('div');
+    grid.className = 'calendar-grid';
+
+    dayHeaders.forEach(d => {
+        const h = document.createElement('div');
+        h.className = 'calendar-day-header';
+        h.textContent = d;
+        grid.appendChild(h);
+    });
+
+    // Leere Felder vor dem 1.
+    for (let i = 0; i < offset; i++) {
+        const empty = document.createElement('div');
+        empty.className = 'calendar-day empty';
+        grid.appendChild(empty);
+    }
+
+    // Tage
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const dayVacations = vacations.filter(v => v.start_date <= dateStr && v.end_date >= dateStr);
+
+        const dayEl = document.createElement('div');
+        dayEl.className = 'calendar-day';
+        dayEl.style.position = 'relative';
+        dayEl.style.flexDirection = 'column';
+        dayEl.style.gap = '2px';
+
+        const numEl = document.createElement('span');
+        numEl.textContent = d;
+        numEl.style.fontSize = '0.8rem';
+        dayEl.appendChild(numEl);
+
+        dayVacations.forEach(v => {
+            const bar = document.createElement('div');
+            bar.style.width = '100%';
+            bar.style.height = '4px';
+            bar.style.borderRadius = '2px';
+            bar.style.background = empColors[v.employee_id] || '#ccc';
+            bar.title = v.employees_planit?.name || '';
+            dayEl.appendChild(bar);
+        });
+
+        grid.appendChild(dayEl);
+    }
+
+    container.appendChild(grid);
+
+    // Legende
+    const legend = document.createElement('div');
+    legend.style.display = 'flex';
+    legend.style.flexWrap = 'wrap';
+    legend.style.gap = '0.5rem';
+    legend.style.marginTop = '0.75rem';
+
+    vacations.forEach(v => {
+        const empId = v.employee_id;
+        const name = v.employees_planit?.name || '';
+        if (legend.querySelector(`[data-emp="${empId}"]`)) return;
+        const item = document.createElement('div');
+        item.setAttribute('data-emp', empId);
+        item.style.display = 'flex';
+        item.style.alignItems = 'center';
+        item.style.gap = '4px';
+        item.style.fontSize = '0.75rem';
+        const dot = document.createElement('div');
+        dot.style.width = '10px';
+        dot.style.height = '10px';
+        dot.style.borderRadius = '50%';
+        dot.style.background = empColors[empId] || '#ccc';
+        item.appendChild(dot);
+        item.appendChild(document.createTextNode(empId === currentEmployee.id ? 'Ich' : name.split(' ')[0]));
+        legend.appendChild(item);
+    });
+
+    container.appendChild(legend);
+}
+
+function changeVacCalMonth(dir) {
+    vacCalDate.setMonth(vacCalDate.getMonth() + dir);
+    loadVacationCalendar();
 }
 
 // ── URLAUB ────────────────────────────────────────────────

@@ -57,7 +57,17 @@
 
     <!-- TAB 2: URLAUB -->
     <div id="tab-urlaub" class="tab-content">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+        <!-- Kalender -->
+        <div class="section-title">Urlaubskalender</div>
+        <div class="month-selector">
+            <button onclick="changeAdminVacCalMonth(-1)">◀</button>
+            <span id="admin-vac-cal-month-label"></span>
+            <button onclick="changeAdminVacCalMonth(1)">▶</button>
+        </div>
+        <div id="admin-vac-calendar"></div>
+
+        <!-- Anträge -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin:1.5rem 0 1rem;">
             <div class="section-title" style="margin-bottom:0;">Urlaubsanträge</div>
             <button class="btn-primary" style="width:auto;" onclick="downloadAllVacations()">⬇ Alle</button>
         </div>
