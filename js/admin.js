@@ -35,7 +35,7 @@ async function loadEmployees() {
         .select('*')
         .eq('user_id', adminSession.user.id)
         .eq('is_active', true)
-        .order('employee_number');
+        .order('name')
     employees = data || [];
 }
 
@@ -476,29 +476,62 @@ async function loadAdminAvailability() {
     const year = adminAvailDate.getFullYear();
     const month = adminAvailDate.getMonth();
     const monthStr = `${year}-${String(month+1).padStart(2,'0')}-01`;
-
     const monthNames = ['Januar','Februar','März','April','Mai','Juni',
                         'Juli','August','September','Oktober','November','Dezember'];
-    document.getElementById('admin-avail-month-label').textContent =
-        `${monthNames[month]} ${year}`;
+    document.getElementById('admin-avail-month-label').textContent = `${monthNames[month]} ${year}`;
 
     const { data } = await db
         .from('availability')
         .select('*')
         .eq('employee_id', employeeId)
         .eq('month', monthStr)
-        .single();
+        .maybeSingle();
 
-    const availDays = data ? data.available_days : [];
+    const availDays = (data && !Array.isArray(data.available_days)) ? data.available_days : {};
     const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstWeekday = new Date(year, month, 1).getDay();
+    const offset = firstWeekday === 0 ? 6 : firstWeekday - 1;
+
     const container = document.getElementById('admin-avail-grid');
     container.innerHTML = '';
 
+    // Wochentag-Header
+    ['Mo','Di','Mi','Do','Fr','Sa','So'].forEach(d => {
+        const h = document.createElement('div');
+        h.className = 'calendar-day-header';
+        h.textContent = d;
+        container.appendChild(h);
+    });
+
+    // Leere Felder
+    for (let i = 0; i < offset; i++) {
+        const empty = document.createElement('div');
+        empty.className = 'avail-day';
+        empty.style.visibility = 'hidden';
+        container.appendChild(empty);
+    }
+
+    // Tage
     for (let d = 1; d <= daysInMonth; d++) {
+        const entry = availDays[d] || null;
+        const status = entry ? entry.status : null;
+
         const div = document.createElement('div');
-        div.className = 'avail-day' + (availDays.includes(d) ? ' selected' : '');
-        div.textContent = d;
+        div.className = 'avail-day';
+        div.style.flexDirection = 'column';
+        div.style.fontSize = '0.75rem';
+        div.style.gap = '2px';
         div.style.cursor = 'default';
+
+        if (status === 'full') div.style.background = '#C8E6C9';
+        else if (status === 'partial') div.style.background = '#FFF9C4';
+        else if (status === 'off') div.style.background = '#FFCDD2';
+
+        const timeLabel = (status === 'partial' && entry.from)
+            ? `<span style="font-size:0.6rem">${entry.from}-${entry.to}</span>`
+            : '';
+
+        div.innerHTML = `<span>${d}</span><span style="font-size:0.9rem">${status === 'full' ? '🟢' : status === 'partial' ? '🟡' : status === 'off' ? '🔴' : ''}</span>${timeLabel}`;
         container.appendChild(div);
     }
 }
@@ -542,13 +575,13 @@ function closeNewEmployeeModal() {
 
 async function submitNewEmployee() {
     const name = document.getElementById('new-emp-name').value.trim();
-    const number = document.getElementById('new-emp-number').value.trim();
+    const loginCode = document.getElementById('new-emp-code').value.trim();
     const password = document.getElementById('new-emp-password').value;
     const errorDiv = document.getElementById('emp-modal-error');
 
     errorDiv.style.display = 'none';
 
-    if (!name || !number || !password) {
+    if (!name || !loginCode || !password) {
         errorDiv.textContent = 'Bitte alle Felder ausfüllen.';
         errorDiv.style.display = 'block';
         return;
@@ -559,7 +592,7 @@ async function submitNewEmployee() {
     const { error } = await db.from('employees_planit').insert({
         user_id: adminSession.user.id,
         name,
-        employee_number: number,
+        login_code: loginCode,
         password_hash: password,
         department: department,
         is_active: true
@@ -629,4 +662,20 @@ function formatDate(dateStr) {
     return new Date(dateStr).toLocaleDateString('de-DE', {
         day: 'numeric', month: 'long', year: 'numeric'
     });
+}
+
+function generateLoginCode(name) {
+    const parts = name.trim().split(' ');
+    const first = parts[0] || '';
+    const last = parts[1] || '';
+    const clean = str => str.replace(/ä/g,'a').replace(/ö/g,'o').replace(/ü/g,'u')
+                            .replace(/Ä/g,'A').replace(/Ö/g,'O').replace(/Ü/g,'U');
+    const code = clean(first).slice(0,2) + clean(last).slice(0,2);
+    return code.charAt(0).toUpperCase() + code.slice(1,2).toLowerCase() +
+           code.charAt(2).toUpperCase() + code.slice(3,4).toLowerCase();
+}
+
+function previewLoginCode() {
+    const name = document.getElementById('new-emp-name').value;
+    document.getElementById('new-emp-code').value = name.trim() ? generateLoginCode(name) : '';
 }

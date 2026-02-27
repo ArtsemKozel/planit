@@ -3,7 +3,7 @@ let calendarDate = new Date();
 let availDate = new Date();
 let myShifts = [];
 let selectedSwapShift = null;
-let selectedAvailDays = [];
+let selectedAvailDays = {};
 
 // ── INIT ──────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -394,15 +394,100 @@ async function submitVacation() {
 }
 
 // ── VERFÜGBARKEIT ─────────────────────────────────────────
+function renderAvailGrid(year, month) {
+    const container = document.getElementById('avail-grid');
+    container.innerHTML = '';
+
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstWeekday = new Date(year, month, 1).getDay();
+    const offset = firstWeekday === 0 ? 6 : firstWeekday - 1;
+
+    // Wochentag-Header
+    ['Mo','Di','Mi','Do','Fr','Sa','So'].forEach(d => {
+        const h = document.createElement('div');
+        h.className = 'calendar-day-header';
+        h.textContent = d;
+        container.appendChild(h);
+    });
+
+    // Leere Felder
+    for (let i = 0; i < offset; i++) {
+        const empty = document.createElement('div');
+        empty.className = 'avail-day';
+        empty.style.visibility = 'hidden';
+        container.appendChild(empty);
+    }
+
+    // Tage
+    for (let d = 1; d <= daysInMonth; d++) {
+        const entry = selectedAvailDays[d] || null;
+        const status = entry ? entry.status : null;
+
+        const div = document.createElement('div');
+        div.className = 'avail-day';
+        div.style.flexDirection = 'column';
+        div.style.fontSize = '0.75rem';
+        div.style.gap = '2px';
+
+        if (status === 'full') div.style.background = '#C8E6C9';
+        else if (status === 'partial') div.style.background = '#FFF9C4';
+        else if (status === 'off') div.style.background = '#FFCDD2';
+
+        const timeLabel = (status === 'partial' && entry.from)
+            ? `<span style="font-size:0.6rem">${entry.from}-${entry.to}</span>`
+            : '';
+
+        div.innerHTML = `<span>${d}</span><span style="font-size:0.9rem">${status === 'full' ? '🟢' : status === 'partial' ? '🟡' : status === 'off' ? '🔴' : ''}</span>${timeLabel}`;
+        div.onclick = () => openAvailModal(d);
+        container.appendChild(div);
+    }
+}
+
+let currentAvailDay = null;
+
+function openAvailModal(day) {
+    currentAvailDay = day;
+    document.getElementById('avail-modal-title').textContent = `${day}. – Verfügbarkeit`;
+    document.getElementById('avail-time-fields').style.display = 'none';
+    document.getElementById('avail-modal').classList.add('open');
+}
+
+function closeAvailModal() {
+    document.getElementById('avail-modal').classList.remove('open');
+    currentAvailDay = null;
+}
+
+function setAvailStatus(status) {
+    if (status === 'partial') {
+        document.getElementById('avail-time-fields').style.display = 'block';
+        return;
+    }
+    selectedAvailDays[currentAvailDay] = { status };
+    renderAvailGrid(availDate.getFullYear(), availDate.getMonth());
+    closeAvailModal();
+}
+
+function confirmPartialAvail() {
+    const from = document.getElementById('avail-from').value;
+    const to = document.getElementById('avail-to').value;
+    selectedAvailDays[currentAvailDay] = { status: 'partial', from, to };
+    renderAvailGrid(availDate.getFullYear(), availDate.getMonth());
+    closeAvailModal();
+}
+
+function clearAvailDay() {
+    delete selectedAvailDays[currentAvailDay];
+    renderAvailGrid(availDate.getFullYear(), availDate.getMonth());
+    closeAvailModal();
+}
+
 async function loadAvailability() {
     const year = availDate.getFullYear();
     const month = availDate.getMonth();
     const monthStr = `${year}-${String(month+1).padStart(2,'0')}-01`;
-
     const monthNames = ['Januar','Februar','März','April','Mai','Juni',
                         'Juli','August','September','Oktober','November','Dezember'];
-    document.getElementById('avail-month-label').textContent = 
-        `${monthNames[month]} ${year}`;
+    document.getElementById('avail-month-label').textContent = `${monthNames[month]} ${year}`;
 
     const { data } = await db
         .from('availability')
@@ -411,33 +496,8 @@ async function loadAvailability() {
         .eq('month', monthStr)
         .maybeSingle();
 
-    selectedAvailDays = data ? data.available_days : [];
+    selectedAvailDays = (data && !Array.isArray(data.available_days)) ? data.available_days : {};
     renderAvailGrid(year, month);
-}
-
-function renderAvailGrid(year, month) {
-    const container = document.getElementById('avail-grid');
-    container.innerHTML = '';
-
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-    for (let d = 1; d <= daysInMonth; d++) {
-        const div = document.createElement('div');
-        div.className = 'avail-day' + (selectedAvailDays.includes(d) ? ' selected' : '');
-        div.textContent = d;
-        div.onclick = () => toggleAvailDay(d, div);
-        container.appendChild(div);
-    }
-}
-
-function toggleAvailDay(day, el) {
-    if (selectedAvailDays.includes(day)) {
-        selectedAvailDays = selectedAvailDays.filter(d => d !== day);
-        el.classList.remove('selected');
-    } else {
-        selectedAvailDays.push(day);
-        el.classList.add('selected');
-    }
 }
 
 async function saveAvailability() {
@@ -450,7 +510,7 @@ async function saveAvailability() {
         .select('id')
         .eq('employee_id', currentEmployee.id)
         .eq('month', monthStr)
-        .single();
+        .maybeSingle();
 
     if (existing) {
         await db.from('availability').update({
@@ -464,7 +524,6 @@ async function saveAvailability() {
             available_days: selectedAvailDays
         });
     }
-
     alert('Verfügbarkeit gespeichert! ✅');
 }
 

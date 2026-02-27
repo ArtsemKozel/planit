@@ -172,11 +172,11 @@
         </div>
         <div class="form-group">
             <label>Name</label>
-            <input type="text" id="new-emp-name" placeholder="Max Mustermann">
+            <input type="text" id="new-emp-name" placeholder="Max Mustermann" oninput="previewLoginCode()">
         </div>
         <div class="form-group">
-            <label>Mitarbeiter-Nummer</label>
-            <input type="text" id="new-emp-number" placeholder="z.B. 1002">
+            <label>Login-Kürzel (auto-generiert)</label>
+            <input type="text" id="new-emp-code" placeholder="z.B. MaMu" readonly style="background:#F5F5F5; color:#999;">
         </div>
         <div class="form-group">
             <label>Passwort</label>
