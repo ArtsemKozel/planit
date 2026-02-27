@@ -465,13 +465,18 @@ function changeAdminVacCalMonth(dir) {
 function populateAvailEmployeeSelect() {
     const select = document.getElementById('avail-employee-select');
     select.innerHTML = employees.length
-        ? employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('')
+        ? `<option value="all">Alle Mitarbeiter</option>` + employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('')
         : '<option>Keine Mitarbeiter</option>';
 }
 
 async function loadAdminAvailability() {
     const employeeId = document.getElementById('avail-employee-select').value;
     if (!employeeId) return;
+
+    if (employeeId === 'all') {
+        await loadAllAvailabilities();
+        return;
+    }
 
     const year = adminAvailDate.getFullYear();
     const month = adminAvailDate.getMonth();
@@ -539,6 +544,86 @@ async function loadAdminAvailability() {
 function changeAdminAvailMonth(dir) {
     adminAvailDate.setMonth(adminAvailDate.getMonth() + dir);
     loadAdminAvailability();
+}
+
+async function loadAllAvailabilities() {
+    const year = adminAvailDate.getFullYear();
+    const month = adminAvailDate.getMonth();
+    const monthStr = `${year}-${String(month+1).padStart(2,'0')}-01`;
+    const monthNames = ['Januar','Februar','März','April','Mai','Juni',
+                        'Juli','August','September','Oktober','November','Dezember'];
+    document.getElementById('admin-avail-month-label').textContent = `${monthNames[month]} ${year}`;
+
+    const container = document.getElementById('admin-avail-grid');
+    container.innerHTML = '';
+
+    for (const emp of employees) {
+        const { data } = await db
+            .from('availability')
+            .select('*')
+            .eq('employee_id', emp.id)
+            .eq('month', monthStr)
+            .maybeSingle();
+
+        const availDays = (data && !Array.isArray(data.available_days)) ? data.available_days : {};
+
+        // Mitarbeiter-Name als Titel
+        const title = document.createElement('div');
+        title.style.fontWeight = '700';
+        title.style.fontSize = '0.9rem';
+        title.style.margin = '1rem 0 0.5rem';
+        title.style.color = 'var(--color-primary)';
+        title.textContent = emp.name;
+        container.appendChild(title);
+
+        // Kalender
+        const grid = document.createElement('div');
+        grid.className = 'availability-grid';
+        grid.style.marginBottom = '1.5rem';
+
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const firstWeekday = new Date(year, month, 1).getDay();
+        const offset = firstWeekday === 0 ? 6 : firstWeekday - 1;
+
+        ['Mo','Di','Mi','Do','Fr','Sa','So'].forEach(d => {
+            const h = document.createElement('div');
+            h.className = 'calendar-day-header';
+            h.textContent = d;
+            grid.appendChild(h);
+        });
+
+        for (let i = 0; i < offset; i++) {
+            const empty = document.createElement('div');
+            empty.className = 'avail-day';
+            empty.style.visibility = 'hidden';
+            grid.appendChild(empty);
+        }
+
+        for (let d = 1; d <= daysInMonth; d++) {
+            const entry = availDays[d] || null;
+            const status = entry ? entry.status : null;
+
+            const div = document.createElement('div');
+            div.className = 'avail-day';
+            div.style.flexDirection = 'column';
+            div.style.fontSize = '0.75rem';
+            div.style.gap = '2px';
+            div.style.cursor = 'default';
+
+            if (status === 'full') div.style.background = '#C8E6C9';
+            else if (status === 'partial') div.style.background = '#FFF9C4';
+            else if (status === 'off') div.style.background = '#FFCDD2';
+
+            const timeLabel = (status === 'partial' && entry.from)
+                ? `<span style="font-size:0.6rem">${entry.from}-${entry.to}</span>`
+                : '';
+
+            div.innerHTML = `<span>${d}</span><span style="font-size:0.9rem">${status === 'full' ? '🟢' : status === 'partial' ? '🟡' : status === 'off' ? '🔴' : ''}</span>${timeLabel}`;
+            grid.appendChild(div);
+        }
+
+        container.appendChild(grid);
+    }
 }
 
 // ── TEAM ──────────────────────────────────────────────────

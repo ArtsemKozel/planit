@@ -634,3 +634,7 @@ select {
     background-position: right 1rem center;
     padding-right: 2.5rem;
 }
+
+#admin-avail-grid {
+    display: block;
+}
