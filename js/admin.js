@@ -657,7 +657,7 @@ function openNewEmployeeModal() {
     document.getElementById('employee-modal').classList.add('open');
     document.getElementById('emp-modal-error').style.display = 'none';
     document.getElementById('new-emp-name').value = '';
-    document.getElementById('new-emp-number').value = '';
+    document.getElementById('new-emp-code').value = '';
     document.getElementById('new-emp-password').value = '';
 }
 
