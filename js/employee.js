@@ -19,6 +19,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadSwaps();
     await loadOverview();
     await loadVacationCalendar();
+    const savedTab = localStorage.getItem('planit_emp_tab');
+    if (savedTab) switchTab(savedTab);
 });
 
 // ── TAB WECHSEL ───────────────────────────────────────────
@@ -30,6 +32,7 @@ function switchTab(tab) {
     if (navBtn) navBtn.classList.add('active');
     if (tab === 'schichtplan') loadWeekGrid();
     if (tab === 'profil') loadProfil();
+    localStorage.setItem('planit_emp_tab', tab);
 }
 
 // ── KALENDER ─────────────────────────────────────────────

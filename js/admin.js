@@ -17,6 +17,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     populateAvailEmployeeSelect();
     await loadAdminAvailability();
     await loadAdminVacationCalendar();
+    const savedTab = localStorage.getItem('planit_admin_tab');
+    if (savedTab) switchTab(savedTab);
 });
 
 // ── TAB WECHSEL ───────────────────────────────────────────
@@ -26,6 +28,7 @@ function switchTab(tab) {
     document.getElementById('tab-' + tab).classList.add('active');
     const navBtn = document.getElementById('nav-' + tab);
     if (navBtn) navBtn.classList.add('active');
+    localStorage.setItem('planit_admin_tab', tab);
 }
 
 // ── MITARBEITER LADEN ─────────────────────────────────────
