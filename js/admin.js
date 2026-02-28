@@ -834,3 +834,65 @@ async function deleteEmployee(id, name) {
     populateAvailEmployeeSelect();
     await loadWeekGrid();
 }
+
+let archiveVisible = false;
+
+async function toggleArchive() {
+    archiveVisible = !archiveVisible;
+    const container = document.getElementById('archive-list');
+    const btn = document.querySelector('[onclick="toggleArchive()"]');
+    
+    if (!archiveVisible) {
+        container.style.display = 'none';
+        btn.textContent = 'Anzeigen';
+        return;
+    }
+
+    btn.textContent = 'Ausblenden';
+    container.style.display = 'block';
+    await loadArchive();
+}
+
+async function loadArchive() {
+    const container = document.getElementById('archive-list');
+    
+    const { data } = await db
+        .from('employees_planit')
+        .select('*')
+        .eq('user_id', adminSession.user.id)
+        .eq('is_active', false)
+        .order('name');
+
+    if (!data || data.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>Keine archivierten Mitarbeiter.</p></div>';
+        return;
+    }
+
+    container.innerHTML = data.map(e => `
+        <div class="list-item">
+            <div class="list-item-info">
+                <h4 style="color:var(--color-text-light);">${e.name}</h4>
+                <p>${e.login_code || ''} · ${e.department || 'Allgemein'}</p>
+            </div>
+            <div style="display:flex; gap:0.5rem;">
+                <button class="btn-small btn-approve" onclick="restoreEmployee('${e.id}')">↩️</button>
+                <button class="btn-small btn-reject" onclick="permanentDeleteEmployee('${e.id}', '${e.name}')">🗑</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function restoreEmployee(id) {
+    await db.from('employees_planit').update({ is_active: true }).eq('id', id);
+    await loadEmployees();
+    await loadTeam();
+    populateAvailEmployeeSelect();
+    await loadWeekGrid();
+    await loadArchive();
+}
+
+async function permanentDeleteEmployee(id, name) {
+    if (!confirm(`${name} wirklich endgültig löschen? Diese Aktion kann nicht rückgängig gemacht werden.`)) return;
+    await db.from('employees_planit').delete().eq('id', id);
+    await loadArchive();
+}
