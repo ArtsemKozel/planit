@@ -631,19 +631,20 @@ async function loadAllAvailabilities() {
 // ── TEAM ──────────────────────────────────────────────────
 async function loadTeam() {
     const container = document.getElementById('team-list');
-
     if (employees.length === 0) {
         container.innerHTML = '<div class="empty-state"><p>Keine Mitarbeiter vorhanden.</p></div>';
         return;
     }
-
     container.innerHTML = employees.map(e => `
         <div class="list-item">
             <div class="list-item-info">
                 <h4>${e.name}</h4>
                 <p>${e.login_code} · ${e.department || 'Allgemein'}</p>
             </div>
-            <span class="badge badge-approved">Aktiv</span>
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+                <button class="btn-small btn-approve" onclick="openEditEmployeeModal('${e.id}')">✏️</button>
+                <button class="btn-small btn-reject" onclick="deleteEmployee('${e.id}', '${e.name}')">🗑</button>
+            </div>
         </div>
     `).join('');
 }
@@ -765,4 +766,67 @@ function generateLoginCode(name) {
 function previewLoginCode() {
     const name = document.getElementById('new-emp-name').value;
     document.getElementById('new-emp-code').value = name.trim() ? generateLoginCode(name) : '';
+}
+
+//-------------
+
+let editEmployeeId = null;
+
+function openEditEmployeeModal(id) {
+    const emp = employees.find(e => e.id === id);
+    if (!emp) return;
+    editEmployeeId = id;
+    document.getElementById('edit-emp-name').value = emp.name;
+    document.getElementById('edit-emp-code').value = emp.login_code || '';
+    document.getElementById('edit-emp-password').value = emp.password_hash || '';
+    document.getElementById('edit-emp-department').value = emp.department || 'Allgemein';
+    document.getElementById('edit-emp-error').style.display = 'none';
+    document.getElementById('edit-employee-modal').classList.add('open');
+}
+
+function closeEditEmployeeModal() {
+    document.getElementById('edit-employee-modal').classList.remove('open');
+    editEmployeeId = null;
+}
+
+async function submitEditEmployee() {
+    const name = document.getElementById('edit-emp-name').value.trim();
+    const loginCode = document.getElementById('edit-emp-code').value.trim();
+    const password = document.getElementById('edit-emp-password').value.trim();
+    const department = document.getElementById('edit-emp-department').value;
+    const errorDiv = document.getElementById('edit-emp-error');
+
+    errorDiv.style.display = 'none';
+
+    if (!name || !loginCode) {
+        errorDiv.textContent = 'Name und Kürzel sind Pflichtfelder.';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    const payload = { name, login_code: loginCode, department };
+    if (password) payload.password_hash = password;
+
+    const { error } = await db.from('employees_planit').update(payload).eq('id', editEmployeeId);
+
+    if (error) {
+        errorDiv.textContent = 'Fehler beim Speichern.';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    closeEditEmployeeModal();
+    await loadEmployees();
+    await loadTeam();
+    populateAvailEmployeeSelect();
+    await loadWeekGrid();
+}
+
+async function deleteEmployee(id, name) {
+    if (!confirm(`${name} wirklich löschen?`)) return;
+    await db.from('employees_planit').update({ is_active: false }).eq('id', id);
+    await loadEmployees();
+    await loadTeam();
+    populateAvailEmployeeSelect();
+    await loadWeekGrid();
 }
