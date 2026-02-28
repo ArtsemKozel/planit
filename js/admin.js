@@ -9,6 +9,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     adminSession = await requireAdminSession();
     if (!adminSession) return;
 
+    const savedTab = localStorage.getItem('planit_admin_tab');
+    if (savedTab) switchTab(savedTab);
+
     await loadEmployees();
     await loadWeekGrid();
     await loadAdminVacations();
@@ -17,8 +20,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     populateAvailEmployeeSelect();
     await loadAdminAvailability();
     await loadAdminVacationCalendar();
-    const savedTab = localStorage.getItem('planit_admin_tab');
-    if (savedTab) switchTab(savedTab);
 });
 
 // ── TAB WECHSEL ───────────────────────────────────────────

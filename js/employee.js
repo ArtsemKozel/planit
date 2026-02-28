@@ -9,8 +9,10 @@ let selectedAvailDays = {};
 document.addEventListener('DOMContentLoaded', async () => {
     currentEmployee = requireEmployeeSession();
     if (!currentEmployee) return;
-
     document.getElementById('employee-name').textContent = currentEmployee.name;
+
+    const savedTab = localStorage.getItem('planit_emp_tab');
+    if (savedTab) switchTab(savedTab);
 
     await loadWeekGrid();
     await loadVacations();
@@ -19,8 +21,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadSwaps();
     await loadOverview();
     await loadVacationCalendar();
-    const savedTab = localStorage.getItem('planit_emp_tab');
-    if (savedTab) switchTab(savedTab);
 });
 
 // ── TAB WECHSEL ───────────────────────────────────────────
