@@ -499,6 +499,7 @@ async function loadAdminAvailability() {
 
     const container = document.getElementById('admin-avail-grid');
     container.innerHTML = '';
+    container.classList.remove('all-view');
 
     // Wochentag-Header
     ['Mo','Di','Mi','Do','Fr','Sa','So'].forEach(d => {
@@ -556,6 +557,7 @@ async function loadAllAvailabilities() {
 
     const container = document.getElementById('admin-avail-grid');
     container.innerHTML = '';
+    container.classList.add('all-view');
 
     for (const emp of employees) {
         const { data } = await db

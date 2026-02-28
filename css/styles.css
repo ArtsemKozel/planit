@@ -636,5 +636,11 @@ select {
 }
 
 #admin-avail-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+}
+
+#admin-avail-grid.all-view {
     display: block;
 }
