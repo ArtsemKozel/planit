@@ -32,6 +32,7 @@ function switchTab(tab) {
     if (navBtn) navBtn.classList.add('active');
     if (tab === 'schichtplan') loadWeekGrid();
     if (tab === 'profil') loadProfil();
+    if (tab === 'stunden') loadMeineStunden();
     localStorage.setItem('planit_emp_tab', tab);
 }
 
@@ -755,4 +756,88 @@ async function changePassword() {
     successDiv.style.display = 'block';
     document.getElementById('new-password').value = '';
     document.getElementById('confirm-password').value = '';
+}
+
+// ============================================
+// MEINE STUNDEN
+// ============================================
+let stundenDate = new Date();
+
+function changeStundenMonth(dir) {
+    stundenDate.setMonth(stundenDate.getMonth() + dir);
+    loadMeineStunden();
+}
+
+async function loadMeineStunden() {
+    const session = JSON.parse(localStorage.getItem('planit_employee'));
+    if (!session) return;
+
+    const year = stundenDate.getFullYear();
+    const month = stundenDate.getMonth(); // 0-indexed
+    const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+    // Monatsname anzeigen
+    const label = stundenDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+    document.getElementById('stunden-month-label').textContent = label;
+
+    // Schichten laden
+    const firstDay = `${monthStr}-01`;
+    const lastDay = new Date(year, month + 1, 0).toISOString().split('T')[0];
+
+    const { data: shifts, error } = await db
+        .from('shifts')
+        .select('*')
+        .eq('employee_id', session.id)
+        .gte('shift_date', firstDay)
+        .lte('shift_date', lastDay)
+        .order('shift_date', { ascending: true });
+
+    if (error || !shifts) {
+        document.getElementById('stunden-list').innerHTML = '<div class="empty-state"><p>Fehler beim Laden.</p></div>';
+        return;
+    }
+
+    // Stunden berechnen
+    let totalMinutes = 0;
+    shifts.forEach(s => {
+        const [sh, sm] = s.start_time.split(':').map(Number);
+        const [eh, em] = s.end_time.split(':').map(Number);
+        const worked = (eh * 60 + em) - (sh * 60 + sm) - (s.break_minutes || 0);
+        totalMinutes += worked;
+    });
+
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+
+    document.getElementById('stunden-total').textContent = `${hours}h ${String(mins).padStart(2, '0')}m`;
+    document.getElementById('stunden-count').textContent = shifts.length;
+
+    // Liste rendern
+    if (shifts.length === 0) {
+        document.getElementById('stunden-list').innerHTML = '<div class="empty-state"><p>Keine Schichten in diesem Monat.</p></div>';
+        return;
+    }
+
+    const weekdays = ['So.', 'Mo.', 'Di.', 'Mi.', 'Do.', 'Fr.', 'Sa.'];
+    const html = shifts.map(s => {
+        const date = new Date(s.shift_date + 'T00:00:00');
+        const day = date.getDate();
+        const wd = weekdays[date.getDay()];
+        const start = s.start_time.slice(0, 5);
+        const end = s.end_time.slice(0, 5);
+        const noteText = s.notes ? `<div style="font-size:0.8rem; color:var(--color-text-light);">${s.notes}</div>` : '';
+        return `
+        <div style="display:flex; align-items:center; gap:1rem; margin-bottom:0.75rem;">
+            <div style="min-width:2.5rem; text-align:center;">
+                <div style="font-size:1.3rem; font-weight:700; color:var(--color-text-light);">${day}</div>
+                <div style="font-size:0.75rem; color:var(--color-text-light);">${wd}</div>
+            </div>
+            <div class="card" style="flex:1; margin-bottom:0; padding:0.75rem 1rem;">
+                <div style="font-weight:600;">${start} – ${end} Uhr</div>
+                ${noteText}
+            </div>
+        </div>`;
+    }).join('');
+
+    document.getElementById('stunden-list').innerHTML = html;
 }
