@@ -179,6 +179,9 @@ function openShiftModal(employeeId, dateStr, existingShift) {
     document.getElementById('shift-notes').value = existingShift ? existingShift.notes || '' : '';
     document.getElementById('shift-error').style.display = 'none';
 
+    const deleteBtn = document.getElementById('shift-delete-btn');
+    deleteBtn.style.display = existingShift ? 'block' : 'none';
+    
     document.getElementById('shift-modal').classList.add('open');
 }
 
@@ -227,6 +230,18 @@ async function submitShift() {
         return;
     }
 
+    closeShiftModal();
+    await loadWeekGrid();
+}
+
+async function deleteShift() {
+    if (!editShiftId) return;
+    if (!confirm('Schicht wirklich löschen?')) return;
+    const { error } = await db.from('shifts').delete().eq('id', editShiftId);
+    if (error) {
+        alert('Fehler beim Löschen!');
+        return;
+    }
     closeShiftModal();
     await loadWeekGrid();
 }
