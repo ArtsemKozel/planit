@@ -29,6 +29,7 @@ function switchTab(tab) {
     document.getElementById('tab-' + tab).classList.add('active');
     const navBtn = document.getElementById('nav-' + tab);
     if (navBtn) navBtn.classList.add('active');
+    if (tab === 'stunden') loadAdminStunden();
     localStorage.setItem('planit_admin_tab', tab);
 }
 
@@ -895,4 +896,150 @@ async function permanentDeleteEmployee(id, name) {
     if (!confirm(`${name} wirklich endgültig löschen? Diese Aktion kann nicht rückgängig gemacht werden.`)) return;
     await db.from('employees_planit').delete().eq('id', id);
     await loadArchive();
+}
+
+// ============================================
+// STUNDEN GENEHMIGEN
+// ============================================
+let adminStundenDate = new Date();
+
+function changeAdminStundenMonth(dir) {
+    adminStundenDate.setMonth(adminStundenDate.getMonth() + dir);
+    loadAdminStunden();
+}
+
+async function loadAdminStunden() {
+    const label = adminStundenDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+    document.getElementById('admin-stunden-month-label').textContent = label;
+
+    const year = adminStundenDate.getFullYear();
+    const month = adminStundenDate.getMonth();
+    const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+    const firstDay = `${monthStr}-01`;
+    const lastDay = new Date(year, month + 1, 0).toISOString().split('T')[0];
+
+    // Alle aktiven Mitarbeiter laden
+    const { data: employees } = await db
+        .from('employees_planit')
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
+
+    if (!employees || employees.length === 0) {
+        document.getElementById('admin-stunden-list').innerHTML = '<div class="empty-state"><p>Keine Mitarbeiter vorhanden.</p></div>';
+        return;
+    }
+
+    // Alle Schichten des Monats laden
+    const { data: shifts } = await db
+        .from('shifts')
+        .select('*')
+        .gte('shift_date', firstDay)
+        .lte('shift_date', lastDay);
+
+    // Genehmigte Stunden laden
+    const { data: approved } = await db
+        .from('approved_hours')
+        .select('*')
+        .eq('month', monthStr);
+
+    const html = employees.map(emp => {
+        // Geplante Stunden berechnen
+        const empShifts = (shifts || []).filter(s => s.employee_id === emp.id);
+        let plannedMinutes = 0;
+        empShifts.forEach(s => {
+            const [sh, sm] = s.start_time.split(':').map(Number);
+            const [eh, em] = s.end_time.split(':').map(Number);
+            plannedMinutes += (eh * 60 + em) - (sh * 60 + sm) - (s.break_minutes || 0);
+        });
+        const ph = Math.floor(plannedMinutes / 60);
+        const pm = plannedMinutes % 60;
+
+        // Genehmigte Stunden
+        const approvedEntry = (approved || []).find(a => a.employee_id === emp.id);
+        const approvedMinutes = approvedEntry ? approvedEntry.approved_minutes : null;
+        const ah = approvedMinutes !== null ? Math.floor(approvedMinutes / 60) : '–';
+        const am = approvedMinutes !== null ? String(approvedMinutes % 60).padStart(2, '0') : '';
+        const approvedDisplay = approvedMinutes !== null ? `${ah}h ${am}m` : '–';
+
+        return `
+        <div class="card" style="margin-bottom:0.75rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+                <div style="font-weight:600;">${emp.name}</div>
+                <div style="font-size:0.8rem; color:var(--color-text-light);">${emp.department}</div>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.75rem;">
+                <div>
+                    <div style="font-size:0.75rem; color:var(--color-text-light);">GEPLANT</div>
+                    <div style="font-weight:600; color:var(--color-primary);">${ph}h ${String(pm).padStart(2,'0')}m</div>
+                </div>
+                <div>
+                    <div style="font-size:0.75rem; color:var(--color-text-light);">GENEHMIGT</div>
+                    <div style="font-weight:600;">${approvedDisplay}</div>
+                </div>
+                <div style="display:flex; align-items:flex-end;">
+                    <button class="btn-secondary" style="width:auto; font-size:0.85rem; padding:0.4rem 0.75rem;" 
+                        data-empid="${emp.id}" data-name="${emp.name}" data-month="${monthStr}" data-minutes="${approvedMinutes !== null ? approvedMinutes : 0}" onclick="openApproveModal(this)">
+                        Eintragen
+                    </button>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+
+    document.getElementById('admin-stunden-list').innerHTML = html;
+}
+
+function openApproveModal(btn) {
+    const employeeId = btn.dataset.empid;
+    const name = btn.dataset.name;
+    const month = btn.dataset.month;
+    const currentMinutes = parseInt(btn.dataset.minutes) || 0;
+    document.getElementById('approve-modal-title').textContent = name;
+    document.getElementById('approve-employee-id').value = employeeId;
+    document.getElementById('approve-month').value = month;
+    const h = Math.floor(currentMinutes / 60);
+    const m = currentMinutes % 60;
+    document.getElementById('approve-hours').value = h;
+    document.getElementById('approve-minutes').value = m;
+    document.getElementById('approve-modal').classList.add('active');
+}
+
+function closeApproveModal() {
+    document.getElementById('approve-modal').classList.remove('active');
+}
+
+async function saveApprovedHours() {
+    const employeeId = document.getElementById('approve-employee-id').value;
+    const month = document.getElementById('approve-month').value;
+    const hours = parseInt(document.getElementById('approve-hours').value) || 0;
+    const minutes = parseInt(document.getElementById('approve-minutes').value) || 0;
+    const totalMinutes = hours * 60 + minutes;
+
+    const { data: existing } = await db
+        .from('approved_hours')
+        .select('id')
+        .eq('employee_id', employeeId)
+        .eq('month', month)
+        .maybeSingle();
+
+    let error;
+    if (existing) {
+        ({ error } = await db
+            .from('approved_hours')
+            .update({ approved_minutes: totalMinutes })
+            .eq('id', existing.id));
+    } else {
+        ({ error } = await db
+            .from('approved_hours')
+            .insert({ employee_id: employeeId, month, approved_minutes: totalMinutes, user_id: (await db.auth.getUser()).data.user.id }));
+    }
+
+    if (error) {
+        alert('Fehler beim Speichern!');
+        return;
+    }
+
+    closeApproveModal();
+    loadAdminStunden();
 }

@@ -239,6 +239,10 @@ label {
     display: flex;
 }
 
+.modal-overlay.active {
+    display: flex;
+}
+
 .modal {
     background: white;
     border-radius: 16px;

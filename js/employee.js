@@ -773,17 +773,16 @@ async function loadMeineStunden() {
     if (!session) return;
 
     const year = stundenDate.getFullYear();
-    const month = stundenDate.getMonth(); // 0-indexed
+    const month = stundenDate.getMonth();
     const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
 
-    // Monatsname anzeigen
     const label = stundenDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
     document.getElementById('stunden-month-label').textContent = label;
 
-    // Schichten laden
     const firstDay = `${monthStr}-01`;
     const lastDay = new Date(year, month + 1, 0).toISOString().split('T')[0];
 
+    // Schichten laden
     const { data: shifts, error } = await db
         .from('shifts')
         .select('*')
@@ -797,22 +796,40 @@ async function loadMeineStunden() {
         return;
     }
 
-    // Stunden berechnen
+    // Geplante Stunden berechnen
     let totalMinutes = 0;
     shifts.forEach(s => {
         const [sh, sm] = s.start_time.split(':').map(Number);
         const [eh, em] = s.end_time.split(':').map(Number);
-        const worked = (eh * 60 + em) - (sh * 60 + sm) - (s.break_minutes || 0);
-        totalMinutes += worked;
+        totalMinutes += (eh * 60 + em) - (sh * 60 + sm) - (s.break_minutes || 0);
     });
+    const ph = Math.floor(totalMinutes / 60);
+    const pm = String(totalMinutes % 60).padStart(2, '0');
 
-    const hours = Math.floor(totalMinutes / 60);
-    const mins = totalMinutes % 60;
+    // Genehmigte Stunden laden
+    const { data: approved } = await db
+        .from('approved_hours')
+        .select('*')
+        .eq('employee_id', session.id)
+        .eq('month', monthStr)
+        .maybeSingle();
 
-    document.getElementById('stunden-total').textContent = `${hours}h ${String(mins).padStart(2, '0')}m`;
+    console.log('Session ID:', session.id);
+    console.log('Approved:', approved);
+
+    // Anzeige
+    if (approved) {
+        const ah = Math.floor(approved.approved_minutes / 60);
+        const am = String(approved.approved_minutes % 60).padStart(2, '0');
+        document.getElementById('stunden-total').innerHTML = `
+            <span style="color:var(--color-primary);">${ph}h ${pm}m</span>
+            <span style="color:var(--color-text-light); font-size:1.2rem;"> / ${ah}h ${am}m</span>`;
+    } else {
+        document.getElementById('stunden-total').textContent = `${ph}h ${pm}m`;
+    }
+
     document.getElementById('stunden-count').textContent = shifts.length;
 
-    // Liste rendern
     if (shifts.length === 0) {
         document.getElementById('stunden-list').innerHTML = '<div class="empty-state"><p>Keine Schichten in diesem Monat.</p></div>';
         return;
