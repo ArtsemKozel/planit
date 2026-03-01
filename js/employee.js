@@ -814,9 +814,6 @@ async function loadMeineStunden() {
         .eq('month', monthStr)
         .maybeSingle();
 
-    console.log('Session ID:', session.id);
-    console.log('Approved:', approved);
-
     // Anzeige
     if (approved) {
         const ah = Math.floor(approved.approved_minutes / 60);
