@@ -664,3 +664,12 @@ select {
     transition: height 0.2s;
     padding: 0;
 }
+
+.calendar-day.holiday {
+    background: #F5F5F5;
+    color: var(--color-text-light);
+}
+.calendar-day.holiday span {
+    color: #E07070;
+    font-weight: 600;
+}

@@ -23,6 +23,44 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadVacationCalendar();
 });
 
+function getBWHolidays(year) {
+    return [
+        `${year}-01-01`, // Neujahr
+        `${year}-01-06`, // Heilige Drei Könige
+        // Ostern dynamisch berechnen
+        ...getEasterDates(year),
+        `${year}-05-01`, // Tag der Arbeit
+        `${year}-10-03`, // Tag der Deutschen Einheit
+        `${year}-11-01`, // Allerheiligen
+        `${year}-12-25`, // 1. Weihnachtstag
+        `${year}-12-26`, // 2. Weihnachtstag
+    ];
+}
+
+function getEasterDates(year) {
+    // Gaußsche Osterformel
+    const a = year % 19, b = Math.floor(year/100), c = year % 100;
+    const d = Math.floor(b/4), e = b % 4, f = Math.floor((b+8)/25);
+    const g = Math.floor((b-f+1)/3), h = (19*a+b-d-g+15) % 30;
+    const i = Math.floor(c/4), k = c % 4;
+    const l = (32+2*e+2*i-h-k) % 7;
+    const m = Math.floor((a+11*h+22*l)/451);
+    const month = Math.floor((h+l-7*m+114)/31);
+    const day = ((h+l-7*m+114) % 31) + 1;
+    const easter = new Date(year, month-1, day);
+    
+    const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate()+n); return r.toISOString().split('T')[0]; };
+    return [
+        addDays(easter, -2), // Karfreitag
+        addDays(easter, 0),  // Ostersonntag
+        addDays(easter, 1),  // Ostermontag
+        addDays(easter, 39), // Christi Himmelfahrt
+        addDays(easter, 49), // Pfingstsonntag
+        addDays(easter, 50), // Pfingstmontag
+        addDays(easter, 60), // Fronleichnam
+    ];
+}
+
 // ── TAB WECHSEL ───────────────────────────────────────────
 function switchTab(tab) {
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -87,10 +125,13 @@ function renderWeekGrid(days, shifts, colleagues) {
     grid.appendChild(corner);
 
     // Tag-Header
+    const weekHolidays = getBWHolidays(days[0].getFullYear());
     days.forEach((d, i) => {
+        const dateStr = d.toISOString().split('T')[0];
+        const isHoliday = weekHolidays.includes(dateStr);
         const header = document.createElement('div');
         header.className = 'week-header';
-        header.innerHTML = `${dayNames[i]}<br><small>${d.getDate()}.${d.getMonth()+1}.</small>`;
+        header.innerHTML = `${dayNames[i]}<br><small style="color:${isHoliday ? '#E07070' : 'inherit'};">${d.getDate()}.${d.getMonth()+1}.${isHoliday ? ' 🎌' : ''}</small>`;
         grid.appendChild(header);
     });
 
@@ -205,11 +246,13 @@ function renderVacationCalendar(year, month, vacations) {
 
     // Tage
     for (let d = 1; d <= daysInMonth; d++) {
+        const holidays = getBWHolidays(year);
         const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         const dayVacations = vacations.filter(v => v.start_date <= dateStr && v.end_date >= dateStr);
 
+        const isHoliday = holidays.includes(dateStr);
         const dayEl = document.createElement('div');
-        dayEl.className = 'calendar-day';
+        dayEl.className = 'calendar-day' + (isHoliday ? ' holiday' : '');
         dayEl.style.position = 'relative';
         dayEl.style.flexDirection = 'column';
         dayEl.style.gap = '2px';
