@@ -93,6 +93,7 @@
 
     <!-- TAB 4: TEAM -->
     <div id="tab-team" class="tab-content">
+        <div id="birthdays-this-month" style="margin-bottom:1.5rem;"></div>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
             <div class="section-title" style="margin-bottom:0;">Team-Übersicht</div>
             <button class="btn-primary" style="width:auto;" onclick="openNewEmployeeModal()">+ Mitarbeiter</button>
@@ -124,7 +125,7 @@
         <div class="section-title">Mehr</div>
         <div class="mehr-list">
             <div class="mehr-item" onclick="switchTab('stunden')">
-                <span>Stunden genehmigen</span>
+                <span>Geleistete Stunden</span>
                 <span>›</span>
             </div>
             <div class="mehr-item" onclick="switchTab('verfuegbarkeit')">
@@ -145,7 +146,7 @@
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
                 Mehr
             </button>
-            <div style="font-size:1.1rem; font-weight:700; color:var(--color-text);">Stunden genehmigen</div>
+            <div style="font-size:1.1rem; font-weight:700; color:var(--color-text);">Geleistete Stunden</div>
             <div></div>
         </div>
 
@@ -229,6 +230,10 @@
                 <option value="Bar">Bar</option>
             </select>
         </div>
+        <div class="form-group">
+            <label>Geburtsdatum (optional)</label>
+            <input type="date" id="new-emp-birthdate">
+        </div>
         <div id="emp-modal-error" style="color:var(--color-red); font-size:0.85rem; margin-bottom:1rem; display:none;"></div>
         <button class="btn-primary" onclick="submitNewEmployee()">Mitarbeiter anlegen</button>
     </div>
@@ -276,6 +281,10 @@
                 <option value="Service">Service</option>
                 <option value="Bar">Bar</option>
             </select>
+        </div>
+        <div class="form-group">
+            <label>Geburtsdatum (optional)</label>
+            <input type="date" id="edit-emp-birthdate">
         </div>
         <div id="edit-emp-error" style="color:var(--color-red); font-size:0.85rem; margin-bottom:1rem; display:none;"></div>
         <button class="btn-primary" onclick="submitEditEmployee()">Speichern</button>

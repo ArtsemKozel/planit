@@ -806,7 +806,7 @@ async function loadMeineStunden() {
     const ph = Math.floor(totalMinutes / 60);
     const pm = String(totalMinutes % 60).padStart(2, '0');
 
-    // Genehmigte Stunden laden
+    // Geleistete Stunden laden
     const { data: approved } = await db
         .from('approved_hours')
         .select('*')
@@ -819,8 +819,11 @@ async function loadMeineStunden() {
         const ah = Math.floor(approved.approved_minutes / 60);
         const am = String(approved.approved_minutes % 60).padStart(2, '0');
         document.getElementById('stunden-total').innerHTML = `
-            <span style="color:var(--color-primary);">${ph}h ${pm}m</span>
-            <span style="color:var(--color-text-light); font-size:1.2rem;"> / ${ah}h ${am}m</span>`;
+                <span style="color:var(--color-primary);">${ph}h ${pm}m</span>
+                <span style="color:var(--color-text-light); font-size:1rem;"> Geplant</span>
+                <br>
+                <span style="font-weight:700;">${ah}h ${am}m</span>
+                <span style="color:var(--color-text-light); font-size:1rem;"> Geleistet</span>`;
     } else {
         document.getElementById('stunden-total').textContent = `${ph}h ${pm}m`;
     }

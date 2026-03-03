@@ -650,6 +650,34 @@ async function loadAllAvailabilities() {
 
 // ── TEAM ──────────────────────────────────────────────────
 async function loadTeam() {
+    // Geburtstage diesen Monat
+    const thisMonth = new Date().getMonth() + 1;
+    const birthdays = employees.filter(e => {
+        if (!e.birthdate) return false;
+        const bMonth = parseInt(e.birthdate.split('-')[1]);
+        return bMonth === thisMonth;
+    });
+
+    const bdContainer = document.getElementById('birthdays-this-month');
+    if (birthdays.length > 0) {
+        const monthName = new Date().toLocaleDateString('de-DE', { month: 'long' });
+        bdContainer.innerHTML = `
+            <div class="card" style="background:#FFF9EC; border-left:3px solid var(--color-primary);">
+                <div style="font-size:0.8rem; color:var(--color-text-light); margin-bottom:0.5rem;">🎂 GEBURTSTAGE IM ${monthName.toUpperCase()}</div>
+                ${birthdays.map(e => {
+                    const date = new Date(e.birthdate + 'T00:00:00');
+                    const day = date.getDate();
+                    const month = date.toLocaleDateString('de-DE', { month: 'long' });
+                    return `<div style="display:flex; justify-content:space-between; padding:0.25rem 0;">
+                        <span style="font-weight:600;">${e.name}</span>
+                        <span style="color:var(--color-text-light);">${day}. ${month}</span>
+                    </div>`;
+                }).join('')}
+            </div>`;
+    } else {
+        bdContainer.innerHTML = '';
+    }
+    
     const container = document.getElementById('team-list');
     if (employees.length === 0) {
         container.innerHTML = '<div class="empty-state"><p>Keine Mitarbeiter vorhanden.</p></div>';
@@ -659,7 +687,7 @@ async function loadTeam() {
         <div class="list-item">
             <div class="list-item-info">
                 <h4>${e.name}</h4>
-                <p>${e.login_code} · ${e.department || 'Allgemein'}</p>
+                <p>${e.login_code} · ${e.department || 'Allgemein'}${e.birthdate ? ' · 🎂 ' + new Date(e.birthdate + 'T00:00:00').toLocaleDateString('de-DE', {day:'numeric', month:'long'}) : ''}</p>
             </div>
             <div style="display:flex; gap:0.5rem; align-items:center;">
                 <button class="btn-small btn-approve" onclick="openEditEmployeeModal('${e.id}')">✏️</button>
@@ -697,13 +725,15 @@ async function submitNewEmployee() {
 
     const department = document.getElementById('new-emp-department').value;
 
+    const birthdate = document.getElementById('new-emp-birthdate').value || null;
     const { error } = await db.from('employees_planit').insert({
         user_id: adminSession.user.id,
         name,
         login_code: loginCode,
         password_hash: password,
         department: department,
-        is_active: true
+        is_active: true,
+        birthdate
     });
 
     if (error) {
@@ -801,6 +831,7 @@ function openEditEmployeeModal(id) {
     document.getElementById('edit-emp-password').value = emp.password_hash || '';
     document.getElementById('edit-emp-department').value = emp.department || 'Allgemein';
     document.getElementById('edit-emp-error').style.display = 'none';
+    document.getElementById('edit-emp-birthdate').value = emp.birthdate || '';
     document.getElementById('edit-employee-modal').classList.add('open');
 }
 
@@ -824,7 +855,8 @@ async function submitEditEmployee() {
         return;
     }
 
-    const payload = { name, login_code: loginCode, department };
+    const birthdate = document.getElementById('edit-emp-birthdate').value || null;
+    const payload = { name, login_code: loginCode, department, birthdate };
     if (password) payload.password_hash = password;
 
     const { error } = await db.from('employees_planit').update(payload).eq('id', editEmployeeId);
@@ -952,7 +984,7 @@ async function loadAdminStunden() {
         .gte('shift_date', firstDay)
         .lte('shift_date', lastDay);
 
-    // Genehmigte Stunden laden
+    // Geleistete Stunden laden
     const { data: approved } = await db
         .from('approved_hours')
         .select('*')
@@ -970,7 +1002,7 @@ async function loadAdminStunden() {
         const ph = Math.floor(plannedMinutes / 60);
         const pm = plannedMinutes % 60;
 
-        // Genehmigte Stunden
+        // Geleistete Stunden
         const approvedEntry = (approved || []).find(a => a.employee_id === emp.id);
         const approvedMinutes = approvedEntry ? approvedEntry.approved_minutes : null;
         const ah = approvedMinutes !== null ? Math.floor(approvedMinutes / 60) : '–';
@@ -989,7 +1021,7 @@ async function loadAdminStunden() {
                     <div style="font-weight:600; color:var(--color-primary);">${ph}h ${String(pm).padStart(2,'0')}m</div>
                 </div>
                 <div>
-                    <div style="font-size:0.75rem; color:var(--color-text-light);">GENEHMIGT</div>
+                    <div style="font-size:0.75rem; color:var(--color-text-light);">GELEISTET</div>
                     <div style="font-weight:600;">${approvedDisplay}</div>
                 </div>
                 <div style="display:flex; align-items:flex-end;">
