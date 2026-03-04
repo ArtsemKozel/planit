@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     populateAvailEmployeeSelect();
     await loadAdminAvailability();
     await loadAdminVacationCalendar();
+    await loadRequestsBadge();
 });
 
 function getBWHolidays(year) {
@@ -1304,4 +1305,19 @@ async function approveRequest(requestId, shiftId, employeeId) {
 async function rejectRequest(requestId) {
     await db.from('open_shift_requests').update({ status: 'rejected' }).eq('id', requestId);
     await loadRequests();
+}
+
+async function loadRequestsBadge() {
+    const { data } = await db
+        .from('open_shift_requests')
+        .select('id')
+        .eq('status', 'pending');
+    
+    const badge = document.getElementById('requests-badge');
+    if (data && data.length > 0) {
+        badge.textContent = data.length;
+        badge.style.display = 'inline';
+    } else {
+        badge.style.display = 'none';
+    }
 }

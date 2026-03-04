@@ -982,3 +982,42 @@ async function submitShiftRequest() {
     closeRequestModal();
     alert('Request gesendet! Der Admin wird benachrichtigt.');
 }
+
+async function loadMyRequests() {
+    const session = JSON.parse(localStorage.getItem('planit_employee'));
+    if (!session) return;
+
+    const { data: requests } = await db
+        .from('open_shift_requests')
+        .select('*, shifts(shift_date, start_time, end_time, department)')
+        .eq('employee_id', session.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+    if (!requests || requests.length === 0) {
+        document.getElementById('my-requests-list').innerHTML = '<div class="empty-state"><p>Keine Requests vorhanden.</p></div>';
+        return;
+    }
+
+    const html = requests.map(r => {
+        const date = new Date(r.shifts.shift_date + 'T00:00:00').toLocaleDateString('de-DE', {day:'numeric', month:'long'});
+        const time = `${r.shifts.start_time.slice(0,5)} – ${r.shifts.end_time.slice(0,5)} Uhr`;
+        const dept = r.shifts.department || '';
+        let statusHtml = '';
+        if (r.status === 'pending') statusHtml = '<span style="color:#C9A24D; font-weight:600;">⏳ Ausstehend</span>';
+        if (r.status === 'approved') statusHtml = '<span style="color:var(--color-green); font-weight:600;">✓ Genehmigt</span>';
+        if (r.status === 'rejected') statusHtml = '<span style="color:var(--color-red); font-weight:600;">✕ Abgelehnt</span>';
+        return `
+        <div class="card" style="margin-bottom:0.75rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div style="font-weight:600;">${date}</div>
+                    <div style="font-size:0.85rem; color:var(--color-text-light);">${time} · ${dept}</div>
+                </div>
+                <div>${statusHtml}</div>
+            </div>
+        </div>`;
+    }).join('');
+
+    document.getElementById('my-requests-list').innerHTML = html;
+}
