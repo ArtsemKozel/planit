@@ -673,3 +673,10 @@ select {
     color: #E07070;
     font-weight: 600;
 }
+
+.week-cell.open-shift {
+    background: #F5E0E0;
+    color: #C97E7E;
+    font-size: 0.7rem;
+    font-weight: 600;
+}

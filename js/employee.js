@@ -151,8 +151,8 @@ function renderWeekGrid(days, shifts, colleagues) {
             const shift = shifts.find(s => s.employee_id === emp.id && s.shift_date === dateStr);
             const cell = document.createElement('div');
             const isOwn = emp.id === currentEmployee.id;
-            cell.className = 'week-cell' + (shift ? ' has-shift' : '');
-            if (shift && isOwn) cell.style.background = 'var(--color-primary)';
+            cell.className = 'week-cell' + (shift ? (shift.is_open ? ' open-shift' : ' has-shift') : '');
+            if (shift && isOwn && !shift.is_open) cell.style.background = 'var(--color-primary)';
             cell.textContent = shift ? `${shift.start_time.slice(0,5)}\n${shift.end_time.slice(0,5)}` : '';
             cell.style.whiteSpace = 'pre';
             grid.appendChild(cell);

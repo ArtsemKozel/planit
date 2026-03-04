@@ -130,6 +130,8 @@ function renderWeekGrid(days, shifts) {
         grid.appendChild(header);
     });
 
+    // Offene Schichten Zeile
+    
     // Mitarbeiter-Zeilen
     // Mitarbeiter-Zeilen gruppiert nach Abteilung
     if (employees.length === 0) {
@@ -157,8 +159,28 @@ function renderWeekGrid(days, shifts) {
         deptRow.textContent = dept.toUpperCase();
         grid.appendChild(deptRow);
 
-        const deptEmployees = employees.filter(e => (e.department || 'Allgemein') === dept);
+        // Offene Schichten Zeile ganz oben in der Abteilung
+        const deptOpenShifts = shifts.filter(s => s.is_open && s.department === dept);
+        const openEmpCell = document.createElement('div');
+        openEmpCell.className = 'week-employee';
+        openEmpCell.style.color = '#C97E7E';
+        openEmpCell.style.fontWeight = '700';
+        openEmpCell.textContent = 'Offen';
+        grid.appendChild(openEmpCell);
 
+        days.forEach(d => {
+            const dateStr = d.toISOString().split('T')[0];
+            const shift = deptOpenShifts.find(s => s.shift_date === dateStr);
+            const cell = document.createElement('div');
+            cell.className = 'week-cell' + (shift ? ' open-shift' : '');
+            cell.textContent = shift ? `${shift.start_time.slice(0,5)}\n${shift.end_time.slice(0,5)}` : '+';
+            cell.style.whiteSpace = 'pre';
+            cell.onclick = () => openOpenShiftModal(dateStr, dept, shift || null);
+            grid.appendChild(cell);
+        });
+
+        // Mitarbeiter Zeilen
+        const deptEmployees = employees.filter(e => (e.department || 'Allgemein') === dept);
         deptEmployees.forEach(emp => {
             const empCell = document.createElement('div');
             empCell.className = 'week-employee';
@@ -172,7 +194,6 @@ function renderWeekGrid(days, shifts) {
             days.forEach(d => {
                 const dateStr = d.toISOString().split('T')[0];
                 const shift = shifts.find(s => s.employee_id === emp.id && s.shift_date === dateStr);
-
                 const cell = document.createElement('div');
                 cell.className = 'week-cell' + (shift ? ' has-shift' : '');
                 cell.textContent = shift ? `${shift.start_time.slice(0,5)}\n${shift.end_time.slice(0,5)}` : '+';
@@ -220,6 +241,13 @@ function openShiftModal(employeeId, dateStr, existingShift) {
     const deleteBtn = document.getElementById('shift-delete-btn');
     deleteBtn.style.display = existingShift ? 'block' : 'none';
     
+    document.getElementById('shift-is-open').checked = existingShift ? (existingShift.is_open || false) : false;
+    document.getElementById('shift-open-note').value = existingShift ? (existingShift.open_note || '') : '';
+    document.getElementById('shift-employee').disabled = existingShift?.is_open || false;
+    document.getElementById('shift-employee').closest('.form-group').style.opacity = existingShift?.is_open ? '0.4' : '1';
+    document.getElementById('shift-open-note-group').style.display = existingShift?.is_open ? 'block' : 'none';
+    document.getElementById('shift-dept-group').style.display = existingShift?.is_open ? 'block' : 'none';
+    document.getElementById('shift-department').value = existingShift?.department || 'Service';
     document.getElementById('shift-modal').classList.add('open');
 }
 
@@ -245,14 +273,18 @@ async function submitShift() {
         return;
     }
 
+    const isOpen = document.getElementById('shift-is-open').checked;
     const payload = {
         user_id: adminSession.user.id,
-        employee_id: employeeId,
+        employee_id: isOpen ? null : employeeId,
         shift_date: date,
         start_time: start,
         end_time: end,
         break_minutes: breakMin ? parseInt(breakMin) : 0,
-        notes: notes || null
+        notes: notes || null,
+        is_open: isOpen,
+        open_note: isOpen ? (document.getElementById('shift-open-note').value || null) : null,
+        department: isOpen ? document.getElementById('shift-department').value : null
     };
 
     let error;
@@ -1128,4 +1160,87 @@ async function saveApprovedHours() {
 
     closeApproveModal();
     loadAdminStunden();
+}
+
+function toggleOpenShift() {
+    const isOpen = document.getElementById('shift-is-open').checked;
+    document.getElementById('shift-employee').closest('.form-group').style.opacity = isOpen ? '0.4' : '1';
+    document.getElementById('shift-employee').disabled = isOpen;
+    document.getElementById('shift-open-note-group').style.display = isOpen ? 'block' : 'none';
+    document.getElementById('shift-dept-group').style.display = isOpen ? 'block' : 'none';
+}
+
+// ============================================
+// OFFENE SCHICHTEN
+// ============================================
+let openShiftData = null; // { dateStr, dept, existingShift }
+
+function openOpenShiftModal(dateStr, dept, existingShift) {
+    openShiftData = { dateStr, dept, existingShift };
+    document.getElementById('open-shift-modal-title').textContent = 
+        `Offen – ${dept} – ${new Date(dateStr + 'T00:00:00').toLocaleDateString('de-DE', {day:'numeric', month:'short'})}`;
+    document.getElementById('open-shift-start').value = existingShift ? existingShift.start_time.slice(0,5) : '08:00';
+    document.getElementById('open-shift-end').value = existingShift ? existingShift.end_time.slice(0,5) : '16:00';
+    document.getElementById('open-shift-break').value = existingShift ? existingShift.break_minutes : 30;
+    document.getElementById('open-shift-note').value = existingShift ? (existingShift.open_note || '') : '';
+    document.getElementById('open-shift-error').style.display = 'none';
+    document.getElementById('open-shift-delete-btn').style.display = existingShift ? 'block' : 'none';
+    document.getElementById('open-shift-modal').classList.add('active');
+}
+
+function closeOpenShiftModal() {
+    document.getElementById('open-shift-modal').classList.remove('active');
+    openShiftData = null;
+}
+
+async function submitOpenShift() {
+    const start = document.getElementById('open-shift-start').value;
+    const end = document.getElementById('open-shift-end').value;
+    const breakMin = document.getElementById('open-shift-break').value;
+    const note = document.getElementById('open-shift-note').value;
+    const errorDiv = document.getElementById('open-shift-error');
+    errorDiv.style.display = 'none';
+
+    if (!start || !end) {
+        errorDiv.textContent = 'Bitte Von und Bis ausfüllen.';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    const payload = {
+        user_id: adminSession.user.id,
+        employee_id: null,
+        shift_date: openShiftData.dateStr,
+        start_time: start,
+        end_time: end,
+        break_minutes: breakMin ? parseInt(breakMin) : 0,
+        is_open: true,
+        open_note: note || null,
+        department: openShiftData.dept
+    };
+
+    let error;
+    if (openShiftData.existingShift) {
+        ({ error } = await db.from('shifts').update(payload).eq('id', openShiftData.existingShift.id));
+    } else {
+        ({ error } = await db.from('shifts').insert(payload));
+    }
+
+    if (error) {
+        errorDiv.textContent = 'Fehler beim Speichern.';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    closeOpenShiftModal();
+    await loadWeekGrid();
+}
+
+async function deleteOpenShift() {
+    if (!openShiftData?.existingShift) return;
+    if (!confirm('Offene Schicht wirklich löschen?')) return;
+    const { error } = await db.from('shifts').delete().eq('id', openShiftData.existingShift.id);
+    if (error) { alert('Fehler beim Löschen!'); return; }
+    closeOpenShiftModal();
+    await loadWeekGrid();
 }

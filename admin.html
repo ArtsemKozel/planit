@@ -177,6 +177,25 @@
             <select id="shift-employee"></select>
         </div>
         <div class="form-group">
+            <div style="display:flex; align-items:center; gap:0.75rem;">
+                <input type="checkbox" id="shift-is-open" style="width:auto;" onchange="toggleOpenShift()">
+                <label style="margin:0;">Schicht ist offen</label>
+            </div>
+        </div>
+        <div id="shift-dept-group" class="form-group" style="display:none;">
+            <label>Abteilung</label>
+            <select id="shift-department">
+                <option value="Service">Service</option>
+                <option value="Küche">Küche</option>
+                <option value="Bar">Bar</option>
+                <option value="Allgemein">Allgemein</option>
+            </select>
+        </div>
+        <div id="shift-open-note-group" class="form-group" style="display:none;">
+            <label>Notiz für Mitarbeiter (optional)</label>
+            <input type="text" id="shift-open-note" placeholder="z.B. Verstärkung gesucht">
+        </div>
+        <div class="form-group">
             <label>Datum</label>
             <input type="date" id="shift-date">
         </div>
@@ -311,6 +330,35 @@
             </div>
         </div>
         <button class="btn-primary" onclick="saveApprovedHours()">Speichern</button>
+    </div>
+</div>
+
+<!-- MODAL: OFFENE SCHICHT -->
+<div id="open-shift-modal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title" id="open-shift-modal-title">Offene Schicht</div>
+            <button class="modal-close" onclick="closeOpenShiftModal()">✕</button>
+        </div>
+        <div class="form-group">
+            <label>Von</label>
+            <input type="time" id="open-shift-start">
+        </div>
+        <div class="form-group">
+            <label>Bis</label>
+            <input type="time" id="open-shift-end">
+        </div>
+        <div class="form-group">
+            <label>Pause (Minuten)</label>
+            <input type="number" id="open-shift-break" placeholder="z.B. 30" min="0">
+        </div>
+        <div class="form-group">
+            <label>Notiz (optional)</label>
+            <input type="text" id="open-shift-note" placeholder="z.B. Verstärkung gesucht">
+        </div>
+        <div id="open-shift-error" style="color:var(--color-red); font-size:0.85rem; margin-bottom:1rem; display:none;"></div>
+        <button id="open-shift-delete-btn" class="btn-secondary" style="margin-bottom:0.75rem; color:var(--color-red); border-color:var(--color-red); display:none;" onclick="deleteOpenShift()">Schicht löschen</button>
+        <button class="btn-primary" onclick="submitOpenShift()">Speichern</button>
     </div>
 </div>
 
