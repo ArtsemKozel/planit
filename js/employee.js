@@ -68,7 +68,7 @@ function switchTab(tab) {
     document.getElementById('tab-' + tab).classList.add('active');
     const navBtn = document.getElementById('nav-' + tab);
     if (navBtn) navBtn.classList.add('active');
-    if (tab === 'schichtplan') loadWeekGrid();
+    if (tab === 'schichtplan') { loadWeekGrid(); loadMyRequests(); }
     if (tab === 'profil') loadProfil();
     if (tab === 'stunden') loadMeineStunden();
     localStorage.setItem('planit_emp_tab', tab);
@@ -987,14 +987,14 @@ async function loadMyRequests() {
     const session = JSON.parse(localStorage.getItem('planit_employee'));
     if (!session) return;
 
-    const { data: requests } = await db
+    const { data: requests, error } = await db
         .from('open_shift_requests')
         .select('*, shifts(shift_date, start_time, end_time, department)')
         .eq('employee_id', session.id)
         .order('created_at', { ascending: false })
         .limit(10);
 
-    if (!requests || requests.length === 0) {
+    if (error || !requests || requests.length === 0) {
         document.getElementById('my-requests-list').innerHTML = '<div class="empty-state"><p>Keine Requests vorhanden.</p></div>';
         return;
     }
