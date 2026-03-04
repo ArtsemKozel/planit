@@ -65,6 +65,7 @@ function switchTab(tab) {
     const navBtn = document.getElementById('nav-' + tab);
     if (navBtn) navBtn.classList.add('active');
     if (tab === 'stunden') loadAdminStunden();
+    if (tab === 'requests') loadRequests();
     localStorage.setItem('planit_admin_tab', tab);
 }
 
@@ -129,8 +130,6 @@ function renderWeekGrid(days, shifts) {
         header.innerHTML = `${dayNames[i]}<br><small style="color:${isHoliday ? '#E07070' : 'inherit'};">${d.getDate()}.${d.getMonth()+1}.${isHoliday ? ' 🎌' : ''}</small>`;
         grid.appendChild(header);
     });
-
-    // Offene Schichten Zeile
     
     // Mitarbeiter-Zeilen
     // Mitarbeiter-Zeilen gruppiert nach Abteilung
@@ -1243,4 +1242,66 @@ async function deleteOpenShift() {
     if (error) { alert('Fehler beim Löschen!'); return; }
     closeOpenShiftModal();
     await loadWeekGrid();
+}
+
+// ============================================
+// EINSPRING-REQUESTS
+// ============================================
+async function loadRequests() {
+    const { data: requests, error } = await db
+        .from('open_shift_requests')
+        .select('*, employees_planit(name), shifts(shift_date, start_time, end_time, department)')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+    if (error || !requests || requests.length === 0) {
+        document.getElementById('requests-list').innerHTML = '<div class="empty-state"><p>Keine Requests vorhanden.</p></div>';
+        return;
+    }
+
+    const html = requests.map(r => {
+        const date = new Date(r.shifts.shift_date + 'T00:00:00').toLocaleDateString('de-DE', {day:'numeric', month:'long'});
+        const time = `${r.shifts.start_time.slice(0,5)} – ${r.shifts.end_time.slice(0,5)} Uhr`;
+        const dept = r.shifts.department || '';
+        const name = r.employees_planit?.name || '?';
+        return `
+        <div class="card" style="margin-bottom:0.75rem;">
+            <div style="font-weight:600; margin-bottom:0.25rem;">${name}</div>
+            <div style="font-size:0.85rem; color:var(--color-text-light); margin-bottom:0.75rem;">${date} · ${time} · ${dept}</div>
+            <div style="display:flex; gap:0.75rem;">
+                <button class="btn-primary" style="flex:1;" onclick="approveRequest('${r.id}', '${r.shift_id}', '${r.employee_id}')">✓ Genehmigen</button>
+                <button class="btn-secondary" style="flex:1;" onclick="rejectRequest('${r.id}')">✕ Ablehnen</button>
+            </div>
+        </div>`;
+    }).join('');
+
+    document.getElementById('requests-list').innerHTML = html;
+}
+
+async function approveRequest(requestId, shiftId, employeeId) {
+    // Schicht dem Mitarbeiter zuweisen
+    const { error: shiftError } = await db
+        .from('shifts')
+        .update({ employee_id: employeeId, is_open: false })
+        .eq('id', shiftId);
+
+    if (shiftError) { alert('Fehler!'); return; }
+
+    // Request als genehmigt markieren
+    await db.from('open_shift_requests').update({ status: 'approved' }).eq('id', requestId);
+    
+    // Alle anderen Requests für diese Schicht ablehnen
+    await db.from('open_shift_requests')
+        .update({ status: 'rejected' })
+        .eq('shift_id', shiftId)
+        .neq('id', requestId);
+
+    await loadRequests();
+    await loadWeekGrid();
+    alert('Schicht wurde zugewiesen!');
+}
+
+async function rejectRequest(requestId) {
+    await db.from('open_shift_requests').update({ status: 'rejected' }).eq('id', requestId);
+    await loadRequests();
 }

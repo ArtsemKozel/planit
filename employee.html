@@ -357,6 +357,21 @@
     </div>
 </div>
 
+<!-- MODAL: SCHICHT ANFRAGEN -->
+<div id="request-modal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">Offene Schicht</div>
+            <button class="modal-close" onclick="closeRequestModal()">✕</button>
+        </div>
+        <div style="font-size:1rem; font-weight:600; margin-bottom:0.5rem;" id="request-modal-info"></div>
+        <div style="font-size:0.85rem; color:var(--color-text-light); margin-bottom:1.5rem;" id="request-modal-note"></div>
+        <input type="hidden" id="request-shift-id">
+        <button class="btn-primary" onclick="submitShiftRequest()">Ich kann einspringen ✋</button>
+        <button class="btn-secondary" style="margin-top:0.75rem;" onclick="closeRequestModal()">Abbrechen</button>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/auth.js"></script>
 <script src="js/ui.js"></script>

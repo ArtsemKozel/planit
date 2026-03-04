@@ -119,12 +119,10 @@ function renderWeekGrid(days, shifts, colleagues) {
     grid.innerHTML = '';
     const dayNames = ['Mo','Di','Mi','Do','Fr','Sa','So'];
 
-    // Leere Ecke
     const corner = document.createElement('div');
     corner.className = 'week-header';
     grid.appendChild(corner);
 
-    // Tag-Header
     const weekHolidays = getBWHolidays(days[0].getFullYear());
     days.forEach((d, i) => {
         const dateStr = d.toISOString().split('T')[0];
@@ -135,27 +133,65 @@ function renderWeekGrid(days, shifts, colleagues) {
         grid.appendChild(header);
     });
 
-    // Mitarbeiter-Zeilen
-    colleagues.forEach(emp => {
-        const empCell = document.createElement('div');
-        empCell.className = 'week-employee';
-        empCell.textContent = emp.name.split(' ')[0];
-        if (emp.id === currentEmployee.id) {
-            empCell.style.color = 'var(--color-primary)';
-            empCell.style.fontWeight = '700';
-        }
-        grid.appendChild(empCell);
+    // Abteilungen sammeln
+    const departments = [...new Set(colleagues.map(e => e.department || 'Allgemein'))];
+
+    departments.forEach(dept => {
+        // Abteilungs-Label
+        const deptRow = document.createElement('div');
+        deptRow.style.gridColumn = '1 / -1';
+        deptRow.style.padding = '0.4rem 0.5rem';
+        deptRow.style.fontSize = '0.75rem';
+        deptRow.style.fontWeight = '600';
+        deptRow.style.color = 'var(--color-primary)';
+        deptRow.style.borderTop = '1px solid var(--color-border)';
+        deptRow.style.marginTop = '0.25rem';
+        deptRow.textContent = dept.toUpperCase();
+        grid.appendChild(deptRow);
+
+        // Offene Schichten Zeile
+        const deptOpenShifts = shifts.filter(s => s.is_open && s.department === dept);
+        const openEmpCell = document.createElement('div');
+        openEmpCell.className = 'week-employee';
+        openEmpCell.style.color = '#C97E7E';
+        openEmpCell.style.fontWeight = '700';
+        openEmpCell.textContent = 'Offen';
+        grid.appendChild(openEmpCell);
 
         days.forEach(d => {
             const dateStr = d.toISOString().split('T')[0];
-            const shift = shifts.find(s => s.employee_id === emp.id && s.shift_date === dateStr);
+            const shift = deptOpenShifts.find(s => s.shift_date === dateStr);
             const cell = document.createElement('div');
-            const isOwn = emp.id === currentEmployee.id;
-            cell.className = 'week-cell' + (shift ? (shift.is_open ? ' open-shift' : ' has-shift') : '');
-            if (shift && isOwn && !shift.is_open) cell.style.background = 'var(--color-primary)';
+            cell.className = 'week-cell' + (shift ? ' open-shift' : '');
             cell.textContent = shift ? `${shift.start_time.slice(0,5)}\n${shift.end_time.slice(0,5)}` : '';
             cell.style.whiteSpace = 'pre';
+            if (shift) cell.onclick = () => openRequestModal(shift);
             grid.appendChild(cell);
+        });
+
+        // Mitarbeiter der Abteilung
+        const deptColleagues = colleagues.filter(e => (e.department || 'Allgemein') === dept);
+        deptColleagues.forEach(emp => {
+            const empCell = document.createElement('div');
+            empCell.className = 'week-employee';
+            empCell.textContent = emp.name.split(' ')[0];
+            if (emp.id === currentEmployee.id) {
+                empCell.style.color = 'var(--color-primary)';
+                empCell.style.fontWeight = '700';
+            }
+            grid.appendChild(empCell);
+
+            days.forEach(d => {
+                const dateStr = d.toISOString().split('T')[0];
+                const shift = shifts.find(s => s.employee_id === emp.id && s.shift_date === dateStr);
+                const cell = document.createElement('div');
+                const isOwn = emp.id === currentEmployee.id;
+                cell.className = 'week-cell' + (shift ? ' has-shift' : '');
+                if (shift && isOwn) cell.style.background = 'var(--color-primary)';
+                cell.textContent = shift ? `${shift.start_time.slice(0,5)}\n${shift.end_time.slice(0,5)}` : '';
+                cell.style.whiteSpace = 'pre';
+                grid.appendChild(cell);
+            });
         });
     });
 }
@@ -900,4 +936,49 @@ async function loadMeineStunden() {
     }).join('');
 
     document.getElementById('stunden-list').innerHTML = html;
+}
+
+function openRequestModal(shift) {
+    const date = new Date(shift.shift_date + 'T00:00:00').toLocaleDateString('de-DE', {day:'numeric', month:'long'});
+    document.getElementById('request-modal-info').textContent = 
+        `${date} · ${shift.start_time.slice(0,5)} – ${shift.end_time.slice(0,5)} Uhr`;
+    document.getElementById('request-modal-note').textContent = shift.open_note || '';
+    document.getElementById('request-shift-id').value = shift.id;
+    document.getElementById('request-modal').classList.add('active');
+}
+
+function closeRequestModal() {
+    document.getElementById('request-modal').classList.remove('active');
+}
+
+async function submitShiftRequest() {
+    const session = JSON.parse(localStorage.getItem('planit_employee'));
+    const shiftId = document.getElementById('request-shift-id').value;
+    
+    // Prüfen ob schon Request existiert
+    const { data: existing } = await db
+        .from('open_shift_requests')
+        .select('id')
+        .eq('shift_id', shiftId)
+        .eq('employee_id', session.id)
+        .maybeSingle();
+
+    if (existing) {
+        alert('Du hast bereits einen Request für diese Schicht gesendet!');
+        return;
+    }
+
+    const { error } = await db.from('open_shift_requests').insert({
+        shift_id: shiftId,
+        employee_id: session.id,
+        status: 'pending'
+    });
+
+    if (error) {
+        alert('Fehler beim Senden!');
+        return;
+    }
+
+    closeRequestModal();
+    alert('Request gesendet! Der Admin wird benachrichtigt.');
 }
