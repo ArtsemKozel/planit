@@ -219,7 +219,7 @@ function getMonday(date) {
 }
 
 // ── SCHICHT MODAL ─────────────────────────────────────────
-function openShiftModal(employeeId, dateStr, existingShift) {
+async function openShiftModal(employeeId, dateStr, existingShift) {
     editShiftId = existingShift ? existingShift.id : null;
 
     document.getElementById('shift-modal-title').textContent =
@@ -248,6 +248,10 @@ function openShiftModal(employeeId, dateStr, existingShift) {
     document.getElementById('shift-open-note-group').style.display = existingShift?.is_open ? 'block' : 'none';
     document.getElementById('shift-dept-group').style.display = existingShift?.is_open ? 'block' : 'none';
     document.getElementById('shift-department').value = existingShift?.department || 'Service';
+    document.getElementById('shift-repeat').checked = false;
+    document.getElementById('shift-repeat-group').style.display = 'none';
+    document.getElementById('shift-repeat-weeks').value = 4;
+    await loadTemplates();
     document.getElementById('shift-modal').classList.add('open');
 }
 
@@ -288,10 +292,24 @@ async function submitShift() {
     };
 
     let error;
+
     if (editShiftId) {
         ({ error } = await db.from('shifts').update(payload).eq('id', editShiftId));
     } else {
-        ({ error } = await db.from('shifts').insert(payload));
+        const repeat = document.getElementById('shift-repeat').checked;
+        const weeks = parseInt(document.getElementById('shift-repeat-weeks').value) || 1;
+
+        if (repeat && weeks > 1) {
+            const payloads = [];
+            for (let i = 0; i < weeks; i++) {
+                const d = new Date(payload.shift_date + 'T12:00:00');
+                d.setDate(d.getDate() + i * 7);
+                payloads.push({ ...payload, shift_date: d.toISOString().split('T')[0] });
+            }
+            ({ error } = await db.from('shifts').insert(payloads));
+        } else {
+            ({ error } = await db.from('shifts').insert(payload));
+        }
     }
 
     if (error) {
@@ -314,6 +332,81 @@ async function deleteShift() {
     }
     closeShiftModal();
     await loadWeekGrid();
+}
+
+function toggleRepeat() {
+    const checked = document.getElementById('shift-repeat').checked;
+    document.getElementById('shift-repeat-group').style.display = checked ? 'block' : 'none';
+}
+
+// ── SCHICHT-VORLAGEN ──────────────────────────────────────
+async function loadTemplates() {
+    const { data: templates } = await db
+        .from('shift_templates')
+        .select('*')
+        .eq('user_id', adminSession.user.id)
+        .order('name');
+
+    const select = document.getElementById('shift-template');
+    select.innerHTML = '<option value="">— Keine Vorlage —</option>';
+    (templates || []).forEach(t => {
+        select.innerHTML += `<option value="${t.id}" data-start="${t.start_time}" data-end="${t.end_time}" data-break="${t.break_minutes}">${t.name} (${t.start_time.slice(0,5)}–${t.end_time.slice(0,5)})</option>`;
+    });
+}
+
+function applyShiftTemplate() {
+    const select = document.getElementById('shift-template');
+    const selected = select.options[select.selectedIndex];
+    if (!selected.value) return;
+    document.getElementById('shift-start').value = selected.dataset.start.slice(0,5);
+    document.getElementById('shift-end').value = selected.dataset.end.slice(0,5);
+    document.getElementById('shift-break').value = selected.dataset.break;
+}
+
+function openSaveTemplateModal() {
+    document.getElementById('template-name').value = '';
+    document.getElementById('template-error').style.display = 'none';
+    document.getElementById('save-template-modal').classList.add('active');
+}
+
+function closeSaveTemplateModal() {
+    document.getElementById('save-template-modal').classList.remove('active');
+}
+
+async function saveTemplate() {
+    const name = document.getElementById('template-name').value.trim();
+    const start = document.getElementById('shift-start').value;
+    const end = document.getElementById('shift-end').value;
+    const breakMin = document.getElementById('shift-break').value || 0;
+    const errorDiv = document.getElementById('template-error');
+
+    if (!name) {
+        errorDiv.textContent = 'Bitte einen Namen eingeben.';
+        errorDiv.style.display = 'block';
+        return;
+    }
+    if (!start || !end) {
+        errorDiv.textContent = 'Bitte erst Von/Bis im Schicht-Modal ausfüllen.';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    const { error } = await db.from('shift_templates').insert({
+        user_id: adminSession.user.id,
+        name,
+        start_time: start,
+        end_time: end,
+        break_minutes: parseInt(breakMin)
+    });
+
+    if (error) {
+        errorDiv.textContent = 'Fehler beim Speichern.';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    closeSaveTemplateModal();
+    await loadTemplates();
 }
 
 // ── URLAUB ────────────────────────────────────────────────

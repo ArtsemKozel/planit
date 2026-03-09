@@ -224,6 +224,16 @@
             <div class="modal-title" id="shift-modal-title">Schicht erstellen</div>
             <button class="modal-close" onclick="closeShiftModal()">✕</button>
         </div>
+        <!-- Vorlage laden -->
+        <div class="form-group" id="template-group">
+            <label>Vorlage laden (optional)</label>
+            <div style="display:flex; gap:0.5rem;">
+                <select id="shift-template" style="flex:1;" onchange="applyShiftTemplate()">
+                    <option value="">— Keine Vorlage —</option>
+                </select>
+                <button type="button" class="btn-small btn-approve" onclick="openSaveTemplateModal()" style="white-space:nowrap;">+ Speichern</button>
+            </div>
+        </div>
         <div class="form-group">
             <label>Mitarbeiter</label>
             <select id="shift-employee"></select>
@@ -266,6 +276,17 @@
         <div class="form-group">
             <label>Notizen (optional)</label>
             <textarea id="shift-notes" rows="2"></textarea>
+        </div>
+        <!-- Wiederholung -->
+        <div class="form-group">
+            <div style="display:flex; align-items:center; gap:0.75rem;">
+                <input type="checkbox" id="shift-repeat" style="width:auto;" onchange="toggleRepeat()">
+                <label style="margin:0;">Wöchentlich wiederholen</label>
+            </div>
+        </div>
+        <div id="shift-repeat-group" class="form-group" style="display:none;">
+            <label>Anzahl Wochen</label>
+            <input type="number" id="shift-repeat-weeks" min="1" max="12" value="4" placeholder="z.B. 4">
         </div>
         <div id="shift-error" style="color:var(--color-red); font-size:0.85rem; margin-bottom:1rem; display:none;"></div>
         <button id="shift-delete-btn" class="btn-secondary" style="margin-bottom:0.75rem; color:var(--color-red); border-color:var(--color-red);" onclick="deleteShift()">Schicht löschen</button>
@@ -415,6 +436,22 @@
         <div id="open-shift-error" style="color:var(--color-red); font-size:0.85rem; margin-bottom:1rem; display:none;"></div>
         <button id="open-shift-delete-btn" class="btn-secondary" style="margin-bottom:0.75rem; color:var(--color-red); border-color:var(--color-red); display:none;" onclick="deleteOpenShift()">Schicht löschen</button>
         <button class="btn-primary" onclick="submitOpenShift()">Speichern</button>
+    </div>
+</div>
+
+<!-- MODAL: VORLAGE SPEICHERN -->
+<div id="save-template-modal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">Vorlage speichern</div>
+            <button class="modal-close" onclick="closeSaveTemplateModal()">✕</button>
+        </div>
+        <div class="form-group">
+            <label>Name der Vorlage</label>
+            <input type="text" id="template-name" placeholder="z.B. Frühschicht, Spätschicht...">
+        </div>
+        <div id="template-error" style="color:var(--color-red); font-size:0.85rem; margin-bottom:1rem; display:none;"></div>
+        <button class="btn-primary" onclick="saveTemplate()">Speichern</button>
     </div>
 </div>
 
