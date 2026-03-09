@@ -325,9 +325,13 @@ async function submitShift() {
 async function deleteShift() {
     if (!editShiftId) return;
     if (!confirm('Schicht wirklich löschen?')) return;
+
+    await db.from('open_shift_requests').delete().eq('shift_id', editShiftId);
+    await db.from('shift_swaps').delete().eq('shift_id', editShiftId);
+
     const { error } = await db.from('shifts').delete().eq('id', editShiftId);
     if (error) {
-        alert('Fehler beim Löschen!');
+        alert('Fehler beim Löschen: ' + error.message);
         return;
     }
     closeShiftModal();
@@ -1355,6 +1359,12 @@ async function submitOpenShift() {
 async function deleteOpenShift() {
     if (!openShiftData?.existingShift) return;
     if (!confirm('Offene Schicht wirklich löschen?')) return;
+    
+    // Erst alle Requests für diese Schicht löschen
+    await db.from('open_shift_requests')
+        .delete()
+        .eq('shift_id', openShiftData.existingShift.id);
+
     const { error } = await db.from('shifts').delete().eq('id', openShiftData.existingShift.id);
     if (error) { alert('Fehler beim Löschen!'); return; }
     closeOpenShiftModal();
