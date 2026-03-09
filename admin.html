@@ -357,6 +357,10 @@
             <label>Geburtsdatum (optional)</label>
             <input type="date" id="edit-emp-birthdate">
         </div>
+        <div class="form-group">
+            <label>Urlaubstage pro Jahr</label>
+            <input type="number" id="edit-emp-vacation-days" min="0" max="365" value="20">
+        </div>
         <div id="edit-emp-error" style="color:var(--color-red); font-size:0.85rem; margin-bottom:1rem; display:none;"></div>
         <button class="btn-primary" onclick="submitEditEmployee()">Speichern</button>
     </div>

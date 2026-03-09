@@ -69,6 +69,7 @@ function switchTab(tab) {
     const navBtn = document.getElementById('nav-' + tab);
     if (navBtn) navBtn.classList.add('active');
     if (tab === 'schichtplan') { loadWeekGrid(); loadMyRequests(); }
+    if (tab === 'urlaub') { loadVacations(); loadVacationAccount(); }
     if (tab === 'profil') loadProfil();
     if (tab === 'stunden') loadMeineStunden();
     localStorage.setItem('planit_emp_tab', tab);
@@ -375,6 +376,49 @@ async function loadVacations() {
             </span>
         </div>
     `).join('');
+}
+
+async function loadVacationAccount() {
+    const year = new Date().getFullYear();
+    document.getElementById('vacation-year-label').textContent = year;
+
+    // Urlaubstage pro Jahr vom Mitarbeiter laden
+    const { data: emp } = await db
+        .from('employees_planit')
+        .select('vacation_days_per_year')
+        .eq('id', currentEmployee.id)
+        .maybeSingle();
+
+    const totalDays = emp?.vacation_days_per_year ?? 20;
+
+    // Genehmigte Urlaubsanträge dieses Jahr laden
+    const { data: requests } = await db
+        .from('vacation_requests')
+        .select('start_date, end_date')
+        .eq('employee_id', currentEmployee.id)
+        .eq('status', 'approved')
+        .gte('start_date', `${year}-01-01`)
+        .lte('end_date', `${year}-12-31`);
+
+    // Urlaubstage zählen
+    let usedDays = 0;
+    (requests || []).forEach(r => {
+        const start = new Date(r.start_date);
+        const end = new Date(r.end_date);
+        const diff = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+        usedDays += diff;
+    });
+
+    const remaining = totalDays - usedDays;
+
+    document.getElementById('vacation-account').textContent = `${remaining} Tage übrig`;
+    document.getElementById('vacation-used').textContent = `${usedDays} genommen`;
+    document.getElementById('vacation-total').textContent = `von ${totalDays} Tagen`;
+
+    // Farbe je nach verbleibenden Tagen
+    const accountEl = document.getElementById('vacation-account');
+    accountEl.style.color = remaining <= 3 ? '#E57373' :
+                             remaining <= 7 ? '#C9A24D' : 'var(--color-primary)';
 }
 
 let signaturePad = null;

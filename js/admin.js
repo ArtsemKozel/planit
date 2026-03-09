@@ -728,7 +728,6 @@ async function loadTeam() {
         const bMonth = parseInt(e.birthdate.split('-')[1]);
         return bMonth === thisMonth;
     });
-
     const bdContainer = document.getElementById('birthdays-this-month');
     if (birthdays.length > 0) {
         const monthName = new Date().toLocaleDateString('de-DE', { month: 'long' });
@@ -754,18 +753,43 @@ async function loadTeam() {
         container.innerHTML = '<div class="empty-state"><p>Keine Mitarbeiter vorhanden.</p></div>';
         return;
     }
-    container.innerHTML = employees.map(e => `
+
+    // Urlaubsanträge dieses Jahr laden
+    const year = new Date().getFullYear();
+    const { data: vacations } = await db
+        .from('vacation_requests')
+        .select('employee_id, start_date, end_date')
+        .eq('user_id', adminSession.user.id)
+        .eq('status', 'approved')
+        .gte('start_date', `${year}-01-01`)
+        .lte('end_date', `${year}-12-31`);
+
+    container.innerHTML = employees.map(e => {
+        // Urlaubstage berechnen
+        const empVacations = (vacations || []).filter(v => v.employee_id === e.id);
+        let usedDays = 0;
+        empVacations.forEach(v => {
+            const start = new Date(v.start_date);
+            const end = new Date(v.end_date);
+            usedDays += Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+        });
+        const totalDays = e.vacation_days_per_year ?? 20;
+        const remaining = totalDays - usedDays;
+        const color = remaining <= 3 ? '#E57373' : remaining <= 7 ? '#C9A24D' : 'var(--color-primary)';
+
+        return `
         <div class="list-item">
             <div class="list-item-info">
                 <h4>${e.name}</h4>
                 <p>${e.login_code} · ${e.department || 'Allgemein'}${e.birthdate ? ' · 🎂 ' + new Date(e.birthdate + 'T00:00:00').toLocaleDateString('de-DE', {day:'numeric', month:'long'}) : ''}</p>
+                <p style="font-size:0.8rem; color:${color}; margin-top:0.2rem;">🏖 ${remaining} von ${totalDays} Urlaubstagen übrig</p>
             </div>
             <div style="display:flex; gap:0.5rem; align-items:center;">
                 <button class="btn-small btn-approve" onclick="openEditEmployeeModal('${e.id}')">✏️</button>
                 <button class="btn-small btn-reject" onclick="deleteEmployee('${e.id}', '${e.name}')">🗑</button>
             </div>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
 }
 
 function openNewEmployeeModal() {
@@ -903,6 +927,7 @@ function openEditEmployeeModal(id) {
     document.getElementById('edit-emp-department').value = emp.department || 'Allgemein';
     document.getElementById('edit-emp-error').style.display = 'none';
     document.getElementById('edit-emp-birthdate').value = emp.birthdate || '';
+    document.getElementById('edit-emp-vacation-days').value = emp.vacation_days_per_year ?? 20;
     document.getElementById('edit-employee-modal').classList.add('open');
 }
 
@@ -916,8 +941,9 @@ async function submitEditEmployee() {
     const loginCode = document.getElementById('edit-emp-code').value.trim();
     const password = document.getElementById('edit-emp-password').value.trim();
     const department = document.getElementById('edit-emp-department').value;
+    const birthdate = document.getElementById('edit-emp-birthdate').value || null;
+    const vacationDays = parseInt(document.getElementById('edit-emp-vacation-days').value) || 20;
     const errorDiv = document.getElementById('edit-emp-error');
-
     errorDiv.style.display = 'none';
 
     if (!name || !loginCode) {
@@ -926,18 +952,15 @@ async function submitEditEmployee() {
         return;
     }
 
-    const birthdate = document.getElementById('edit-emp-birthdate').value || null;
-    const payload = { name, login_code: loginCode, department, birthdate };
+    const payload = { name, login_code: loginCode, department, birthdate, vacation_days_per_year: vacationDays };
     if (password) payload.password_hash = password;
 
     const { error } = await db.from('employees_planit').update(payload).eq('id', editEmployeeId);
-
     if (error) {
         errorDiv.textContent = 'Fehler beim Speichern.';
         errorDiv.style.display = 'block';
         return;
     }
-
     closeEditEmployeeModal();
     await loadEmployees();
     await loadTeam();
