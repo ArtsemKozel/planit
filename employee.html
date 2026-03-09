@@ -371,10 +371,14 @@
             <button class="modal-close" onclick="closeRequestModal()">✕</button>
         </div>
         <div style="font-size:1rem; font-weight:600; margin-bottom:0.5rem;" id="request-modal-info"></div>
-        <div style="font-size:0.85rem; color:var(--color-text-light); margin-bottom:1.5rem;" id="request-modal-note"></div>
+        <div style="font-size:0.85rem; color:var(--color-text-light); margin-bottom:0.5rem;" id="request-modal-note"></div>
+        <div id="request-modal-status" style="margin-bottom:1rem; font-size:0.9rem;"></div>
         <input type="hidden" id="request-shift-id">
-        <button class="btn-primary" onclick="submitShiftRequest()">Ich kann einspringen ✋</button>
-        <button class="btn-secondary" style="margin-top:0.75rem;" onclick="closeRequestModal()">Abbrechen</button>
+        <div id="request-modal-buttons">
+            <button class="btn-primary" style="background:#4CAF50;" onclick="submitShiftRequest('yes')">✅ Ja, ich kann einspringen</button>
+            <button class="btn-primary" style="background:#E57373; margin-top:0.75rem;" onclick="submitShiftRequest('no')">❌ Nein, ich kann nicht</button>
+            <button class="btn-secondary" style="margin-top:0.75rem;" onclick="closeRequestModal()">Abbrechen</button>
+        </div>
     </div>
 </div>
 

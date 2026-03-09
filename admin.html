@@ -177,8 +177,41 @@
             <div style="font-size:1.1rem; font-weight:700; color:var(--color-text);">Einspring-Requests</div>
             <div></div>
         </div>
+
+        <!-- Offene Schichten -->
+        <div style="font-size:0.85rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.05em; margin-bottom:0.75rem;">OFFENE SCHICHTEN</div>
         <div id="requests-list">
             <div class="empty-state"><p>Keine Requests vorhanden.</p></div>
+        </div>
+
+        <!-- Statistik -->
+        <div style="font-size:0.85rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.05em; margin-top:2rem; margin-bottom:0.75rem;">EINSPRING-STATISTIK</div>
+        <div class="card">
+            <div style="display:flex; gap:0.75rem; margin-bottom:1rem;">
+                <select id="stats-month" onchange="loadRequestsStats()" style="flex:1; padding:0.5rem; border:1px solid var(--color-border); border-radius:8px; font-size:0.9rem; background:white;">
+                    <option value="0">Alle Monate</option>
+                    <option value="1">Januar</option>
+                    <option value="2">Februar</option>
+                    <option value="3">März</option>
+                    <option value="4">April</option>
+                    <option value="5">Mai</option>
+                    <option value="6">Juni</option>
+                    <option value="7">Juli</option>
+                    <option value="8">August</option>
+                    <option value="9">September</option>
+                    <option value="10">Oktober</option>
+                    <option value="11">November</option>
+                    <option value="12">Dezember</option>
+                </select>
+                <select id="stats-year" onchange="loadRequestsStats()" style="flex:1; padding:0.5rem; border:1px solid var(--color-border); border-radius:8px; font-size:0.9rem; background:white;">
+                    <option value="2025">2025</option>
+                    <option value="2026" selected>2026</option>
+                    <option value="2027">2027</option>
+                </select>
+            </div>
+            <div id="requests-stats">
+                <div class="empty-state"><p>Keine Daten vorhanden.</p></div>
+            </div>
         </div>
     </div>
 

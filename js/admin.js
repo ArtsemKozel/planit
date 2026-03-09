@@ -66,7 +66,7 @@ function switchTab(tab) {
     const navBtn = document.getElementById('nav-' + tab);
     if (navBtn) navBtn.classList.add('active');
     if (tab === 'stunden') loadAdminStunden();
-    if (tab === 'requests') loadRequests();
+    if (tab === 'requests') { loadRequests(); loadRequestsStats(); }
     localStorage.setItem('planit_admin_tab', tab);
 }
 
@@ -1249,34 +1249,85 @@ async function deleteOpenShift() {
 // EINSPRING-REQUESTS
 // ============================================
 async function loadRequests() {
-    const { data: requests, error } = await db
+    // Alle offenen Schichten laden
+    const { data: openShifts } = await db
+        .from('shifts')
+        .select('*')
+        .eq('user_id', adminSession.user.id)
+        .eq('is_open', true)
+        .order('shift_date');
+
+    // Alle Requests laden (alle Status)
+    const { data: requests } = await db
         .from('open_shift_requests')
-        .select('*, employees_planit(name), shifts(shift_date, start_time, end_time, department)')
-        .eq('status', 'pending')
+        .select('*, employees_planit(name, department)')
+        .eq('user_id', adminSession.user.id)
         .order('created_at', { ascending: false });
 
-    if (error || !requests || requests.length === 0) {
-        document.getElementById('requests-list').innerHTML = '<div class="empty-state"><p>Keine Requests vorhanden.</p></div>';
+    // Alle Mitarbeiter laden
+    const { data: allEmployees } = await db
+        .from('employees_planit')
+        .select('id, name, department')
+        .eq('user_id', adminSession.user.id)
+        .eq('is_active', true);
+
+    const container = document.getElementById('requests-list');
+
+    if (!openShifts || openShifts.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>Keine offenen Schichten.</p></div>';
         return;
     }
 
-    const html = requests.map(r => {
-        const date = new Date(r.shifts.shift_date + 'T00:00:00').toLocaleDateString('de-DE', {day:'numeric', month:'long'});
-        const time = `${r.shifts.start_time.slice(0,5)} – ${r.shifts.end_time.slice(0,5)} Uhr`;
-        const dept = r.shifts.department || '';
-        const name = r.employees_planit?.name || '?';
+    const html = openShifts.map(shift => {
+        const date = new Date(shift.shift_date + 'T00:00:00').toLocaleDateString('de-DE', {day:'numeric', month:'long'});
+        const time = `${shift.start_time.slice(0,5)} – ${shift.end_time.slice(0,5)} Uhr`;
+        const dept = shift.department || 'Allgemein';
+
+        // Mitarbeiter dieser Abteilung
+        const deptEmployees = (allEmployees || []).filter(e => (e.department || 'Allgemein') === dept);
+
+        // Requests für diese Schicht
+        const shiftRequests = (requests || []).filter(r => r.shift_id === shift.id);
+
+        const employeeRows = deptEmployees.map(emp => {
+            const req = shiftRequests.find(r => r.employee_id === emp.id);
+            let statusHtml = '<span style="color:#aaa; font-size:0.8rem;">— noch keine Antwort</span>';
+            let actionHtml = '';
+
+            if (req) {
+                if (req.status === 'yes') {
+                    statusHtml = '<span style="color:#4CAF50; font-weight:600;">✅ Ja</span>';
+                    actionHtml = `<button class="btn-primary" style="padding:0.25rem 0.75rem; font-size:0.8rem;" onclick="approveRequest('${req.id}', '${shift.id}', '${emp.id}')">Einteilen</button>`;
+                } else if (req.status === 'no') {
+                    statusHtml = '<span style="color:#E57373; font-weight:600;">❌ Nein</span>';
+                } else if (req.status === 'approved') {
+                    statusHtml = '<span style="color:#4CAF50; font-weight:600;">✅ Eingeteilt</span>';
+                } else if (req.status === 'rejected') {
+                    statusHtml = '<span style="color:#aaa; font-weight:600;">Abgelehnt</span>';
+                } else if (req.status === 'pending') {
+                    statusHtml = '<span style="color:#C9A24D; font-weight:600;">⏳ Ausstehend</span>';
+                }
+            }
+
+            return `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem 0; border-bottom:1px solid var(--color-border);">
+                    <span style="font-size:0.9rem;">${emp.name}</span>
+                    <div style="display:flex; align-items:center; gap:0.75rem;">
+                        ${statusHtml}
+                        ${actionHtml}
+                    </div>
+                </div>`;
+        }).join('');
+
         return `
-        <div class="card" style="margin-bottom:0.75rem;">
-            <div style="font-weight:600; margin-bottom:0.25rem;">${name}</div>
-            <div style="font-size:0.85rem; color:var(--color-text-light); margin-bottom:0.75rem;">${date} · ${time} · ${dept}</div>
-            <div style="display:flex; gap:0.75rem;">
-                <button class="btn-primary" style="flex:1;" onclick="approveRequest('${r.id}', '${r.shift_id}', '${r.employee_id}')">✓ Genehmigen</button>
-                <button class="btn-secondary" style="flex:1;" onclick="rejectRequest('${r.id}')">✕ Ablehnen</button>
-            </div>
-        </div>`;
+            <div class="card" style="margin-bottom:1rem;">
+                <div style="font-weight:700; margin-bottom:0.25rem;">${date} · ${dept}</div>
+                <div style="font-size:0.85rem; color:var(--color-text-light); margin-bottom:0.75rem;">${time}</div>
+                ${employeeRows || '<div style="color:#aaa; font-size:0.85rem;">Keine Mitarbeiter in dieser Abteilung.</div>'}
+            </div>`;
     }).join('');
 
-    document.getElementById('requests-list').innerHTML = html;
+    container.innerHTML = html;
 }
 
 async function approveRequest(requestId, shiftId, employeeId) {
@@ -1320,4 +1371,70 @@ async function loadRequestsBadge() {
     } else {
         badge.style.display = 'none';
     }
+}
+
+async function loadRequestsStats() {
+    const month = parseInt(document.getElementById('stats-month')?.value || '0');
+    const year = parseInt(document.getElementById('stats-year')?.value || new Date().getFullYear());
+
+    const { data: allEmployees } = await db
+        .from('employees_planit')
+        .select('id, name, department')
+        .eq('user_id', adminSession.user.id)
+        .eq('is_active', true)
+        .order('name');
+
+    let query = db
+        .from('open_shift_requests')
+        .select('employee_id, status, created_at')
+        .eq('user_id', adminSession.user.id);
+
+    // Datumsfilter
+    if (month > 0) {
+        const from = `${year}-${String(month).padStart(2,'0')}-01`;
+        const to = `${year}-${String(month).padStart(2,'0')}-31`;
+        query = query.gte('created_at', from).lte('created_at', to);
+    } else {
+        const from = `${year}-01-01`;
+        const to = `${year}-12-31`;
+        query = query.gte('created_at', from).lte('created_at', to);
+    }
+
+    const { data: requests } = await query;
+
+    if (!allEmployees || allEmployees.length === 0) return;
+
+    const stats = allEmployees.map(emp => {
+        const empRequests = (requests || []).filter(r => r.employee_id === emp.id);
+        const total = empRequests.filter(r => ['yes','no','approved','rejected'].includes(r.status)).length;
+        const yes = empRequests.filter(r => r.status === 'yes' || r.status === 'approved').length;
+        const percent = total > 0 ? Math.round((yes / total) * 100) : null;
+        return { ...emp, total, yes, percent };
+    });
+
+    stats.sort((a, b) => {
+        if (a.percent === null && b.percent === null) return 0;
+        if (a.percent === null) return 1;
+        if (b.percent === null) return -1;
+        return b.percent - a.percent;
+    });
+
+    const html = stats.map(s => {
+        const barColor = s.percent === null ? '#ddd' :
+                         s.percent >= 70 ? '#4CAF50' :
+                         s.percent >= 40 ? '#C9A24D' : '#E57373';
+        const percentText = s.percent !== null ? `${s.percent}%` : '—';
+        const subText = s.total > 0 ? `${s.yes} von ${s.total} Mal Ja gesagt` : 'Noch keine Anfragen';
+
+        return `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:0.6rem 0; border-bottom:1px solid var(--color-border);">
+                <div>
+                    <div style="font-weight:600; font-size:0.9rem;">${s.name}</div>
+                    <div style="font-size:0.78rem; color:var(--color-text-light);">${subText}</div>
+                </div>
+                <div style="font-size:1.1rem; font-weight:700; color:${barColor}; min-width:2.5rem; text-align:right;">${percentText}</div>
+            </div>`;
+    }).join('');
+
+    document.getElementById('requests-stats').innerHTML = html;
 }

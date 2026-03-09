@@ -938,12 +938,32 @@ async function loadMeineStunden() {
     document.getElementById('stunden-list').innerHTML = html;
 }
 
-function openRequestModal(shift) {
+async function openRequestModal(shift) {
     const date = new Date(shift.shift_date + 'T00:00:00').toLocaleDateString('de-DE', {day:'numeric', month:'long'});
-    document.getElementById('request-modal-info').textContent = 
+    document.getElementById('request-modal-info').textContent =
         `${date} · ${shift.start_time.slice(0,5)} – ${shift.end_time.slice(0,5)} Uhr`;
     document.getElementById('request-modal-note').textContent = shift.open_note || '';
     document.getElementById('request-shift-id').value = shift.id;
+    document.getElementById('request-modal-status').textContent = '';
+    document.getElementById('request-modal-buttons').style.display = 'block';
+
+    // Prüfen ob Mitarbeiter schon geantwortet hat
+    const session = JSON.parse(localStorage.getItem('planit_employee'));
+    const { data: existing } = await db
+        .from('open_shift_requests')
+        .select('id, status')
+        .eq('shift_id', shift.id)
+        .eq('employee_id', session.id)
+        .maybeSingle();
+
+    if (existing) {
+        const statusText = existing.status === 'yes' ? '✅ Du hast Ja gesagt' :
+                           existing.status === 'no' ? '❌ Du hast Nein gesagt' :
+                           existing.status === 'approved' ? '✅ Du wurdest eingeteilt' : '⏳ Ausstehend';
+        document.getElementById('request-modal-status').textContent = statusText;
+        document.getElementById('request-modal-buttons').style.display = 'none';
+    }
+
     document.getElementById('request-modal').classList.add('active');
 }
 
@@ -951,10 +971,10 @@ function closeRequestModal() {
     document.getElementById('request-modal').classList.remove('active');
 }
 
-async function submitShiftRequest() {
+async function submitShiftRequest(answer) {
     const session = JSON.parse(localStorage.getItem('planit_employee'));
     const shiftId = document.getElementById('request-shift-id').value;
-    
+
     // Prüfen ob schon Request existiert
     const { data: existing } = await db
         .from('open_shift_requests')
@@ -964,23 +984,22 @@ async function submitShiftRequest() {
         .maybeSingle();
 
     if (existing) {
-        alert('Du hast bereits einen Request für diese Schicht gesendet!');
-        return;
-    }
-
-    const { error } = await db.from('open_shift_requests').insert({
-        shift_id: shiftId,
-        employee_id: session.id,
-        status: 'pending'
-    });
-
-    if (error) {
-        alert('Fehler beim Senden!');
-        return;
+        // Update bestehenden Request
+        await db.from('open_shift_requests')
+            .update({ status: answer })
+            .eq('id', existing.id);
+    } else {
+        // Neuen Request erstellen
+        await db.from('open_shift_requests').insert({
+            shift_id: shiftId,
+            employee_id: session.id,
+            user_id: session.user_id,
+            status: answer
+        });
     }
 
     closeRequestModal();
-    alert('Request gesendet! Der Admin wird benachrichtigt.');
+    await loadWeekGrid();
 }
 
 async function loadMyRequests() {
