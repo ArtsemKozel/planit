@@ -861,7 +861,13 @@ async function loadTeam() {
         .gte('start_date', `${year}-01-01`)
         .lte('end_date', `${year}-12-31`);
 
-    container.innerHTML = employees.map(e => {
+    const departments = [...new Set(employees.map(e => e.department || 'Allgemein'))].sort();
+
+    container.innerHTML = departments.map(dept => {
+        const deptEmployees = employees.filter(e => (e.department || 'Allgemein') === dept);
+        return `
+            <div style="font-size:0.85rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.05em; margin:1rem 0 0.5rem;">${dept.toUpperCase()}</div>
+            ${deptEmployees.map(e => {
         // Urlaubstage berechnen
         const empVacations = (vacations || []).filter(v => v.employee_id === e.id);
         let usedDays = 0;
@@ -886,7 +892,9 @@ async function loadTeam() {
                 <button class="btn-small btn-reject" onclick="deleteEmployee('${e.id}', '${e.name}')">🗑</button>
             </div>
         </div>`;
-    }).join('');
+
+    }).join('')}`;
+}).join('');
 }
 
 function openNewEmployeeModal() {
