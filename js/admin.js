@@ -878,7 +878,7 @@ async function loadTeam() {
         <div class="list-item">
             <div class="list-item-info">
                 <h4>${e.name}</h4>
-                <p>${e.login_code} · ${e.department || 'Allgemein'}${e.birthdate ? ' · 🎂 ' + new Date(e.birthdate + 'T00:00:00').toLocaleDateString('de-DE', {day:'numeric', month:'long'}) : ''}</p>
+                <p>${e.login_code} · PIN: ${e.password_hash || '—'} · ${e.department || 'Allgemein'}${e.birthdate ? ' · 🎂 ' + new Date(e.birthdate + 'T00:00:00').toLocaleDateString('de-DE', {day:'numeric', month:'long'}) : ''}</p>
                 <p style="font-size:0.8rem; color:${color}; margin-top:0.2rem;">🏖 ${remaining} von ${totalDays} Urlaubstagen übrig</p>
             </div>
             <div style="display:flex; gap:0.5rem; align-items:center;">
