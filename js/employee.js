@@ -556,15 +556,18 @@ function renderAvailGrid(year, month) {
         div.style.fontSize = '0.75rem';
         div.style.gap = '2px';
 
-        if (status === 'full') div.style.background = '#C8E6C9';
-        else if (status === 'partial') div.style.background = '#FFF9C4';
-        else if (status === 'off') div.style.background = '#FFCDD2';
+        if (status === 'full') div.style.background = '#D8F0D8';
+        else if (status === 'partial') div.style.background = '#FFF3CC';
+        else if (status === 'off') div.style.background = '#FFD9D9';    
 
         const timeLabel = (status === 'partial' && entry.from)
             ? `<span style="font-size:0.6rem">${entry.from}-${entry.to}</span>`
             : '';
 
-        div.innerHTML = `<span>${d}</span><span style="font-size:0.9rem">${status === 'full' ? '🟢' : status === 'partial' ? '🟡' : status === 'off' ? '🔴' : ''}</span>${timeLabel}`;
+        const timeHtml = (status === 'partial' && entry?.from)
+            ? `<span style="font-size:0.6rem; line-height:1.2;">${entry.from}</span><span style="font-size:0.6rem; line-height:1.2;">${entry.to}</span>`
+            : '';
+        div.innerHTML = `<span>${d}</span>${timeHtml}`;
         div.onclick = () => openAvailModal(d);
         container.appendChild(div);
     }
