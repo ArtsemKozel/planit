@@ -358,15 +358,13 @@
             <button class="btn-secondary" style="padding:0.75rem 0.25rem; text-align:center;" onclick="setAvailStatus('off')">🔴<br>Nicht verfügbar</button>
         </div>
         <div id="avail-time-fields" style="display:none; margin-top:1rem;">
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.75rem;">
-                <div style="flex:1;">
-                    <label style="font-size:0.85rem; color:var(--color-text-light); display:block; margin-bottom:0.4rem;">Von</label>
-                    <input type="time" id="avail-from" value="08:00" style="width:100%; padding:0.75rem; border:2px solid var(--color-primary); border-radius:10px; font-size:1rem; text-align:center; background:white; box-sizing:border-box;">
-                </div>
-                <div style="flex:1;">
-                    <label style="font-size:0.85rem; color:var(--color-text-light); display:block; margin-bottom:0.4rem;">Bis</label>
-                    <input type="time" id="avail-to" value="16:00" style="width:100%; padding:0.75rem; border:2px solid var(--color-primary); border-radius:10px; font-size:1rem; text-align:center; background:white; box-sizing:border-box;">
-                </div>
+            <div style="margin-bottom:0.75rem;">
+                <label style="font-size:0.85rem; color:var(--color-text-light); display:block; margin-bottom:0.4rem;">Von</label>
+                <input type="time" id="avail-from" value="08:00" style="width:100%; padding:0.75rem; border:2px solid var(--color-primary); border-radius:10px; font-size:1rem; text-align:center; background:white; box-sizing:border-box;">
+            </div>
+            <div style="margin-bottom:0.75rem;">
+                <label style="font-size:0.85rem; color:var(--color-text-light); display:block; margin-bottom:0.4rem;">Bis</label>
+                <input type="time" id="avail-to" value="16:00" style="width:100%; padding:0.75rem; border:2px solid var(--color-primary); border-radius:10px; font-size:1rem; text-align:center; background:white; box-sizing:border-box;">
             </div>
             <button class="btn-primary" onclick="confirmPartialAvail()">Bestätigen</button>
         </div>
