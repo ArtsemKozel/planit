@@ -357,14 +357,14 @@
             <button class="btn-secondary" style="padding:0.75rem 0.25rem; text-align:center;" onclick="setAvailStatus('partial')">🟡<br>Teilweise</button>
             <button class="btn-secondary" style="padding:0.75rem 0.25rem; text-align:center;" onclick="setAvailStatus('off')">🔴<br>Nicht verfügbar</button>
         </div>
-        <div id="avail-time-fields" style="display:none; margin-top:1rem;">
-            <div style="margin-bottom:0.75rem;">
+        <div id="avail-time-fields" style="display:none; margin-top:1rem; width:100%; box-sizing:border-box;">
+            <div style="margin-bottom:0.75rem; width:100%; box-sizing:border-box;">
                 <label style="font-size:0.85rem; color:var(--color-text-light); display:block; margin-bottom:0.4rem;">Von</label>
-                <input type="time" id="avail-from" value="08:00">
+                <input type="time" id="avail-from" value="08:00" style="box-sizing:border-box; width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:8px; font-size:0.95rem;">
             </div>
-            <div style="margin-bottom:0.75rem;">
+            <div style="margin-bottom:0.75rem; width:100%; box-sizing:border-box;">
                 <label style="font-size:0.85rem; color:var(--color-text-light); display:block; margin-bottom:0.4rem;">Bis</label>
-                <input type="time" id="avail-to" value="16:00">
+                <input type="time" id="avail-to" value="16:00" style="box-sizing:border-box; width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:8px; font-size:0.95rem;">
             </div>
             <button class="btn-primary" onclick="confirmPartialAvail()">Bestätigen</button>
         </div>

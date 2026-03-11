@@ -276,18 +276,6 @@ label {
     line-height: 1;
 }
 
-.modal input[type="time"] {
-    width: calc(100% - 0px);
-    max-width: 100%;
-    padding: 0.4rem 0.75rem;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    font-size: 0.95rem;
-    background: white;
-    box-sizing: border-box;
-    display: block;
-}
-
 /* CALENDAR */
 .calendar-grid {
     display: grid;
