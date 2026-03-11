@@ -252,6 +252,7 @@ label {
     max-width: 600px;
     max-height: 85vh;
     overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .modal-header {
@@ -276,13 +277,15 @@ label {
 }
 
 .modal input[type="time"] {
-    width: 100%;
+    width: calc(100% - 0px);
+    max-width: 100%;
     padding: 0.4rem 0.75rem;
     border: 1px solid #ccc;
     border-radius: 8px;
     font-size: 0.95rem;
     background: white;
     box-sizing: border-box;
+    display: block;
 }
 
 /* CALENDAR */
