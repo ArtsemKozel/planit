@@ -275,6 +275,13 @@ label {
     line-height: 1;
 }
 
+input[type="time"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    box-sizing: border-box;
+}
+
 /* CALENDAR */
 .calendar-grid {
     display: grid;
