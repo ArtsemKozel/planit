@@ -352,10 +352,10 @@
             <div class="modal-title" id="avail-modal-title">Tag auswählen</div>
             <button class="modal-close" onclick="closeAvailModal()">✕</button>
         </div>
-        <div style="display:flex; gap:0.75rem; margin-bottom:1rem;">
-            <button class="btn-secondary" style="flex:1;" onclick="setAvailStatus('full')">🟢 Ganztägig</button>
-            <button class="btn-secondary" style="flex:1;" onclick="setAvailStatus('partial')">🟡 Teilweise</button>
-            <button class="btn-secondary" style="flex:1;" onclick="setAvailStatus('off')">🔴 Nicht</button>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.75rem; margin-bottom:1rem;">
+            <button class="btn-secondary" style="padding:0.75rem 0.25rem; text-align:center;" onclick="setAvailStatus('full')">🟢<br>Ganztägig</button>
+            <button class="btn-secondary" style="padding:0.75rem 0.25rem; text-align:center;" onclick="setAvailStatus('partial')">🟡<br>Teilweise</button>
+            <button class="btn-secondary" style="padding:0.75rem 0.25rem; text-align:center;" onclick="setAvailStatus('off')">🔴<br>Nicht verfügbar</button>
         </div>
         <div id="avail-time-fields" style="display:none;">
             <div style="display:flex; gap:1rem;">
