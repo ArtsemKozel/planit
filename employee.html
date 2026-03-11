@@ -127,13 +127,13 @@
         <!-- Legende -->
         <div style="display:flex; gap:1rem; margin-bottom:1rem; flex-wrap:wrap;">
             <div style="display:flex; align-items:center; gap:0.4rem; font-size:0.8rem;">
-                <span>🟢</span> Ganztägig
+                <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#D8F0D8; border:1px solid #a0c8a0;"></span> Ganztägig
             </div>
             <div style="display:flex; align-items:center; gap:0.4rem; font-size:0.8rem;">
-                <span>🟡</span> Teilweise
+                <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#FFF3CC; border:1px solid #d4c070;"></span> Teilweise
             </div>
             <div style="display:flex; align-items:center; gap:0.4rem; font-size:0.8rem;">
-                <span>🔴</span> Nicht verfügbar
+                <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#FFD9D9; border:1px solid #d4a0a0;"></span> Nicht verfügbar
             </div>
         </div>
 
@@ -353,9 +353,18 @@
             <button class="modal-close" onclick="closeAvailModal()">✕</button>
         </div>
         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.75rem; margin-bottom:1rem;">
-            <button class="btn-secondary" style="padding:0.75rem 0.25rem; text-align:center;" onclick="setAvailStatus('full')">🟢<br>Ganztägig</button>
-            <button class="btn-secondary" style="padding:0.75rem 0.25rem; text-align:center;" onclick="setAvailStatus('partial')">🟡<br>Teilweise</button>
-            <button class="btn-secondary" style="padding:0.75rem 0.25rem; text-align:center;" onclick="setAvailStatus('off')">🔴<br>Nicht verfügbar</button>
+            <button class="btn-secondary" style="padding:0.75rem 0.25rem; text-align:center;" onclick="setAvailStatus('full')">
+                <span style="display:block; width:16px; height:16px; border-radius:50%; background:#D8F0D8; border:1px solid #a0c8a0; margin:0 auto 4px;"></span>
+                Ganztägig
+            </button>
+            <button class="btn-secondary" style="padding:0.75rem 0.25rem; text-align:center;" onclick="setAvailStatus('partial')">
+                <span style="display:block; width:16px; height:16px; border-radius:50%; background:#FFF3CC; border:1px solid #d4c070; margin:0 auto 4px;"></span>
+                Teilweise
+            </button>
+            <button class="btn-secondary" style="padding:0.75rem 0.25rem; text-align:center;" onclick="setAvailStatus('off')">
+                <span style="display:block; width:16px; height:16px; border-radius:50%; background:#FFD9D9; border:1px solid #d4a0a0; margin:0 auto 4px;"></span>
+                Nicht verfügbar
+            </button>
         </div>
         <div id="avail-time-fields" style="display:none; margin-top:1rem; width:100%; box-sizing:border-box;">
             <div style="margin-bottom:0.75rem; width:100%; box-sizing:border-box;">
