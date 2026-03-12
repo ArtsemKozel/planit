@@ -50,6 +50,11 @@
             <span id="week-label"></span>
             <button onclick="changeWeek(1)">▶</button>
         </div>
+        <div style="display:flex; justify-content:flex-end; margin-bottom:0.75rem;">
+            <button id="planning-mode-btn" onclick="togglePlanningMode()" style="background:#f0f0f0; border:none; border-radius:20px; padding:0.4rem 1rem; font-size:0.85rem; cursor:pointer; color:var(--color-text);">
+                🗓 Planungsmodus: AUS
+            </button>
+        </div>
         <div style="overflow-x:auto;">
             <div id="week-grid" class="week-grid"></div>
         </div>

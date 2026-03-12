@@ -3,6 +3,8 @@ let employees = [];
 let weekDate = new Date();
 let adminAvailDate = new Date();
 let editShiftId = null;
+let planningMode = false;
+let availabilityCache = {};
 
 // ── INIT ──────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -107,11 +109,51 @@ async function loadWeekGrid() {
         .gte('shift_date', firstDay)
         .lte('shift_date', lastDay);
 
-    renderWeekGrid(days, shifts || []);
+    const availCache = await loadAvailabilityForWeek(days);
+    renderWeekGrid(days, shifts || [], availCache);
     await renderHoursOverview(days, shifts || []);
 }
 
-function renderWeekGrid(days, shifts) {
+async function togglePlanningMode() {
+    planningMode = !planningMode;
+    const btn = document.getElementById('planning-mode-btn');
+    btn.textContent = planningMode ? '🗓 Planungsmodus: AN' : '🗓 Planungsmodus: AUS';
+    btn.style.background = planningMode ? '#D8F0D8' : '#f0f0f0';
+    btn.style.color = planningMode ? '#6aaa6a' : 'var(--color-text)';
+    await loadWeekGrid();
+}
+
+async function loadAvailabilityForWeek(days) {
+    if (!planningMode) return {};
+    
+    // Beide Monate laden falls Woche zwei Monate überspannt
+    const months = [...new Set(days.map(d => {
+        const y = d.getFullYear();
+        const m = d.getMonth();
+        return `${y}-${String(m+1).padStart(2,'0')}-01`;
+    }))];
+
+    const { data } = await db
+        .from('availability')
+        .select('employee_id, available_days, month')
+        .eq('user_id', adminSession.user.id)
+        .in('month', months);
+
+    const cache = {};
+    (data || []).forEach(a => {
+        if (!cache[a.employee_id]) cache[a.employee_id] = {};
+        const monthDate = new Date(a.month);
+        const monthNum = monthDate.getMonth();
+        const year = monthDate.getFullYear();
+        Object.entries(a.available_days || {}).forEach(([day, val]) => {
+            const dateStr = `${year}-${String(monthNum+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+            cache[a.employee_id][dateStr] = val;
+        });
+    });
+    return cache;
+}
+
+function renderWeekGrid(days, shifts, availCache = {}) {
     const grid = document.getElementById('week-grid');
     grid.innerHTML = '';
 
@@ -214,6 +256,17 @@ function renderWeekGrid(days, shifts) {
                 cell.className = 'week-cell' + (shift ? ' has-shift' : '');
                 cell.textContent = shift ? `${shift.start_time.slice(0,5)}\n${shift.end_time.slice(0,5)}` : '+';
                 cell.style.whiteSpace = 'pre';
+
+                // Planungsmodus: Verfügbarkeitsfarbe
+                if (planningMode && !shift) {
+                    const empAvail = availCache[emp.id] || {};
+                    const entry = empAvail[dateStr];
+                    const status = entry ? entry.status : null;
+                    if (status === 'full') cell.style.background = '#D8F0D8';
+                    else if (status === 'partial') cell.style.background = '#FFF3CC';
+                    else if (status === 'off') cell.style.background = '#FFD9D9';
+                }
+
                 cell.onclick = () => openShiftModal(emp.id, dateStr, shift);
                 grid.appendChild(cell);
             });
