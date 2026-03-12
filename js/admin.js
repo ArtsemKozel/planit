@@ -283,7 +283,7 @@ async function renderHoursOverview(days, weekShifts) {
             <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem 0; border-bottom:1px solid var(--color-border);">
                 <span style="font-size:0.9rem; font-weight:600;">${displayName}</span>
                 <div style="text-align:right; font-size:0.85rem;">
-                    <span style="color:${weekColor}; font-weight:600;">${weekH}h KW${kwNumber} (${mondayStr}–${sundayStr})</span>
+                    <span style="color:${weekColor}; font-weight:600;">${weekH}h KW${kwNumber}</span>
                     <span style="color:var(--color-text-light); margin-left:0.5rem;">/ ${monthH}h ${monthNames[month-1]}</span>
                 </div>
             </div>`;
