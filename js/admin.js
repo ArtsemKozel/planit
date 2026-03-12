@@ -108,6 +108,7 @@ async function loadWeekGrid() {
         .lte('shift_date', lastDay);
 
     renderWeekGrid(days, shifts || []);
+    await renderHoursOverview(days, shifts || []);
 }
 
 function renderWeekGrid(days, shifts) {
@@ -188,6 +189,21 @@ function renderWeekGrid(days, shifts) {
             const displayName = parts.length > 1 
                 ? `${parts[0]} ${parts[1][0]}.` 
                 : parts[0];
+
+            // Wochenstunden berechnen
+            const empShifts = shifts.filter(s => s.employee_id === emp.id && !s.is_open);
+            let weekMinutes = 0;
+            empShifts.forEach(s => {
+                const start = s.start_time.slice(0,5).split(':').map(Number);
+                const end = s.end_time.slice(0,5).split(':').map(Number);
+                const minutes = (end[0]*60+end[1]) - (start[0]*60+start[1]) - (s.break_minutes || 0);
+                weekMinutes += minutes;
+            });
+            const weekHours = (weekMinutes / 60).toFixed(1);
+            const hoursColor = weekMinutes === 0 ? 'var(--color-text-light)' :
+                            weekMinutes > 600 ? '#E8A0A0' :
+                            weekMinutes < 240 ? '#FFF3CC' : '#D8F0D8';
+
             empCell.textContent = displayName;
             grid.appendChild(empCell);
 
@@ -203,6 +219,77 @@ function renderWeekGrid(days, shifts) {
             });
         });
     });
+}
+
+async function renderHoursOverview(days, weekShifts) {
+    const container = document.getElementById('hours-overview');
+    if (!container) return;
+
+    // KW berechnen
+    const monday = days[0];
+    const sunday = days[6];
+    const mondayStr = `${monday.getDate().toString().padStart(2,'0')}.${(monday.getMonth()+1).toString().padStart(2,'0')}`;
+    const sundayStr = `${sunday.getDate().toString().padStart(2,'0')}.${(sunday.getMonth()+1).toString().padStart(2,'0')}`;
+
+    // KW Nummer berechnen
+    const startOfYear = new Date(monday.getFullYear(), 0, 1);
+    const kwNumber = Math.ceil(((monday - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7);
+
+    // Monatsstunden laden
+    const year = monday.getFullYear();
+    const month = monday.getMonth() + 1;
+    const monthStart = `${year}-${String(month).padStart(2,'0')}-01`;
+    const monthEnd = `${year}-${String(month).padStart(2,'0')}-31`;
+    const monthNames = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+
+    const { data: monthShifts } = await db
+        .from('shifts')
+        .select('employee_id, start_time, end_time, break_minutes')
+        .eq('user_id', adminSession.user.id)
+        .eq('is_open', false)
+        .gte('shift_date', monthStart)
+        .lte('shift_date', monthEnd);
+
+    const html = employees.map(emp => {
+        // Wochenstunden
+        const empWeekShifts = weekShifts.filter(s => s.employee_id === emp.id && !s.is_open);
+        let weekMinutes = 0;
+        empWeekShifts.forEach(s => {
+            const start = s.start_time.slice(0,5).split(':').map(Number);
+            const end = s.end_time.slice(0,5).split(':').map(Number);
+            weekMinutes += (end[0]*60+end[1]) - (start[0]*60+start[1]) - (s.break_minutes || 0);
+        });
+
+        // Monatsstunden
+        const empMonthShifts = (monthShifts || []).filter(s => s.employee_id === emp.id);
+        let monthMinutes = 0;
+        empMonthShifts.forEach(s => {
+            const start = s.start_time.slice(0,5).split(':').map(Number);
+            const end = s.end_time.slice(0,5).split(':').map(Number);
+            monthMinutes += (end[0]*60+end[1]) - (start[0]*60+start[1]) - (s.break_minutes || 0);
+        });
+
+        const weekH = (weekMinutes / 60).toFixed(1);
+        const monthH = (monthMinutes / 60).toFixed(1);
+
+        const weekColor = weekMinutes === 0 ? 'var(--color-text-light)' :
+                          weekMinutes > 600 ? '#c05050' :
+                          weekMinutes < 240 ? '#b8a020' : '#6aaa6a';
+
+        const parts = emp.name.trim().split(' ');
+        const displayName = parts.length > 1 ? `${parts[0]} ${parts[1][0]}.` : parts[0];
+
+        return `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem 0; border-bottom:1px solid var(--color-border);">
+                <span style="font-size:0.9rem; font-weight:600;">${displayName}</span>
+                <div style="text-align:right; font-size:0.85rem;">
+                    <span style="color:${weekColor}; font-weight:600;">${weekH}h KW${kwNumber} (${mondayStr}–${sundayStr})</span>
+                    <span style="color:var(--color-text-light); margin-left:0.5rem;">/ ${monthH}h ${monthNames[month-1]}</span>
+                </div>
+            </div>`;
+    }).join('');
+
+    container.innerHTML = html || '<div class="empty-state"><p>Keine Mitarbeiter.</p></div>';
 }
 
 function changeWeek(dir) {
