@@ -502,6 +502,21 @@ async function checkAvailabilityWarning(employeeId, date, start, end) {
     const emp = employees.find(e => e.id === employeeId);
     if (!emp) return null;
 
+    // Urlaub prüfen
+    const { data: vacations } = await db
+        .from('vacation_requests')
+        .select('start_date, end_date')
+        .eq('user_id', adminSession.user.id)
+        .eq('employee_id', employeeId)
+        .eq('status', 'approved')
+        .lte('start_date', date)
+        .gte('end_date', date);
+
+    if (vacations && vacations.length > 0) {
+        return `${emp.name} hat an diesem Tag genehmigten Urlaub!`;
+    }
+
+    // Verfügbarkeit prüfen
     const d = new Date(date + 'T12:00:00');
     const monthStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
     const dayNum = d.getDate();
