@@ -893,6 +893,17 @@ async function loadAdminAvailability() {
         .eq('month', monthStr)
         .maybeSingle();
 
+    // Urlaubstage laden
+    const monthStart = `${year}-${String(month+1).padStart(2,'0')}-01`;
+    const monthEnd = `${year}-${String(month+1).padStart(2,'0')}-${new Date(year, month+1, 0).getDate()}`;
+    const { data: vacations } = await db
+        .from('vacation_requests')
+        .select('start_date, end_date')
+        .eq('employee_id', employeeId)
+        .eq('status', 'approved')
+        .gte('start_date', monthStart)
+        .lte('end_date', monthEnd);
+
     const availDays = (data && !Array.isArray(data.available_days)) ? data.available_days : {};
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const firstWeekday = new Date(year, month, 1).getDay();
@@ -930,7 +941,11 @@ async function loadAdminAvailability() {
         div.style.gap = '2px';
         div.style.cursor = 'default';
 
-        if (status === 'full') div.style.background = '#D8F0D8';
+        const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const isVacation = (vacations || []).some(v => v.start_date <= dateStr && v.end_date >= dateStr);
+
+        if (isVacation) div.style.background = '#D0E8FF';
+        else if (status === 'full') div.style.background = '#D8F0D8';
         else if (status === 'partial') div.style.background = '#FFF3CC';
         else if (status === 'off') div.style.background = '#FFD9D9';
         const timeHtml = (status === 'partial' && entry?.from)
@@ -952,6 +967,9 @@ function changeAdminAvailMonth(dir) {
 async function loadAllAvailabilities() {
     const year = adminAvailDate.getFullYear();
     const month = adminAvailDate.getMonth();
+    const loadId = `${year}-${month}`;
+    loadAllAvailabilities._currentLoad = loadId;
+
     const monthStr = `${year}-${String(month+1).padStart(2,'0')}-01`;
     const monthNames = ['Januar','Februar','März','April','Mai','Juni',
                         'Juli','August','September','Oktober','November','Dezember'];
@@ -961,7 +979,12 @@ async function loadAllAvailabilities() {
     container.innerHTML = '';
     container.classList.add('all-view');
 
+    const monthStart = `${year}-${String(month+1).padStart(2,'0')}-01`;
+    const monthEnd = `${year}-${String(month+1).padStart(2,'0')}-${new Date(year, month+1, 0).getDate()}`;
+
     for (const emp of employees) {
+        if (loadAllAvailabilities._currentLoad !== loadId) return;
+
         const { data } = await db
             .from('availability')
             .select('*')
@@ -969,9 +992,21 @@ async function loadAllAvailabilities() {
             .eq('month', monthStr)
             .maybeSingle();
 
+        if (loadAllAvailabilities._currentLoad !== loadId) return;
+
         const availDays = (data && !Array.isArray(data.available_days)) ? data.available_days : {};
 
-        // Mitarbeiter-Name als Titel
+        const { data: vacations } = await db
+            .from('vacation_requests')
+            .select('start_date, end_date')
+            .eq('user_id', adminSession.user.id)
+            .eq('employee_id', emp.id)
+            .eq('status', 'approved')
+            .lte('start_date', monthEnd)
+            .gte('end_date', monthStart);
+
+        if (loadAllAvailabilities._currentLoad !== loadId) return;
+
         const title = document.createElement('div');
         title.style.fontWeight = '700';
         title.style.fontSize = '0.9rem';
@@ -980,7 +1015,6 @@ async function loadAllAvailabilities() {
         title.textContent = emp.name;
         container.appendChild(title);
 
-        // Kalender
         const grid = document.createElement('div');
         grid.className = 'availability-grid';
         grid.style.marginBottom = '1.5rem';
@@ -1014,9 +1048,14 @@ async function loadAllAvailabilities() {
             div.style.gap = '2px';
             div.style.cursor = 'default';
 
-            if (status === 'full') div.style.background = '#D8F0D8';
+            const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            const isVacation = (vacations || []).some(v => v.start_date <= dateStr && v.end_date >= dateStr);
+
+            if (isVacation) div.style.background = '#D0E8FF';
+            else if (status === 'full') div.style.background = '#D8F0D8';
             else if (status === 'partial') div.style.background = '#FFF3CC';
             else if (status === 'off') div.style.background = '#FFD9D9';
+
             const timeHtml = (status === 'partial' && entry?.from)
                 ? `<span style="font-size:0.6rem; line-height:1.2;">${entry.from}</span><span style="font-size:0.6rem; line-height:1.2;">${entry.to}</span>`
                 : '';
