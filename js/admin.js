@@ -936,7 +936,10 @@ async function loadAdminAvailability() {
         const timeHtml = (status === 'partial' && entry?.from)
             ? `<span style="font-size:0.6rem; line-height:1.2;">${entry.from}</span><span style="font-size:0.6rem; line-height:1.2;">${entry.to}</span>`
             : '';
-        div.innerHTML = `<span>${d}</span>${timeHtml}`;
+        const commentHtml = entry?.comment
+            ? `<span style="font-size:0.55rem; color:#888; line-height:1.2; white-space:normal; text-align:center;">${entry.comment}</span>`
+            : '';
+        div.innerHTML = `<span>${d}</span>${timeHtml}${commentHtml}`;
         container.appendChild(div);
     }
 }
@@ -1017,7 +1020,10 @@ async function loadAllAvailabilities() {
             const timeHtml = (status === 'partial' && entry?.from)
                 ? `<span style="font-size:0.6rem; line-height:1.2;">${entry.from}</span><span style="font-size:0.6rem; line-height:1.2;">${entry.to}</span>`
                 : '';
-            div.innerHTML = `<span>${d}</span>${timeHtml}`;
+            const commentHtml = entry?.comment
+                ? `<span style="font-size:0.55rem; color:#888; line-height:1.2; white-space:normal; text-align:center;">${entry.comment}</span>`
+                : '';
+            div.innerHTML = `<span>${d}</span>${timeHtml}${commentHtml}`;
             grid.appendChild(div);
         }
 

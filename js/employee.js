@@ -579,6 +579,18 @@ function openAvailModal(day) {
     currentAvailDay = day;
     document.getElementById('avail-modal-title').textContent = `${day}. – Verfügbarkeit`;
     document.getElementById('avail-time-fields').style.display = 'none';
+    
+    // Bestehenden Kommentar laden
+    const entry = selectedAvailDays[day];
+    document.getElementById('avail-comment').value = entry?.comment || '';
+    
+    // Bestehende Zeiten laden falls partial
+    if (entry?.status === 'partial' && entry.from) {
+        document.getElementById('avail-time-fields').style.display = 'block';
+        document.getElementById('avail-from').value = entry.from;
+        document.getElementById('avail-to').value = entry.to || '16:00';
+    }
+    
     document.getElementById('avail-modal').classList.add('open');
 }
 
@@ -592,7 +604,8 @@ function setAvailStatus(status) {
         document.getElementById('avail-time-fields').style.display = 'block';
         return;
     }
-    selectedAvailDays[currentAvailDay] = { status };
+    const comment = document.getElementById('avail-comment').value.trim();
+    selectedAvailDays[currentAvailDay] = { status, ...(comment ? { comment } : {}) };
     renderAvailGrid(availDate.getFullYear(), availDate.getMonth());
     closeAvailModal();
 }
@@ -600,7 +613,8 @@ function setAvailStatus(status) {
 function confirmPartialAvail() {
     const from = document.getElementById('avail-from').value;
     const to = document.getElementById('avail-to').value;
-    selectedAvailDays[currentAvailDay] = { status: 'partial', from, to };
+    const comment = document.getElementById('avail-comment').value.trim();
+    selectedAvailDays[currentAvailDay] = { status: 'partial', from, to, ...(comment ? { comment } : {}) };
     renderAvailGrid(availDate.getFullYear(), availDate.getMonth());
     closeAvailModal();
 }
