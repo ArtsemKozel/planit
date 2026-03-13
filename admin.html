@@ -466,6 +466,18 @@
     </div>
 </div>
 
+<!-- MODAL: VERFÜGBARKEITS-WARNUNG -->
+<div id="avail-warning-modal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">⚠️ Verfügbarkeit</div>
+        </div>
+        <div id="avail-warning-text" style="margin-bottom:1.5rem; font-size:0.95rem; line-height:1.5;"></div>
+        <button class="btn-primary" onclick="confirmShiftDespiteWarning()">Trotzdem einplanen</button>
+        <button class="btn-secondary" style="margin-top:0.75rem;" onclick="closeAvailWarningModal()">Abbrechen</button>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/auth.js"></script>
 <script src="js/admin.js"></script>

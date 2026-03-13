@@ -408,7 +408,6 @@ async function submitShift() {
     const breakMin = document.getElementById('shift-break').value;
     const notes = document.getElementById('shift-notes').value;
     const errorDiv = document.getElementById('shift-error');
-
     errorDiv.style.display = 'none';
 
     if (!date || !start || !end) {
@@ -431,14 +430,83 @@ async function submitShift() {
         department: isOpen ? document.getElementById('shift-department').value : null
     };
 
-    let error;
+    const repeat = document.getElementById('shift-repeat').checked;
+    const weeks = parseInt(document.getElementById('shift-repeat-weeks').value) || 1;
 
+    // Verfügbarkeit prüfen (nur bei normalen Schichten, nicht offenen)
+    if (!isOpen) {
+        const warning = await checkAvailabilityWarning(employeeId, date, start, end);
+        if (warning) {
+            pendingShiftPayload = payload;
+            pendingShiftIsRepeat = repeat;
+            pendingShiftWeeks = weeks;
+            document.getElementById('avail-warning-text').textContent = warning;
+            document.getElementById('avail-warning-modal').classList.add('active');
+            return;
+        }
+    }
+
+    await saveShift(payload, repeat, weeks);
+}
+
+let pendingShiftPayload = null;
+let pendingShiftIsRepeat = false;
+let pendingShiftWeeks = 1;
+
+function closeAvailWarningModal() {
+    document.getElementById('avail-warning-modal').classList.remove('active');
+    pendingShiftPayload = null;
+}
+
+async function confirmShiftDespiteWarning() {
+    document.getElementById('avail-warning-modal').classList.remove('active');
+    await saveShift(pendingShiftPayload, pendingShiftIsRepeat, pendingShiftWeeks);
+}
+
+async function checkAvailabilityWarning(employeeId, date, start, end) {
+    if (!employeeId || !date) return null;
+    const emp = employees.find(e => e.id === employeeId);
+    if (!emp) return null;
+
+    const d = new Date(date + 'T12:00:00');
+    const monthStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
+    const dayNum = d.getDate();
+
+    const { data } = await db
+        .from('availability')
+        .select('available_days')
+        .eq('employee_id', employeeId)
+        .eq('month', monthStr)
+        .maybeSingle();
+
+    if (!data) return null;
+    const entry = (data.available_days || {})[dayNum];
+    if (!entry) return null;
+
+    if (entry.status === 'off') {
+        return `${emp.name} ist an diesem Tag nicht verfügbar!`;
+    }
+
+    if (entry.status === 'partial' && entry.from && entry.to) {
+        const toMinutes = t => parseInt(t.split(':')[0]) * 60 + parseInt(t.split(':')[1]);
+        const availFrom = toMinutes(entry.from);
+        const availTo = toMinutes(entry.to);
+        const shiftFrom = toMinutes(start);
+        const shiftTo = toMinutes(end);
+        if (shiftFrom < availFrom || shiftTo > availTo) {
+            return `${emp.name} ist nur von ${entry.from}–${entry.to} Uhr verfügbar. Die Schicht liegt außerhalb!`;
+        }
+    }
+
+    return null;
+}
+
+async function saveShift(payload, repeat, weeks) {
+    const errorDiv = document.getElementById('shift-error');
+    let error;
     if (editShiftId) {
         ({ error } = await db.from('shifts').update(payload).eq('id', editShiftId));
     } else {
-        const repeat = document.getElementById('shift-repeat').checked;
-        const weeks = parseInt(document.getElementById('shift-repeat-weeks').value) || 1;
-
         if (repeat && weeks > 1) {
             const payloads = [];
             for (let i = 0; i < weeks; i++) {
@@ -451,13 +519,11 @@ async function submitShift() {
             ({ error } = await db.from('shifts').insert(payload));
         }
     }
-
     if (error) {
         errorDiv.textContent = 'Fehler beim Speichern.';
         errorDiv.style.display = 'block';
         return;
     }
-
     closeShiftModal();
     await loadWeekGrid();
 }
