@@ -600,10 +600,24 @@ function closeAvailModal() {
 }
 
 function setAvailStatus(status) {
-    if (status === 'partial') {
-        document.getElementById('avail-time-fields').style.display = 'block';
-        return;
-    }
+    // Alle Buttons zurücksetzen
+    document.querySelectorAll('#avail-modal .btn-secondary').forEach(btn => {
+        btn.style.outline = 'none';
+    });
+
+    // Gewählten Button markieren
+    const colors = { full: '#a0c8a0', partial: '#d4c070', off: '#d4a0a0' };
+    event.currentTarget.style.outline = `2px solid ${colors[status]}`;
+
+    document.getElementById('avail-time-fields').style.display = status === 'partial' ? 'block' : 'none';
+    document.getElementById('avail-confirm-btn').style.display = status === 'partial' ? 'none' : 'block';
+
+    if (!selectedAvailDays[currentAvailDay]) selectedAvailDays[currentAvailDay] = {};
+    selectedAvailDays[currentAvailDay].status = status;
+}
+
+function confirmAvail() {
+    const status = selectedAvailDays[currentAvailDay]?.status;
     const comment = document.getElementById('avail-comment').value.trim();
     selectedAvailDays[currentAvailDay] = { status, ...(comment ? { comment } : {}) };
     renderAvailGrid(availDate.getFullYear(), availDate.getMonth());
