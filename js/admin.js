@@ -129,19 +129,29 @@ async function togglePlanningMode() {
 
 async function loadAvailabilityForWeek(days) {
     if (!planningMode) return {};
-    
-    // Beide Monate laden falls Woche zwei Monate überspannt
+
     const months = [...new Set(days.map(d => {
         const y = d.getFullYear();
         const m = d.getMonth();
         return `${y}-${String(m+1).padStart(2,'0')}-01`;
     }))];
 
+    const weekStart = days[0].toISOString().split('T')[0];
+    const weekEnd = days[days.length-1].toISOString().split('T')[0];
+
     const { data } = await db
         .from('availability')
         .select('employee_id, available_days, month')
         .eq('user_id', adminSession.user.id)
         .in('month', months);
+
+    const { data: vacations } = await db
+        .from('vacation_requests')
+        .select('employee_id, start_date, end_date')
+        .eq('user_id', adminSession.user.id)
+        .eq('status', 'approved')
+        .lte('start_date', weekEnd)
+        .gte('end_date', weekStart);
 
     const cache = {};
     (data || []).forEach(a => {
@@ -154,6 +164,18 @@ async function loadAvailabilityForWeek(days) {
             cache[a.employee_id][dateStr] = val;
         });
     });
+
+    // Urlaubstage als 'vacation' markieren
+    (vacations || []).forEach(v => {
+        if (!cache[v.employee_id]) cache[v.employee_id] = {};
+        days.forEach(d => {
+            const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            if (v.start_date <= dateStr && v.end_date >= dateStr) {
+                cache[v.employee_id][dateStr] = { status: 'vacation' };
+            }
+        });
+    });
+
     return cache;
 }
 
@@ -266,7 +288,8 @@ function renderWeekGrid(days, shifts, availCache = {}) {
                     const empAvail = availCache[emp.id] || {};
                     const entry = empAvail[dateStr];
                     const status = entry ? entry.status : null;
-                    if (status === 'full') cell.style.background = '#D8F0D8';
+                    if (status === 'vacation') cell.style.background = '#D0E8FF';
+                    else if (status === 'full') cell.style.background = '#D8F0D8';
                     else if (status === 'partial') {
                         cell.style.background = '#FFF3CC';
                         if (entry.from && entry.to) {
