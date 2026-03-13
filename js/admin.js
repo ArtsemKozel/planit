@@ -263,7 +263,14 @@ function renderWeekGrid(days, shifts, availCache = {}) {
                     const entry = empAvail[dateStr];
                     const status = entry ? entry.status : null;
                     if (status === 'full') cell.style.background = '#D8F0D8';
-                    else if (status === 'partial') cell.style.background = '#FFF3CC';
+                    else if (status === 'partial') {
+                        cell.style.background = '#FFF3CC';
+                        if (entry.from && entry.to) {
+                            cell.textContent = `${entry.from.slice(0,5)}\n${entry.to.slice(0,5)}`;
+                            cell.style.whiteSpace = 'pre';
+                            cell.style.fontSize = '0.65rem';
+                        }
+                    }
                     else if (status === 'off') cell.style.background = '#FFD9D9';
                 }
 
