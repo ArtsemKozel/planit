@@ -521,9 +521,21 @@ async function submitVacation() {
 }
 
 // ── VERFÜGBARKEIT ─────────────────────────────────────────
-function renderAvailGrid(year, month) {
+async function renderAvailGrid(year, month) {
     const container = document.getElementById('avail-grid');
     container.innerHTML = '';
+
+    // Urlaubstage laden
+    const monthStart = `${year}-${String(month+1).padStart(2,'0')}-01`;
+    const monthEnd = `${year}-${String(month+1).padStart(2,'0')}-${new Date(year, month+1, 0).getDate()}`;
+    const { data: vacations, error: vacError } = await db
+        .from('vacation_requests')
+        .select('start_date, end_date')
+        .eq('employee_id', currentEmployee.id)
+        .eq('status', 'approved')
+        .gte('start_date', monthStart)
+        .lte('end_date', monthEnd);
+    console.log('Vacations:', vacations, 'Error:', vacError);
 
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const firstWeekday = new Date(year, month, 1).getDay();
@@ -556,9 +568,13 @@ function renderAvailGrid(year, month) {
         div.style.fontSize = '0.75rem';
         div.style.gap = '2px';
 
-        if (status === 'full') div.style.background = '#D8F0D8';
+        const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const isVacation = (vacations || []).some(v => v.start_date <= dateStr && v.end_date >= dateStr);
+
+        if (isVacation) div.style.background = '#D0E8FF';
+        else if (status === 'full') div.style.background = '#D8F0D8';
         else if (status === 'partial') div.style.background = '#FFF3CC';
-        else if (status === 'off') div.style.background = '#FFD9D9';    
+        else if (status === 'off') div.style.background = '#FFD9D9';
 
         const timeLabel = (status === 'partial' && entry.from)
             ? `<span style="font-size:0.6rem">${entry.from}-${entry.to}</span>`
@@ -616,26 +632,26 @@ function setAvailStatus(status) {
     selectedAvailDays[currentAvailDay].status = status;
 }
 
-function confirmAvail() {
+async function confirmAvail() {
     const status = selectedAvailDays[currentAvailDay]?.status;
     const comment = document.getElementById('avail-comment').value.trim();
     selectedAvailDays[currentAvailDay] = { status, ...(comment ? { comment } : {}) };
-    renderAvailGrid(availDate.getFullYear(), availDate.getMonth());
+    await renderAvailGrid(availDate.getFullYear(), availDate.getMonth());
     closeAvailModal();
 }
 
-function confirmPartialAvail() {
+async function confirmPartialAvail() {
     const from = document.getElementById('avail-from').value;
     const to = document.getElementById('avail-to').value;
     const comment = document.getElementById('avail-comment').value.trim();
     selectedAvailDays[currentAvailDay] = { status: 'partial', from, to, ...(comment ? { comment } : {}) };
-    renderAvailGrid(availDate.getFullYear(), availDate.getMonth());
+    await renderAvailGrid(availDate.getFullYear(), availDate.getMonth());
     closeAvailModal();
 }
 
-function clearAvailDay() {
+async function clearAvailDay() {
     delete selectedAvailDays[currentAvailDay];
-    renderAvailGrid(availDate.getFullYear(), availDate.getMonth());
+    await renderAvailGrid(availDate.getFullYear(), availDate.getMonth());
     closeAvailModal();
 }
 
@@ -655,7 +671,7 @@ async function loadAvailability() {
         .maybeSingle();
 
     selectedAvailDays = (data && !Array.isArray(data.available_days)) ? data.available_days : {};
-    renderAvailGrid(year, month);
+    await renderAvailGrid(year, month);
 }
 
 async function saveAvailability() {
