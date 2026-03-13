@@ -49,7 +49,11 @@ function getEasterDates(year) {
     const day = ((h+l-7*m+114) % 31) + 1;
     const easter = new Date(year, month-1, day);
     
-    const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate()+n); return r.toISOString().split('T')[0]; };
+    const addDays = (d, n) => { 
+        const r = new Date(d); 
+        r.setDate(r.getDate()+n); 
+        return `${r.getFullYear()}-${String(r.getMonth()+1).padStart(2,'0')}-${String(r.getDate()).padStart(2,'0')}`;
+    };
     return [
         addDays(easter, -2), // Karfreitag
         addDays(easter, 0),  // Ostersonntag
