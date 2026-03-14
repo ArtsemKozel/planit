@@ -4,6 +4,7 @@ let availDate = new Date();
 let myShifts = [];
 let selectedSwapShift = null;
 let selectedAvailDays = {};
+let overviewDate = new Date();
 
 // ── INIT ──────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -841,8 +842,8 @@ async function submitSwap() {
 
 // ── ÜBERSICHT ─────────────────────────────────────────────
 async function loadOverview() {
-    const now = new Date();
-    const today = now.toISOString().split('T')[0];
+    const now = overviewDate;
+    const today = new Date().toISOString().split('T')[0];
     const monthStart = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
     const monthEnd = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${new Date(now.getFullYear(), now.getMonth()+1, 0).getDate()}`;
     const monthNames = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
@@ -919,6 +920,11 @@ async function loadOverview() {
             listEl.appendChild(row);
         });
     }
+}
+
+function changeOverviewMonth(dir) {
+    overviewDate.setMonth(overviewDate.getMonth() + dir);
+    loadOverview();
 }
 
 // ── HELPER ────────────────────────────────────────────────
