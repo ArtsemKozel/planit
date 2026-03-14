@@ -684,25 +684,26 @@ async function loadAdminVacations() {
     }
 
     container.innerHTML = vacations.map(v => `
-        <div class="list-item">
-            <div class="list-item-info">
-                <h4>${v.employees_planit?.name || 'Unbekannt'}</h4>
-                <p>${formatDate(v.start_date)} – ${formatDate(v.end_date)}</p>
-                <p style="font-size:0.8rem;">${v.reason || 'Kein Grund'}</p>
+            <div class="list-item">
+                <div class="list-item-info">
+                    <h4>${v.employees_planit?.name || 'Unbekannt'}</h4>
+                    <p>${formatDate(v.start_date)} – ${formatDate(v.end_date)}</p>
+                    <p style="font-size:0.8rem;">${v.reason || 'Kein Grund'}</p>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:0.5rem; align-items:flex-end;">
+                    <span class="badge badge-${v.status}">
+    ${v.status === 'pending' ? 'Ausstehend' : v.status === 'approved' ? 'Genehmigt' : 'Abgelehnt'}
+                    </span>
+    ${v.status === 'pending' ? `
+                        <div style="display:flex; gap:0.5rem;">
+                            <button class="btn-small btn-approve" onclick="reviewVacation('${v.id}', 'approved')">✓</button>
+                            <button class="btn-small btn-reject" onclick="reviewVacation('${v.id}', 'rejected')">✕</button>
+                        </div>
+                    ` : ''}
+                    <button class="btn-small" style="background:#FFD9D9; color:#C97E7E;" onclick="deleteVacation('${v.id}')">🗑</button>
+                </div>
             </div>
-            <div style="display:flex; flex-direction:column; gap:0.5rem; align-items:flex-end;">
-                <span class="badge badge-${v.status}">
-                    ${v.status === 'pending' ? 'Ausstehend' : v.status === 'approved' ? 'Genehmigt' : 'Abgelehnt'}
-                </span>
-                ${v.status === 'pending' ? `
-                    <div style="display:flex; gap:0.5rem;">
-                        <button class="btn-small btn-approve" onclick="reviewVacation('${v.id}', 'approved')">✓</button>
-                        <button class="btn-small btn-reject" onclick="reviewVacation('${v.id}', 'rejected')">✕</button>
-                    </div>
-                ` : ''}
-            </div>
-        </div>
-    `).join('');
+        `).join('');
 }
 
 let rejectVacationId = null;
@@ -780,6 +781,15 @@ async function downloadAllVacations() {
     });
 
     doc.save('Urlaubsantraege.pdf');
+}
+
+async function deleteVacation(id) {
+    if (!confirm('Urlaubsantrag wirklich löschen?')) return;
+    const { error } = await db
+        .from('vacation_requests')
+        .delete()
+        .eq('id', id);
+    if (!error) await loadAdminVacations();
 }
 
 // ── URLAUBSKALENDER (ADMIN) ───────────────────────────────
