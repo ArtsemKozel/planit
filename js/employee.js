@@ -577,6 +577,7 @@ async function renderAvailGrid(year, month) {
         const isVacation = (vacations || []).some(v => v.start_date <= dateStr && v.end_date >= dateStr);
 
         if (isVacation) div.style.background = '#D0E8FF';
+        else if (status === 'school') div.style.background = '#E8D0FF';
         else if (status === 'full') div.style.background = '#D8F0D8';
         else if (status === 'partial') div.style.background = '#FFF3CC';
         else if (status === 'off') div.style.background = '#FFD9D9';
@@ -600,18 +601,22 @@ function openAvailModal(day) {
     currentAvailDay = day;
     document.getElementById('avail-modal-title').textContent = `${day}. – Verfügbarkeit`;
     document.getElementById('avail-time-fields').style.display = 'none';
-    
+
+    // Schule-Button nur für Azubis
+    document.getElementById('avail-school-btn').style.display = 
+        currentEmployee.is_apprentice ? 'block' : 'none';
+
     // Bestehenden Kommentar laden
     const entry = selectedAvailDays[day];
     document.getElementById('avail-comment').value = entry?.comment || '';
-    
+
     // Bestehende Zeiten laden falls partial
     if (entry?.status === 'partial' && entry.from) {
         document.getElementById('avail-time-fields').style.display = 'block';
         document.getElementById('avail-from').value = entry.from;
         document.getElementById('avail-to').value = entry.to || '16:00';
     }
-    
+
     document.getElementById('avail-modal').classList.add('open');
 }
 

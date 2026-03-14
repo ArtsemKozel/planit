@@ -83,7 +83,9 @@ async function loginEmployee() {
         id: employee.id,
         name: employee.name,
         login_code: employee.login_code,
-        user_id: employee.user_id
+        user_id: employee.user_id,
+        is_apprentice: employee.is_apprentice || false,
+        department: employee.department
     }));
     window.location.href = 'employee.html';
 }

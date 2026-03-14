@@ -289,6 +289,7 @@ function renderWeekGrid(days, shifts, availCache = {}) {
                     const entry = empAvail[dateStr];
                     const status = entry ? entry.status : null;
                     if (status === 'vacation') cell.style.background = '#D0E8FF';
+                    else if (status === 'school') cell.style.background = '#E8D0FF';
                     else if (status === 'full') cell.style.background = '#D8F0D8';
                     else if (status === 'partial') {
                         cell.style.background = '#FFF3CC';
@@ -534,6 +535,10 @@ async function checkAvailabilityWarning(employeeId, date, start, end) {
 
     if (entry.status === 'off') {
         return `${emp.name} ist an diesem Tag nicht verfügbar!`;
+    }
+
+    if (entry.status === 'school') {
+        return `${emp.name} hat an diesem Tag Schule!`;
     }
 
     if (entry.status === 'partial' && entry.from && entry.to) {
@@ -997,6 +1002,7 @@ async function loadAdminAvailability() {
         const isVacation = (vacations || []).some(v => v.start_date <= dateStr && v.end_date >= dateStr);
 
         if (isVacation) div.style.background = '#D0E8FF';
+        else if (status === 'school') div.style.background = '#E8D0FF';
         else if (status === 'full') div.style.background = '#D8F0D8';
         else if (status === 'partial') div.style.background = '#FFF3CC';
         else if (status === 'off') div.style.background = '#FFD9D9';
@@ -1104,6 +1110,7 @@ async function loadAllAvailabilities() {
             const isVacation = (vacations || []).some(v => v.start_date <= dateStr && v.end_date >= dateStr);
 
             if (isVacation) div.style.background = '#D0E8FF';
+            else if (status === 'school') div.style.background = '#E8D0FF';
             else if (status === 'full') div.style.background = '#D8F0D8';
             else if (status === 'partial') div.style.background = '#FFF3CC';
             else if (status === 'off') div.style.background = '#FFD9D9';
@@ -1232,6 +1239,7 @@ async function submitNewEmployee() {
     const department = document.getElementById('new-emp-department').value;
 
     const birthdate = document.getElementById('new-emp-birthdate').value || null;
+    const is_apprentice = document.getElementById('new-emp-apprentice').checked;
     const { error } = await db.from('employees_planit').insert({
         user_id: adminSession.user.id,
         name,
@@ -1239,7 +1247,8 @@ async function submitNewEmployee() {
         password_hash: password,
         department: department,
         is_active: true,
-        birthdate
+        birthdate,
+        is_apprentice
     });
 
     if (error) {
@@ -1339,6 +1348,7 @@ function openEditEmployeeModal(id) {
     document.getElementById('edit-emp-error').style.display = 'none';
     document.getElementById('edit-emp-birthdate').value = emp.birthdate || '';
     document.getElementById('edit-emp-vacation-days').value = emp.vacation_days_per_year ?? 20;
+    document.getElementById('edit-emp-apprentice').checked = emp.is_apprentice || false;
     document.getElementById('edit-employee-modal').classList.add('open');
 }
 
@@ -1363,7 +1373,8 @@ async function submitEditEmployee() {
         return;
     }
 
-    const payload = { name, login_code: loginCode, department, birthdate, vacation_days_per_year: vacationDays };
+    const is_apprentice = document.getElementById('edit-emp-apprentice').checked;
+    const payload = { name, login_code: loginCode, department, birthdate, vacation_days_per_year: vacationDays, is_apprentice };
     if (password) payload.password_hash = password;
 
     const { error } = await db.from('employees_planit').update(payload).eq('id', editEmployeeId);
