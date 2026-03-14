@@ -46,15 +46,31 @@
 
     <!-- TAB 0: ÜBERSICHT -->
     <div id="tab-uebersicht" class="tab-content active">
-        <div class="section-title">Übersicht</div>
+
+        <!-- Ihr Dienstplan -->
         <div class="card" style="margin-bottom:1rem;">
-            <div style="font-size:0.8rem; color:var(--color-text-light); margin-bottom:0.4rem;">HEUTE</div>
-            <div id="today-shift-info" style="font-size:1rem; font-weight:600;">Keine Schicht heute</div>
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem;">
+                <div style="display:flex; align-items:center; gap:0.5rem;">
+                    <span style="font-size:1.4rem;">📅</span>
+                    <span style="font-weight:700; font-size:1.05rem;">Ihr Dienstplan</span>
+                </div>
+                <span id="overview-month" style="font-size:0.85rem; color:var(--color-text-light);"></span>
+            </div>
+            <div id="overview-shifts-list"></div>
         </div>
+
+        <!-- Offene Schichten -->
         <div class="card">
-            <div style="font-size:0.8rem; color:var(--color-text-light); margin-bottom:0.4rem;">NÄCHSTE SCHICHT</div>
-            <div id="next-shift-info" style="font-size:1rem; font-weight:600;">–</div>
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem;">
+                <div style="display:flex; align-items:center; gap:0.5rem;">
+                    <span style="font-size:1.4rem;">📋</span>
+                    <span style="font-weight:700; font-size:1.05rem;">Offene Schichten</span>
+                </div>
+                <span id="overview-open-month" style="font-size:0.85rem; color:var(--color-text-light);"></span>
+            </div>
+            <div id="overview-open-list"></div>
         </div>
+
     </div>
 
     <!-- TAB 1: SCHICHTPLAN -->

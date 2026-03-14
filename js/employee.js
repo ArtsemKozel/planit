@@ -841,33 +841,83 @@ async function submitSwap() {
 
 // ── ÜBERSICHT ─────────────────────────────────────────────
 async function loadOverview() {
-    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+    const monthEnd = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${new Date(now.getFullYear(), now.getMonth()+1, 0).getDate()}`;
+    const monthNames = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+    const dayNames = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 
-    // Alle zukünftigen Schichten laden
+    document.getElementById('overview-month').textContent = `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+    document.getElementById('overview-open-month').textContent = `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+
+    // Eigene Schichten laden
     const { data: shifts } = await db
         .from('shifts')
         .select('*')
         .eq('employee_id', currentEmployee.id)
-        .gte('shift_date', today)
-        .order('shift_date')
-        .limit(5);
+        .gte('shift_date', monthStart)
+        .lte('shift_date', monthEnd)
+        .order('shift_date');
 
-    const todayShift = shifts ? shifts.find(s => s.shift_date === today) : null;
-    const nextShift = shifts ? shifts.find(s => s.shift_date > today) : null;
+    const listEl = document.getElementById('overview-shifts-list');
+    listEl.innerHTML = '';
 
-    const todayEl = document.getElementById('today-shift-info');
-    const nextEl = document.getElementById('next-shift-info');
-
-    if (todayShift) {
-        todayEl.textContent = `${todayShift.start_time.slice(0,5)} – ${todayShift.end_time.slice(0,5)} Uhr`;
+    if (!shifts || shifts.length === 0) {
+        listEl.innerHTML = '<div style="color:var(--color-text-light); font-size:0.9rem;">Keine Schichten diesen Monat</div>';
     } else {
-        todayEl.textContent = 'Keine Schicht heute';
+        shifts.forEach(s => {
+            const d = new Date(s.shift_date + 'T12:00:00');
+            const isToday = s.shift_date === today;
+            const row = document.createElement('div');
+            row.style.cssText = `display:flex; align-items:center; gap:1rem; padding:0.75rem; border-radius:12px; margin-bottom:0.5rem; background:${isToday ? '#FFF8E7' : 'var(--color-gray)'};`;
+            row.innerHTML = `
+                <div style="min-width:2.5rem; text-align:center;">
+                    <div style="font-size:1.3rem; font-weight:700; line-height:1; color:${isToday ? 'var(--color-primary)' : 'inherit'};">${d.getDate()}</div>
+                    <div style="font-size:0.7rem; color:var(--color-text-light);">${dayNames[d.getDay()]}</div>
+                </div>
+                <div style="flex:1; background:white; border-radius:10px; padding:0.6rem 0.75rem;">
+                    <div style="font-weight:700; font-size:0.95rem;">${s.start_time.slice(0,5)} – ${s.end_time.slice(0,5)}</div>
+                    ${s.notes ? `<div style="font-size:0.8rem; color:var(--color-text-light);">${s.notes}</div>` : ''}
+                </div>
+            `;
+            listEl.appendChild(row);
+        });
     }
 
-    if (nextShift) {
-        nextEl.textContent = `${formatDate(nextShift.shift_date)} | ${nextShift.start_time.slice(0,5)} – ${nextShift.end_time.slice(0,5)} Uhr`;
+    // Offene Schichten laden (eigene Abteilung)
+    const { data: openShifts } = await db
+        .from('shifts')
+        .select('*')
+        .eq('user_id', currentEmployee.user_id)
+        .eq('is_open', true)
+        .eq('department', currentEmployee.department)
+        .gte('shift_date', monthStart)
+        .lte('shift_date', monthEnd)
+        .order('shift_date');
+
+    const openEl = document.getElementById('overview-open-list');
+    openEl.innerHTML = '';
+
+    if (!openShifts || openShifts.length === 0) {
+        openEl.innerHTML = '<div style="color:var(--color-text-light); font-size:0.9rem;">Keine offenen Schichten</div>';
     } else {
-        nextEl.textContent = '–';
+        openShifts.forEach(s => {
+            const d = new Date(s.shift_date + 'T12:00:00');
+            const row = document.createElement('div');
+            row.style.cssText = `display:flex; align-items:center; gap:1rem; padding:0.75rem; border-radius:12px; margin-bottom:0.5rem; background:#FFF0F0;`;
+            row.innerHTML = `
+                <div style="min-width:2.5rem; text-align:center;">
+                    <div style="font-size:1.3rem; font-weight:700; line-height:1; color:#C97E7E;">${d.getDate()}</div>
+                    <div style="font-size:0.7rem; color:var(--color-text-light);">${dayNames[d.getDay()]}</div>
+                </div>
+                <div style="flex:1; background:white; border-radius:10px; padding:0.6rem 0.75rem;">
+                    <div style="font-weight:700; font-size:0.95rem; color:#C97E7E;">${s.start_time.slice(0,5)} – ${s.end_time.slice(0,5)}</div>
+                    ${s.open_note ? `<div style="font-size:0.8rem; color:#C97E7E;">${s.open_note}</div>` : ''}
+                </div>
+            `;
+            listEl.appendChild(row);
+        });
     }
 }
 
