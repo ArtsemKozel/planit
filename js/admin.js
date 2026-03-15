@@ -982,7 +982,7 @@ function renderAdminVacationCalendar(year, month, vacations) {
         dot.style.borderRadius = '50%';
         dot.style.background = empColors[v.employee_id] || '#ccc';
         item.appendChild(dot);
-        item.appendChild(document.createTextNode(v.employees_planit?.name?.split(' ')[0] || '?'));
+        item.appendChild(document.createTextNode(v.employees_planit?.name || '?'));
         legend.appendChild(item);
     });
 
