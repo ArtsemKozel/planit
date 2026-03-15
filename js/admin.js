@@ -327,7 +327,7 @@ async function renderHoursOverview(days, weekShifts) {
     const year = monday.getFullYear();
     const month = monday.getMonth() + 1;
     const monthStart = `${year}-${String(month).padStart(2,'0')}-01`;
-    const monthEnd = `${year}-${String(month).padStart(2,'0')}-31`;
+    const monthEnd = `${year}-${String(month).padStart(2,'0')}-${new Date(year, month, 0).getDate()}`;
     const monthNames = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 
     const { data: monthShifts } = await db
