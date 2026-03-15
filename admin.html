@@ -243,6 +243,7 @@
                     <option value="">— Keine Vorlage —</option>
                 </select>
                 <button type="button" class="btn-small btn-approve" onclick="openSaveTemplateModal()" style="white-space:nowrap;">+ Speichern</button>
+                <button type="button" class="btn-small" onclick="openManageTemplatesModal()" style="white-space:nowrap;">✎</button>
             </div>
         </div>
         <div class="form-group">
@@ -487,6 +488,44 @@
         <div id="avail-warning-text" style="margin-bottom:1.5rem; font-size:0.95rem; line-height:1.5;"></div>
         <button class="btn-primary" onclick="confirmShiftDespiteWarning()">Trotzdem einplanen</button>
         <button class="btn-secondary" style="margin-top:0.75rem;" onclick="closeAvailWarningModal()">Abbrechen</button>
+    </div>
+</div>
+
+<!-- MODAL: VORLAGEN VERWALTEN -->
+<div id="manage-templates-modal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">Vorlagen verwalten</div>
+            <button class="modal-close" onclick="closeManageTemplatesModal()">✕</button>
+        </div>
+        <div id="manage-templates-list"></div>
+    </div>
+</div>
+
+<!-- MODAL: VORLAGE BEARBEITEN -->
+<div id="edit-template-modal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">Vorlage bearbeiten</div>
+            <button class="modal-close" onclick="closeEditTemplateModal()">✕</button>
+        </div>
+        <div class="form-group">
+            <label>Name</label>
+            <input type="text" id="edit-template-name">
+        </div>
+        <div class="form-group">
+            <label>Von</label>
+            <input type="time" id="edit-template-start">
+        </div>
+        <div class="form-group">
+            <label>Bis</label>
+            <input type="time" id="edit-template-end">
+        </div>
+        <div class="form-group">
+            <label>Pause (Minuten)</label>
+            <input type="number" id="edit-template-break" min="0" value="0">
+        </div>
+        <button class="btn-primary" onclick="submitEditTemplate()">Speichern</button>
     </div>
 </div>
 

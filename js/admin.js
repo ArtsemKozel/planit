@@ -604,6 +604,8 @@ function toggleRepeat() {
 }
 
 // ── SCHICHT-VORLAGEN ──────────────────────────────────────
+let shiftTemplates = [];
+
 async function loadTemplates() {
     const { data: templates } = await db
         .from('shift_templates')
@@ -611,6 +613,8 @@ async function loadTemplates() {
         .eq('user_id', adminSession.user.id)
         .order('name');
 
+    shiftTemplates = templates || [];
+        
     const select = document.getElementById('shift-template');
     select.innerHTML = '<option value="">— Keine Vorlage —</option>';
     (templates || []).forEach(t => {
@@ -631,6 +635,77 @@ function openSaveTemplateModal() {
     document.getElementById('template-name').value = '';
     document.getElementById('template-error').style.display = 'none';
     document.getElementById('save-template-modal').classList.add('active');
+}
+
+function openManageTemplatesModal() {
+    const list = document.getElementById('manage-templates-list');
+    list.innerHTML = '';
+    if (!shiftTemplates || shiftTemplates.length === 0) {
+        list.innerHTML = '<div style="color:var(--color-text-light); font-size:0.9rem;">Keine Vorlagen vorhanden.</div>';
+    } else {
+        shiftTemplates.forEach(t => {
+            const row = document.createElement('div');
+            row.className = 'list-item';
+            row.innerHTML = `
+                <div class="list-item-info">
+                    <h4>${t.name}</h4>
+                    <p>${t.start_time.slice(0,5)} – ${t.end_time.slice(0,5)}, Pause: ${t.break_minutes} Min</p>
+                </div>
+                <div style="display:flex; gap:0.5rem;">
+                    <button class="btn-small btn-approve" onclick="openEditTemplateModal('${t.id}')">✎</button>
+                    <button class="btn-small btn-reject" onclick="deleteTemplate('${t.id}')">🗑</button>
+                </div>
+            `;
+            list.appendChild(row);
+        });
+    }
+    document.getElementById('manage-templates-modal').classList.add('active');
+}
+
+function closeManageTemplatesModal() {
+    document.getElementById('manage-templates-modal').classList.remove('active');
+}
+
+async function deleteTemplate(id) {
+    if (!confirm('Vorlage wirklich löschen?')) return;
+    const { error } = await db.from('shift_templates').delete().eq('id', id);
+    if (!error) {
+        await loadTemplates();
+        openManageTemplatesModal();
+    }
+}
+
+let editTemplateId = null;
+
+function openEditTemplateModal(id) {
+    const t = shiftTemplates.find(t => t.id === id);
+    if (!t) return;
+    editTemplateId = id;
+    document.getElementById('edit-template-name').value = t.name;
+    document.getElementById('edit-template-start').value = t.start_time.slice(0,5);
+    document.getElementById('edit-template-end').value = t.end_time.slice(0,5);
+    document.getElementById('edit-template-break').value = t.break_minutes || 0;
+    document.getElementById('edit-template-modal').classList.add('active');
+}
+
+function closeEditTemplateModal() {
+    document.getElementById('edit-template-modal').classList.remove('active');
+}
+
+async function submitEditTemplate() {
+    const name = document.getElementById('edit-template-name').value.trim();
+    const start = document.getElementById('edit-template-start').value;
+    const end = document.getElementById('edit-template-end').value;
+    const breakMin = parseInt(document.getElementById('edit-template-break').value) || 0;
+    if (!name || !start || !end) return;
+    const { error } = await db.from('shift_templates')
+        .update({ name, start_time: start, end_time: end, break_minutes: breakMin })
+        .eq('id', editTemplateId);
+    if (!error) {
+        await loadTemplates();
+        closeEditTemplateModal();
+        openManageTemplatesModal();
+    }
 }
 
 function closeSaveTemplateModal() {
