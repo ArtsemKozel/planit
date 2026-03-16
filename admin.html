@@ -131,6 +131,17 @@
         </div>
     </div>
 
+    <!-- TAB: KRANKMELDUNGEN -->
+    <div id="tab-krankmeldungen" class="tab-content">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+            <div class="section-title" style="margin-bottom:0;">Krankmeldungen</div>
+            <button class="btn-primary" style="width:auto;" onclick="openSickLeaveModal()">+ Neu</button>
+        </div>
+        <div id="sick-leave-list">
+            <div class="empty-state"><p>Keine Krankmeldungen vorhanden.</p></div>
+        </div>
+    </div>
+
     <!-- TAB: MEHR -->
     <div id="tab-mehr" class="tab-content">
         <div class="section-title">Mehr</div>
@@ -149,6 +160,10 @@
             </div>
             <div class="mehr-item" onclick="switchTab('requests')">
                 <span>Einspring-Requests <span id="requests-badge" style="background:var(--color-primary); color:white; border-radius:10px; padding:0.1rem 0.5rem; font-size:0.75rem; display:none;"></span></span>
+                <span>›</span>
+            </div>
+            <div class="mehr-item" onclick="switchTab('krankmeldungen')">
+                <span>Krankmeldungen</span>
                 <span>›</span>
             </div>
         </div>
@@ -549,6 +564,44 @@
             <input type="number" id="edit-vacation-days" min="0">
         </div>
         <button class="btn-primary" onclick="submitEditVacation()">Speichern</button>
+    </div>
+</div>
+
+<!-- MODAL: KRANKMELDUNG -->
+<div id="sick-leave-modal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">Krankmeldung</div>
+            <button class="modal-close" onclick="closeSickLeaveModal()">✕</button>
+        </div>
+        <div class="form-group">
+            <label>Mitarbeiter</label>
+            <select id="sick-leave-employee"></select>
+        </div>
+        <div class="form-group">
+            <label>Von</label>
+            <input type="date" id="sick-leave-start">
+        </div>
+        <div class="form-group">
+            <label>Bis</label>
+            <input type="date" id="sick-leave-end">
+        </div>
+        <button class="btn-primary" onclick="submitSickLeave()">Speichern</button>
+    </div>
+</div>
+
+<!-- MODAL: KRANKMELDUNG VERLÄNGERN -->
+<div id="extend-sick-leave-modal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">Krankmeldung verlängern</div>
+            <button class="modal-close" onclick="closeExtendSickLeaveModal()">✕</button>
+        </div>
+        <div class="form-group">
+            <label>Neues Enddatum</label>
+            <input type="date" id="extend-sick-leave-end">
+        </div>
+        <button class="btn-primary" onclick="submitExtendSickLeave()">Speichern</button>
     </div>
 </div>
 

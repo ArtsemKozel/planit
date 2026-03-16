@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadAdminAvailability();
     await loadAdminVacationCalendar();
     await loadRequestsBadge();
+    await loadSickLeaves();
 });
 
 function getBWHolidays(year) {
@@ -2041,4 +2042,178 @@ async function loadRequestsStats() {
     }).join('');
 
     document.getElementById('requests-stats').innerHTML = html;
+}
+
+// ── KRANKMELDUNGEN ─────────────────────────────────────────
+let extendSickLeaveId = null;
+
+function openSickLeaveModal() {
+    const select = document.getElementById('sick-leave-employee');
+    select.innerHTML = employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+    document.getElementById('sick-leave-start').value = '';
+    document.getElementById('sick-leave-end').value = '';
+    document.getElementById('sick-leave-modal').classList.add('active');
+}
+
+function closeSickLeaveModal() {
+    document.getElementById('sick-leave-modal').classList.remove('active');
+}
+
+function openExtendSickLeaveModal(id, currentEnd) {
+    extendSickLeaveId = id;
+    document.getElementById('extend-sick-leave-end').value = currentEnd;
+    document.getElementById('extend-sick-leave-modal').classList.add('active');
+}
+
+function closeExtendSickLeaveModal() {
+    document.getElementById('extend-sick-leave-modal').classList.remove('active');
+}
+
+async function loadSickLeaves() {
+    const { data: sickLeaves } = await db
+        .from('sick_leaves')
+        .select('*, employees_planit(name)')
+        .eq('user_id', adminSession.user.id)
+        .order('start_date', { ascending: false });
+
+    const container = document.getElementById('sick-leave-list');
+    if (!sickLeaves || sickLeaves.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>Keine Krankmeldungen vorhanden.</p></div>';
+        return;
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    container.innerHTML = sickLeaves.map(s => {
+        const isActive = s.end_date >= today;
+        return `
+        <div class="list-item">
+            <div class="list-item-info">
+                <h4>${s.employees_planit?.name || 'Unbekannt'} ${isActive ? '<span style="background:#FFE0CC; color:#E07040; font-size:0.7rem; padding:2px 6px; border-radius:8px;">Aktiv</span>' : ''}</h4>
+                <p>${formatDate(s.start_date)} – ${formatDate(s.end_date)}</p>
+            </div>
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+                <button class="btn-small btn-approve" onclick="openExtendSickLeaveModal('${s.id}', '${s.end_date}')">✎</button>
+                <button class="btn-small" style="background:#FFD9D9; color:#C97E7E;" onclick="deleteSickLeave('${s.id}')">🗑</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+async function submitSickLeave() {
+    const employeeId = document.getElementById('sick-leave-employee').value;
+    const start = document.getElementById('sick-leave-start').value;
+    const end = document.getElementById('sick-leave-end').value;
+    if (!employeeId || !start || !end) return;
+
+    // Krankmeldung speichern
+    const { error } = await db.from('sick_leaves').insert({
+        user_id: adminSession.user.id,
+        employee_id: employeeId,
+        start_date: start,
+        end_date: end
+    });
+    if (error) return;
+
+    // Schichten in diesem Zeitraum automatisch öffnen
+    const emp = employees.find(e => e.id === employeeId);
+    const { data: shifts } = await db
+        .from('shifts')
+        .select('id, department')
+        .eq('user_id', adminSession.user.id)
+        .eq('employee_id', employeeId)
+        .gte('shift_date', start)
+        .lte('shift_date', end);
+
+    if (shifts && shifts.length > 0) {
+        for (const shift of shifts) {
+            await db.from('shifts').update({
+                is_open: true,
+                employee_id: null,
+                open_note: 'Krankmeldung',
+                department: shift.department || emp?.department || 'Allgemein'
+            }).eq('id', shift.id);
+        }
+    }
+
+    closeSickLeaveModal();
+    await loadSickLeaves();
+    await loadWeekGrid();
+}
+
+async function submitExtendSickLeave() {
+    const newEnd = document.getElementById('extend-sick-leave-end').value;
+    if (!newEnd) return;
+
+    // Erst alte Daten laden
+    const { data: sick } = await db
+        .from('sick_leaves')
+        .select('*')
+        .eq('id', extendSickLeaveId)
+        .maybeSingle();
+
+    if (!sick) return;
+
+    // Enddatum aktualisieren
+    await db.from('sick_leaves').update({ end_date: newEnd }).eq('id', extendSickLeaveId);
+
+    // Neue Schichten im verlängerten Zeitraum öffnen
+    if (newEnd > sick.end_date) {
+        const { data: shifts } = await db
+            .from('shifts')
+            .select('id')
+            .eq('user_id', adminSession.user.id)
+            .eq('employee_id', sick.employee_id)
+            .gt('shift_date', sick.end_date)
+            .lte('shift_date', newEnd);
+
+        if (shifts && shifts.length > 0) {
+            await db.from('shifts').update({
+                is_open: true,
+                employee_id: null,
+                open_note: 'Krankmeldung'
+            }).in('id', shifts.map(s => s.id));
+        }
+    }
+
+    closeExtendSickLeaveModal();
+    await loadSickLeaves();
+    await loadWeekGrid();
+}
+
+async function deleteSickLeave(id) {
+    if (!confirm('Krankmeldung wirklich löschen?')) return;
+    
+    // Erst Krankmeldung laden um Daten zu haben
+    const { data: sick } = await db
+        .from('sick_leaves')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+    if (!sick) return;
+
+    // Schichten zurück dem Mitarbeiter zuweisen
+    const { data: shifts } = await db
+        .from('shifts')
+        .select('id')
+        .eq('user_id', adminSession.user.id)
+        .eq('is_open', true)
+        .eq('open_note', 'Krankmeldung')
+        .gte('shift_date', sick.start_date)
+        .lte('shift_date', sick.end_date);
+
+    if (shifts && shifts.length > 0) {
+        for (const shift of shifts) {
+            await db.from('shifts').update({
+                is_open: false,
+                employee_id: sick.employee_id,
+                open_note: null,
+                department: null
+            }).eq('id', shift.id);
+        }
+    }
+
+    await db.from('sick_leaves').delete().eq('id', id);
+    await loadSickLeaves();
+    await loadWeekGrid();
 }
