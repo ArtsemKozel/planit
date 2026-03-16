@@ -456,18 +456,11 @@ function clearSignature() {
 async function submitVacation() {
     const start = document.getElementById('vacation-start').value;
     const end = document.getElementById('vacation-end').value;
-    const days = document.getElementById('vacation-days').value;
     const errorDiv = document.getElementById('vacation-error');
-
     errorDiv.style.display = 'none';
 
     if (!start || !end) {
         errorDiv.textContent = 'Bitte Start- und Enddatum auswählen.';
-        errorDiv.style.display = 'block';
-        return;
-    }
-    if (!days) {
-        errorDiv.textContent = 'Bitte Anzahl Urlaubstage eingeben.';
         errorDiv.style.display = 'block';
         return;
     }
@@ -478,7 +471,7 @@ async function submitVacation() {
         employee_id: currentEmployee.id,
         start_date: start,
         end_date: end,
-        reason: `${days} Tage`,
+        reason: null,
         status: 'pending'
     });
 
@@ -492,7 +485,6 @@ async function submitVacation() {
     const canvas = document.getElementById('signature-canvas');
     let signature = null;
     try { signature = canvas.toDataURL('image/png'); } catch(e) {}
-
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     doc.setFontSize(16);
@@ -510,14 +502,11 @@ async function submitVacation() {
     doc.text(formatDate(start), 70, 64);
     doc.text('Bis:', 20, 76);
     doc.text(formatDate(end), 70, 76);
-    doc.text('Urlaubstage:', 20, 88);
-    doc.text(days + ' Tage', 70, 88);
     if (signature) {
         doc.text('Unterschrift:', 20, 110);
         doc.addImage(signature, 'PNG', 20, 115, 60, 25);
     }
     doc.save(`Urlaubsantrag_${currentEmployee.name}_${start}.pdf`);
-    
     closeVacationModal();
     setTimeout(() => loadVacations(), 500);
 }
