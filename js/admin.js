@@ -768,7 +768,7 @@ async function loadAdminVacations() {
                 <div class="list-item-info">
                     <h4>${v.employees_planit?.name || 'Unbekannt'}</h4>
                     <p>${formatDate(v.start_date)} – ${formatDate(v.end_date)}</p>
-                    <p style="font-size:0.8rem;">${v.reason || 'Kein Grund'}</p>
+                    ${v.reason ? `<p style="font-size:0.8rem;">${v.reason}</p>` : ''}
                     ${v.status === 'approved' ? `<p style="font-size:0.8rem; color:var(--color-primary);">🏖 ${v.deducted_days || 0} Urlaubstage abgezogen</p>` : ''}
                 </div>
                 <div style="display:flex; flex-direction:column; gap:0.5rem; align-items:flex-end;">
