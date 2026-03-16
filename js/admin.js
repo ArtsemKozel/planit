@@ -757,36 +757,84 @@ async function loadAdminVacations() {
         .order('created_at', { ascending: false });
 
     const container = document.getElementById('admin-vacation-list');
-
     if (!vacations || vacations.length === 0) {
         container.innerHTML = '<div class="empty-state"><p>Keine Anträge vorhanden.</p></div>';
         return;
     }
 
-    container.innerHTML = vacations.map(v => `
-            <div class="list-item">
-                <div class="list-item-info">
-                    <h4>${v.employees_planit?.name || 'Unbekannt'}</h4>
-                    <p>${formatDate(v.start_date)} – ${formatDate(v.end_date)}</p>
-                    ${v.reason ? `<p style="font-size:0.8rem;">${v.reason}</p>` : ''}
-                    ${v.status === 'approved' ? `<p style="font-size:0.8rem; color:var(--color-primary);">🏖 ${v.deducted_days || 0} Urlaubstage abgezogen</p>` : ''}
-                </div>
-                <div style="display:flex; flex-direction:column; gap:0.5rem; align-items:flex-end;">
-                    <span class="badge badge-${v.status}">
-    ${v.status === 'pending' ? 'Ausstehend' : v.status === 'approved' ? 'Genehmigt' : 'Abgelehnt'}
-                    </span>
-    ${v.status === 'pending' ? `
-                        <div style="display:flex; gap:0.5rem;">
-                            <button class="btn-small btn-approve" onclick="reviewVacation('${v.id}', 'approved')">✓</button>
-                            <button class="btn-small btn-reject" onclick="reviewVacation('${v.id}', 'rejected')">✕</button>
-                        </div>
-                    ` : `
-                        <button class="btn-small btn-approve" onclick="editVacation('${v.id}', '${v.start_date}', '${v.end_date}', ${v.deducted_days || 0})">✎</button>
-                    `}
-                    <button class="btn-small" style="background:#FFD9D9; color:#C97E7E;" onclick="deleteVacation('${v.id}')">🗑</button>
-                </div>
+    const thisYear = new Date().getFullYear();
+    const today = new Date().toISOString().split('T')[0];
+    const current = vacations.filter(v => v.end_date >= today || v.status === 'pending');
+    const archived = vacations.filter(v => v.end_date < today && v.status !== 'pending');
+
+    const renderItem = v => `
+        <div class="list-item">
+            <div class="list-item-info">
+                <h4>${v.employees_planit?.name || 'Unbekannt'}</h4>
+                <p>${formatDate(v.start_date)} – ${formatDate(v.end_date)}</p>
+                ${v.reason ? `<p style="font-size:0.8rem;">${v.reason}</p>` : ''}
+                ${v.status === 'approved' ? `<p style="font-size:0.8rem; color:var(--color-primary);">🏖 ${v.deducted_days || 0} Urlaubstage abgezogen</p>` : ''}
+            </div>
+            <div style="display:flex; flex-direction:column; gap:0.5rem; align-items:flex-end;">
+                <span class="badge badge-${v.status}">
+                    ${v.status === 'pending' ? 'Ausstehend' : v.status === 'approved' ? 'Genehmigt' : 'Abgelehnt'}
+                </span>
+                ${v.status === 'pending' ? `
+                    <div style="display:flex; gap:0.5rem;">
+                        <button class="btn-small btn-approve" onclick="reviewVacation('${v.id}', 'approved')">✓</button>
+                        <button class="btn-small btn-reject" onclick="reviewVacation('${v.id}', 'rejected')">✕</button>
+                    </div>
+                ` : `
+                    <button class="btn-small btn-approve" onclick="editVacation('${v.id}', '${v.start_date}', '${v.end_date}', ${v.deducted_days || 0})">✎</button>
+                `}
+                <button class="btn-small" style="background:#FFD9D9; color:#C97E7E;" onclick="deleteVacation('${v.id}')">🗑</button>
+            </div>
+        </div>`;
+
+    let html = current.length > 0
+        ? current.map(renderItem).join('')
+        : '<div class="empty-state"><p>Keine aktuellen Anträge.</p></div>';
+
+    if (archived.length > 0) {
+        // Nach Jahr gruppieren
+        const byYear = {};
+        archived.forEach(v => {
+            const year = new Date(v.start_date).getFullYear();
+            if (!byYear[year]) byYear[year] = [];
+            byYear[year].push(v);
+        });
+
+        const archiveHtml = Object.keys(byYear).sort((a,b) => b-a).map(year => `
+            <div style="margin-bottom:1rem;">
+                <div style="font-size:0.8rem; font-weight:700; color:var(--color-text-light); margin-bottom:0.5rem;">${year}</div>
+                ${byYear[year].map(renderItem).join('')}
             </div>
         `).join('');
+
+        html += `
+        <div style="margin-top:1.5rem;">
+            <button onclick="toggleVacationArchive()" style="background:none; border:none; cursor:pointer; font-size:0.85rem; color:var(--color-text-light); display:flex; align-items:center; gap:0.5rem; padding:0;">
+                <span id="archive-toggle-icon">▶</span> Archiv (${archived.length} Anträge)
+            </button>
+            <div id="vacation-archive" style="display:none; margin-top:0.75rem;">
+                ${archiveHtml}
+            </div>
+        </div>`;
+    }
+
+    container.innerHTML = html;
+}
+
+function toggleVacationArchive() {
+    const archive = document.getElementById('vacation-archive');
+    const icon = document.getElementById('archive-toggle-icon');
+    if (archive.style.display === 'none') {
+        archive.style.display = 'block';
+        icon.textContent = '▼';
+    } else {
+        archive.style.display = 'none';
+        icon.textContent = '▶';
+    }
 }
 
 let rejectVacationId = null;
