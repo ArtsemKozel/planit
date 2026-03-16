@@ -399,7 +399,7 @@ async function loadVacationAccount() {
     // Genehmigte Urlaubsanträge dieses Jahr laden
     const { data: requests } = await db
         .from('vacation_requests')
-        .select('start_date, end_date')
+        .select('start_date, end_date, deducted_days')
         .eq('employee_id', currentEmployee.id)
         .eq('status', 'approved')
         .gte('start_date', `${year}-01-01`)
@@ -408,10 +408,7 @@ async function loadVacationAccount() {
     // Urlaubstage zählen
     let usedDays = 0;
     (requests || []).forEach(r => {
-        const start = new Date(r.start_date);
-        const end = new Date(r.end_date);
-        const diff = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
-        usedDays += diff;
+        usedDays += r.deducted_days || 0;
     });
 
     const remaining = totalDays - usedDays;

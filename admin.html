@@ -529,6 +529,29 @@
     </div>
 </div>
 
+<!-- MODAL: URLAUBSANTRAG BEARBEITEN -->
+<div id="edit-vacation-modal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">Urlaubsantrag bearbeiten</div>
+            <button class="modal-close" onclick="closeEditVacationModal()">✕</button>
+        </div>
+        <div class="form-group">
+            <label>Von</label>
+            <input type="date" id="edit-vacation-start">
+        </div>
+        <div class="form-group">
+            <label>Bis</label>
+            <input type="date" id="edit-vacation-end">
+        </div>
+        <div class="form-group">
+            <label>Abzuziehende Urlaubstage</label>
+            <input type="number" id="edit-vacation-days" min="0">
+        </div>
+        <button class="btn-primary" onclick="submitEditVacation()">Speichern</button>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/auth.js"></script>
 <script src="js/admin.js"></script>

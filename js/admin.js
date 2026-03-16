@@ -769,6 +769,7 @@ async function loadAdminVacations() {
                     <h4>${v.employees_planit?.name || 'Unbekannt'}</h4>
                     <p>${formatDate(v.start_date)} – ${formatDate(v.end_date)}</p>
                     <p style="font-size:0.8rem;">${v.reason || 'Kein Grund'}</p>
+                    ${v.status === 'approved' ? `<p style="font-size:0.8rem; color:var(--color-primary);">🏖 ${v.deducted_days || 0} Urlaubstage abgezogen</p>` : ''}
                 </div>
                 <div style="display:flex; flex-direction:column; gap:0.5rem; align-items:flex-end;">
                     <span class="badge badge-${v.status}">
@@ -779,7 +780,9 @@ async function loadAdminVacations() {
                             <button class="btn-small btn-approve" onclick="reviewVacation('${v.id}', 'approved')">✓</button>
                             <button class="btn-small btn-reject" onclick="reviewVacation('${v.id}', 'rejected')">✕</button>
                         </div>
-                    ` : ''}
+                    ` : `
+                        <button class="btn-small btn-approve" onclick="editVacation('${v.id}', '${v.start_date}', '${v.end_date}', ${v.deducted_days || 0})">✎</button>
+                    `}
                     <button class="btn-small" style="background:#FFD9D9; color:#C97E7E;" onclick="deleteVacation('${v.id}')">🗑</button>
                 </div>
             </div>
@@ -870,6 +873,35 @@ async function deleteVacation(id) {
         .delete()
         .eq('id', id);
     if (!error) await loadAdminVacations();
+}
+
+let editVacationId = null;
+
+function editVacation(id, startDate, endDate, deductedDays) {
+    editVacationId = id;
+    document.getElementById('edit-vacation-start').value = startDate;
+    document.getElementById('edit-vacation-end').value = endDate;
+    document.getElementById('edit-vacation-days').value = deductedDays;
+    document.getElementById('edit-vacation-modal').classList.add('active');
+}
+
+function closeEditVacationModal() {
+    document.getElementById('edit-vacation-modal').classList.remove('active');
+}
+
+async function submitEditVacation() {
+    const start = document.getElementById('edit-vacation-start').value;
+    const end = document.getElementById('edit-vacation-end').value;
+    const days = parseInt(document.getElementById('edit-vacation-days').value) || 0;
+    const { error } = await db.from('vacation_requests').update({
+        start_date: start,
+        end_date: end,
+        deducted_days: days
+    }).eq('id', editVacationId);
+    if (!error) {
+        closeEditVacationModal();
+        await loadAdminVacations();
+    }
 }
 
 // ── URLAUBSKALENDER (ADMIN) ───────────────────────────────
@@ -1243,7 +1275,7 @@ async function loadTeam() {
     const year = new Date().getFullYear();
     const { data: vacations } = await db
         .from('vacation_requests')
-        .select('employee_id, start_date, end_date')
+        .select('employee_id, start_date, end_date, deducted_days')
         .eq('user_id', adminSession.user.id)
         .eq('status', 'approved')
         .gte('start_date', `${year}-01-01`)
@@ -1260,9 +1292,7 @@ async function loadTeam() {
         const empVacations = (vacations || []).filter(v => v.employee_id === e.id);
         let usedDays = 0;
         empVacations.forEach(v => {
-            const start = new Date(v.start_date);
-            const end = new Date(v.end_date);
-            usedDays += Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+            usedDays += v.deducted_days || 0;
         });
         const totalDays = e.vacation_days_per_year ?? 20;
         const remaining = totalDays - usedDays;
