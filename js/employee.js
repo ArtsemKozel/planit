@@ -879,8 +879,50 @@ async function loadOverview() {
         .lte('shift_date', monthEnd)
         .order('shift_date');
 
+    // Krankmeldungs-Schichten laden
+    const { data: sickShifts } = await db
+        .from('shifts')
+        .select('*')
+        .eq('user_id', currentEmployee.user_id)
+        .eq('is_open', true)
+        .eq('open_note', 'Krankmeldung')
+        .gte('shift_date', monthStart)
+        .lte('shift_date', monthEnd)
+        .order('shift_date');
+
+    // Krankmeldung prüfen ob Schichten dazugehören
+    const { data: mySickLeave } = await db
+        .from('sick_leaves')
+        .select('start_date, end_date')
+        .eq('employee_id', currentEmployee.id)
+        .gte('end_date', monthStart)
+        .lte('start_date', monthEnd)
+        .maybeSingle();
+
+    const mySickShifts = (sickShifts || []).filter(s => 
+        mySickLeave && s.shift_date >= mySickLeave.start_date && s.shift_date <= mySickLeave.end_date
+    );
+
     const listEl = document.getElementById('overview-shifts-list');
     listEl.innerHTML = '';
+
+    // Krankmeldungs-Schichten rosa hinzufügen
+    mySickShifts.forEach(s => {
+        const d = new Date(s.shift_date + 'T12:00:00');
+        const row = document.createElement('div');
+        row.style.cssText = `display:flex; align-items:center; gap:1rem; padding:0.75rem; border-radius:12px; margin-bottom:0.5rem; background:#FFF0F0;`;
+        row.innerHTML = `
+            <div style="min-width:2.5rem; text-align:center;">
+                <div style="font-size:1.3rem; font-weight:700; line-height:1; color:#C97E7E;">${d.getDate()}</div>
+                <div style="font-size:0.7rem; color:var(--color-text-light);">${dayNames[d.getDay()]}</div>
+            </div>
+            <div style="flex:1; background:white; border-radius:10px; padding:0.6rem 0.75rem;">
+                <div style="font-weight:700; font-size:0.95rem; color:#C97E7E;">${s.start_time.slice(0,5)} – ${s.end_time.slice(0,5)}</div>
+                <div style="font-size:0.8rem; color:#C97E7E;">Krankmeldung</div>
+            </div>
+        `;
+        listEl.appendChild(row);
+    });
 
     if (!shifts || shifts.length === 0) {
         listEl.innerHTML = '<div style="color:var(--color-text-light); font-size:0.9rem;">Keine Schichten diesen Monat</div>';
@@ -915,14 +957,22 @@ async function loadOverview() {
         .gte('shift_date', monthStart)
         .lte('shift_date', monthEnd)
         .order('shift_date');
+    
+    const filteredOpenShifts = (openShifts || []).filter(s => {
+        if (s.open_note === 'Krankmeldung' && mySickLeave && 
+            s.shift_date >= mySickLeave.start_date && s.shift_date <= mySickLeave.end_date) {
+            return false;
+        }
+        return true;
+    });
 
     const openEl = document.getElementById('overview-open-list');
     openEl.innerHTML = '';
 
-    if (!openShifts || openShifts.length === 0) {
+    if (!filteredOpenShifts || filteredOpenShifts.length === 0) {
         openEl.innerHTML = '<div style="color:var(--color-text-light); font-size:0.9rem;">Keine offenen Schichten</div>';
     } else {
-        openShifts.forEach(s => {
+        filteredOpenShifts.forEach(s => {
             const d = new Date(s.shift_date + 'T12:00:00');
             const row = document.createElement('div');
             row.style.cssText = `display:flex; align-items:center; gap:1rem; padding:0.75rem; border-radius:12px; margin-bottom:0.5rem; background:#FFF0F0;`;
