@@ -117,10 +117,18 @@ async function loadWeekGrid() {
         .eq('is_active', true)
         .order('name');
 
-    renderWeekGrid(days, shifts || [], colleagues || []);
+    // Krankmeldungen für diese Woche laden
+    const { data: sickLeaves } = await db
+        .from('sick_leaves')
+        .select('employee_id, start_date, end_date')
+        .eq('user_id', currentEmployee.user_id)
+        .lte('start_date', lastDay)
+        .gte('end_date', firstDay);
+
+    renderWeekGrid(days, shifts || [], colleagues || [], sickLeaves || []);
 }
 
-function renderWeekGrid(days, shifts, colleagues) {
+function renderWeekGrid(days, shifts, colleagues, sickLeaves = []) {
     const grid = document.getElementById('emp-week-grid');
     grid.innerHTML = '';
     const dayNames = ['Mo','Di','Mi','Do','Fr','Sa','So'];
@@ -196,6 +204,13 @@ function renderWeekGrid(days, shifts, colleagues) {
                 if (shift && isOwn) cell.style.background = 'var(--color-primary)';
                 cell.textContent = shift ? `${shift.start_time.slice(0,5)}\n${shift.end_time.slice(0,5)}` : '';
                 cell.style.whiteSpace = 'pre';
+                const isSick = sickLeaves.some(s => s.employee_id === emp.id && s.start_date <= dateStr && s.end_date >= dateStr);
+                if (isSick && !shift) {
+                    cell.style.background = '#FFE0CC';
+                    cell.textContent = 'Krank';
+                    cell.style.color = '#E07040';
+                    cell.style.fontSize = '0.7rem';
+                }
                 grid.appendChild(cell);
             });
         });
