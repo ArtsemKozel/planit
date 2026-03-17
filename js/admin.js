@@ -113,9 +113,17 @@ async function loadWeekGrid() {
         .eq('user_id', adminSession.user.id)
         .gte('shift_date', firstDay)
         .lte('shift_date', lastDay);
+    
+    // Krankmeldungen für diese Woche laden
+    const { data: sickLeaves } = await db
+        .from('sick_leaves')
+        .select('employee_id, start_date, end_date')
+        .eq('user_id', adminSession.user.id)
+        .lte('start_date', lastDay)
+        .gte('end_date', firstDay);
 
     const availCache = await loadAvailabilityForWeek(days);
-    renderWeekGrid(days, shifts || [], availCache);
+    renderWeekGrid(days, shifts || [], availCache, sickLeaves || []);
     await renderHoursOverview(days, shifts || []);
 }
 
@@ -180,7 +188,7 @@ async function loadAvailabilityForWeek(days) {
     return cache;
 }
 
-function renderWeekGrid(days, shifts, availCache = {}) {
+function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
     const grid = document.getElementById('week-grid');
     grid.innerHTML = '';
 
@@ -301,6 +309,15 @@ function renderWeekGrid(days, shifts, availCache = {}) {
                         }
                     }
                     else if (status === 'off') cell.style.background = '#FFD9D9';
+                }
+
+                // Krankmeldung Orange markieren
+                const isSick = sickLeaves.some(s => s.employee_id === emp.id && s.start_date <= dateStr && s.end_date >= dateStr);
+                if (isSick && !shift) {
+                    cell.style.background = '#FFE0CC';
+                    cell.textContent = 'Krank';
+                    cell.style.color = '#E07040';
+                    cell.style.fontSize = '0.7rem';
                 }
 
                 cell.onclick = () => openShiftModal(emp.id, dateStr, shift);
@@ -2128,6 +2145,7 @@ async function submitSickLeave() {
         for (const shift of shifts) {
             await db.from('shifts').update({
                 is_open: true,
+                employee_id: null,
                 open_note: 'Krankmeldung',
                 department: shift.department || emp?.department || 'Allgemein'
             }).eq('id', shift.id);
