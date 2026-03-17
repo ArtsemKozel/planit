@@ -843,6 +843,33 @@ async function loadOverview() {
     document.getElementById('overview-month').textContent = `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
     document.getElementById('overview-open-month').textContent = `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
 
+    // Krankmeldung prüfen
+    const { data: sickLeave } = await db
+        .from('sick_leaves')
+        .select('start_date, end_date')
+        .eq('employee_id', currentEmployee.id)
+        .gte('end_date', today)
+        .order('start_date')
+        .limit(1)
+        .maybeSingle();
+
+    console.log('SickLeave result:', sickLeave, 'Employee:', currentEmployee.id);
+
+    const sickCard = document.getElementById('sick-leave-card');
+    if (sickLeave) {
+        sickCard.style.display = 'block';
+        sickCard.innerHTML = `
+            <div style="background:#FFE8D0; border-radius:12px; padding:1rem; margin-bottom:1rem; display:flex; align-items:center; gap:0.75rem;">
+                <span style="font-size:1.5rem;">🤒</span>
+                <div>
+                    <div style="font-weight:700; font-size:0.95rem;">Du bist krank gemeldet</div>
+                    <div style="font-size:0.85rem; color:#E07040;">${formatDate(sickLeave.start_date)} – ${formatDate(sickLeave.end_date)}</div>
+                </div>
+            </div>`;
+    } else {
+        sickCard.style.display = 'none';
+}
+
     // Eigene Schichten laden
     const { data: shifts } = await db
         .from('shifts')
@@ -884,6 +911,7 @@ async function loadOverview() {
         .eq('user_id', currentEmployee.user_id)
         .eq('is_open', true)
         .eq('department', currentEmployee.department)
+        .is('employee_id', null)
         .gte('shift_date', monthStart)
         .lte('shift_date', monthEnd)
         .order('shift_date');
@@ -905,10 +933,9 @@ async function loadOverview() {
                 </div>
                 <div style="flex:1; background:white; border-radius:10px; padding:0.6rem 0.75rem;">
                     <div style="font-weight:700; font-size:0.95rem; color:#C97E7E;">${s.start_time.slice(0,5)} – ${s.end_time.slice(0,5)}</div>
-                    ${s.open_note ? `<div style="font-size:0.8rem; color:#C97E7E;">${s.open_note}</div>` : ''}
                 </div>
             `;
-            listEl.appendChild(row);
+            openEl.appendChild(row);
         });
     }
 }

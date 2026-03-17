@@ -2128,7 +2128,6 @@ async function submitSickLeave() {
         for (const shift of shifts) {
             await db.from('shifts').update({
                 is_open: true,
-                employee_id: null,
                 open_note: 'Krankmeldung',
                 department: shift.department || emp?.department || 'Allgemein'
             }).eq('id', shift.id);
