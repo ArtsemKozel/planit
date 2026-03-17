@@ -2173,22 +2173,46 @@ async function submitExtendSickLeave() {
     // Enddatum aktualisieren
     await db.from('sick_leaves').update({ end_date: newEnd }).eq('id', extendSickLeaveId);
 
-    // Neue Schichten im verlängerten Zeitraum öffnen
     if (newEnd > sick.end_date) {
+        // Verlängern — neue Schichten öffnen
         const { data: shifts } = await db
             .from('shifts')
-            .select('id')
+            .select('id, department')
             .eq('user_id', adminSession.user.id)
             .eq('employee_id', sick.employee_id)
             .gt('shift_date', sick.end_date)
             .lte('shift_date', newEnd);
-
         if (shifts && shifts.length > 0) {
-            await db.from('shifts').update({
-                is_open: true,
-                employee_id: null,
-                open_note: 'Krankmeldung'
-            }).in('id', shifts.map(s => s.id));
+            const emp = await db.from('employees_planit').select('department').eq('id', sick.employee_id).maybeSingle();
+            for (const shift of shifts) {
+                await db.from('shifts').update({
+                    is_open: true,
+                    employee_id: null,
+                    open_note: 'Krankmeldung',
+                    department: shift.department || emp.data?.department || 'Allgemein'
+                }).eq('id', shift.id);
+            }
+        }
+    } else if (newEnd < sick.end_date) {
+        // Verkürzen — Schichten zurück zum Mitarbeiter
+        const { data: shifts } = await db
+            .from('shifts')
+            .select('id')
+            .eq('user_id', adminSession.user.id)
+            .eq('is_open', true)
+            .eq('open_note', 'Krankmeldung')
+            .gt('shift_date', newEnd)
+            .lte('shift_date', sick.end_date);
+            console.log('Shifts to restore:', shifts, 'newEnd:', newEnd, 'sick.end_date:', sick.end_date);
+        if (shifts && shifts.length > 0) {
+            for (const shift of shifts) {
+                await db.from('shifts').update({
+                    is_open: false,
+                    employee_id: sick.employee_id,
+                    open_note: null,
+                    department: null
+                }).eq('id', shift.id);
+            }
         }
     }
 
