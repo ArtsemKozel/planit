@@ -1413,6 +1413,9 @@ async function submitNewEmployee() {
 
     const birthdate = document.getElementById('new-emp-birthdate').value || null;
     const is_apprentice = document.getElementById('new-emp-apprentice').checked;
+    const startDate = document.getElementById('new-emp-start-date').value || null;
+    const hoursPerVacationDay = parseFloat(document.getElementById('new-emp-hours-per-vacation-day').value) || 8.0;
+    const vacationDays = parseInt(document.getElementById('new-emp-vacation-days')?.value) || 20;
     const { error } = await db.from('employees_planit').insert({
         user_id: adminSession.user.id,
         name,
@@ -1421,7 +1424,10 @@ async function submitNewEmployee() {
         department: department,
         is_active: true,
         birthdate,
-        is_apprentice
+        is_apprentice,
+        start_date: startDate,
+        hours_per_vacation_day: hoursPerVacationDay,
+        vacation_days_per_year: vacationDays
     });
 
     if (error) {
@@ -1521,6 +1527,8 @@ function openEditEmployeeModal(id) {
     document.getElementById('edit-emp-error').style.display = 'none';
     document.getElementById('edit-emp-birthdate').value = emp.birthdate || '';
     document.getElementById('edit-emp-vacation-days').value = emp.vacation_days_per_year ?? 20;
+    document.getElementById('edit-emp-start-date').value = emp.start_date || '';
+    document.getElementById('edit-emp-hours-per-vacation-day').value = emp.hours_per_vacation_day || 8.0;
     document.getElementById('edit-emp-apprentice').checked = emp.is_apprentice || false;
     document.getElementById('edit-employee-modal').classList.add('open');
 }
@@ -1537,6 +1545,8 @@ async function submitEditEmployee() {
     const department = document.getElementById('edit-emp-department').value;
     const birthdate = document.getElementById('edit-emp-birthdate').value || null;
     const vacationDays = parseInt(document.getElementById('edit-emp-vacation-days').value) || 20;
+    const startDate = document.getElementById('edit-emp-start-date').value || null;
+    const hoursPerVacationDay = parseFloat(document.getElementById('edit-emp-hours-per-vacation-day').value) || 8.0;
     const errorDiv = document.getElementById('edit-emp-error');
     errorDiv.style.display = 'none';
 
@@ -1547,7 +1557,7 @@ async function submitEditEmployee() {
     }
 
     const is_apprentice = document.getElementById('edit-emp-apprentice').checked;
-    const payload = { name, login_code: loginCode, department, birthdate, vacation_days_per_year: vacationDays, is_apprentice };
+    const payload = { name, login_code: loginCode, department, birthdate, vacation_days_per_year: vacationDays, is_apprentice, start_date: startDate, hours_per_vacation_day: hoursPerVacationDay };
     if (password) payload.password_hash = password;
 
     const { error } = await db.from('employees_planit').update(payload).eq('id', editEmployeeId);
@@ -2309,7 +2319,7 @@ async function loadUrlaubsverwaltung() {
             <div style="display:flex; align-items:center; gap:1rem;">
                 <div style="text-align:right;">
                     <div style="font-size:0.75rem; color:var(--color-text-light);">ÜBRIG</div>
-                    <div style="font-weight:700; color:${account.remaining <= 3 ? '#E57373' : account.remaining <= 7 ? '#C9A24D' : 'var(--color-primary)'};">${account.remaining} Tage</div>
+                    <div style="font-weight:700; color:${account.remaining <= 3 ? '#E57373' : account.remaining <= 7 ? '#C9A24D' : 'var(--color-primary)'};">${account.remaining.toFixed(2)} Tage</div>
                 </div>
                 <span id="toggle-${emp.id}" style="color:var(--color-text-light); font-size:0.85rem;">▶</span>
             </div>
@@ -2324,31 +2334,63 @@ async function loadUrlaubsverwaltung() {
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:1rem;">
                 <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem;">
                     <div style="font-size:0.75rem; color:var(--color-text-light);">Jahresanspruch</div>
-                    <div style="font-weight:700;">${account.entitlement} Tage</div>
+                    <div style="font-weight:700;">${account.entitlement.toFixed(2)} Tage</div>
+                    <div style="font-size:0.75rem; color:var(--color-text-light);">${account.entitlementH.toFixed(2)} Std</div>
                 </div>
                 <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem;">
                     <div style="font-size:0.75rem; color:var(--color-text-light);">Übertrag Vorjahr</div>
-                    <div style="font-weight:700;">${account.carryover} Tage</div>
+                    <div style="font-weight:700;">${account.carryover.toFixed(2)} Tage</div>
+                    <div style="font-size:0.75rem; color:var(--color-text-light);">${account.carryoverH.toFixed(2)} Std</div>
                 </div>
                 <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem;">
                     <div style="font-size:0.75rem; color:var(--color-text-light);">Genommen</div>
-                    <div style="font-weight:700;">${account.used} Tage</div>
+                    <div style="font-weight:700;">${account.used.toFixed(2)} Tage</div>
+                    <div style="font-size:0.75rem; color:var(--color-text-light);">${account.usedH.toFixed(2)} Std</div>
                 </div>
                 <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem;">
                     <div style="font-size:0.75rem; color:var(--color-text-light);">Übrig</div>
-                    <div style="font-weight:700; color:${account.remaining <= 3 ? '#E57373' : 'var(--color-primary)'};">${account.remaining} Tage</div>
+                    <div style="font-weight:700; color:${account.remaining <= 3 ? '#E57373' : 'var(--color-primary)'};">${account.remaining.toFixed(2)} Tage</div>
+                    <div style="font-size:0.75rem; color:var(--color-text-light);">${account.remainingH.toFixed(2)} Std</div>
                 </div>
             </div>
-            <div style="font-size:0.8rem; color:var(--color-text-light); margin-bottom:0.5rem;">Std. pro Urlaubstag: ${emp.hours_per_vacation_day || 8.0}h · Eintrittsdatum: ${emp.start_date ? formatDate(emp.start_date) : '–'}</div>
-            <div style="font-weight:600; font-size:0.85rem; margin-bottom:0.5rem;">Urlaubsanträge ${year}:</div>
-            ${(vacations || []).filter(v => v.employee_id === emp.id).length === 0 
-                ? '<div style="color:var(--color-text-light); font-size:0.85rem;">Keine Anträge</div>'
-                : (vacations || []).filter(v => v.employee_id === emp.id).map(v => `
-                    <div style="display:flex; justify-content:space-between; padding:0.4rem 0; border-bottom:1px solid var(--color-border); font-size:0.85rem;">
-                        <span>${formatDate(v.start_date)} – ${formatDate(v.end_date)}</span>
-                        <span style="font-weight:600;">${v.deducted_days || 0} Tage</span>
-                    </div>`).join('')
-            }
+            <div style="font-size:0.8rem; color:var(--color-text-light); margin-bottom:1rem;">Std. pro Urlaubstag: ${emp.hours_per_vacation_day || 8.0}h · Eintrittsdatum: ${emp.start_date ? formatDate(emp.start_date) : '–'}</div>
+            <div style="font-weight:600; font-size:0.85rem; margin-bottom:0.5rem;">Einträge ${year}:</div>
+            <div id="eintraege-${emp.id}">
+                ${(vacations || []).filter(v => v.employee_id === emp.id).length === 0
+                    ? '<div style="color:var(--color-text-light); font-size:0.85rem; margin-bottom:0.75rem;">Keine Einträge</div>'
+                    : (vacations || [])
+                        .filter(v => v.employee_id === emp.id)
+                        .sort((a, b) => a.start_date.localeCompare(b.start_date))
+                        .map(v => `
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0; border-bottom:1px solid var(--color-border); font-size:0.85rem;">
+                                <div>
+                                    <span style="display:inline-block; font-size:0.7rem; padding:1px 6px; border-radius:6px; margin-right:0.4rem; background:${v.type === 'payout' ? '#FFF3CC' : v.type === 'manual' ? '#E8D0FF' : '#D8F0D8'}; color:${v.type === 'payout' ? '#C9A24D' : v.type === 'manual' ? '#9B59B6' : '#4CAF50'};">${v.type === 'payout' ? 'Auszahlung' : v.type === 'manual' ? 'Manuell' : 'Urlaub'}</span>
+                                    <span>${v.type === 'manual' ? formatDate(v.start_date) : formatDate(v.start_date) + ' – ' + formatDate(v.end_date)}</span>
+                                    ${v.reason ? `<div style="font-size:0.75rem; color:var(--color-text-light);">${v.reason}</div>` : ''}
+                                </div>
+                                <span style="font-weight:600; white-space:nowrap;">${(v.deducted_days || 0).toFixed(2)} Tage</span>
+                            </div>`).join('')
+                }
+            </div>
+            <button onclick="showAddEintragForm('${emp.id}', ${emp.hours_per_vacation_day || 8.0})" style="margin-top:0.75rem; width:100%; padding:0.6rem; border:2px dashed var(--color-border); border-radius:8px; background:transparent; color:var(--color-text-light); font-size:0.85rem; cursor:pointer;">+ Eintrag hinzufügen</button>
+            <div id="eintrag-form-${emp.id}" style="display:none; margin-top:0.75rem; background:#F5F5F5; border-radius:8px; padding:0.75rem;">
+                <div style="font-weight:600; font-size:0.85rem; margin-bottom:0.5rem;">Neuer Eintrag</div>
+                <select id="eintrag-type-${emp.id}" style="width:100%; padding:0.5rem; border-radius:8px; border:1px solid var(--color-border); margin-bottom:0.5rem; font-size:0.85rem;">
+                    <option value="vacation">Urlaub genommen</option>
+                    <option value="payout">Auszahlung</option>
+                    <option value="manual">Manuelle Korrektur</option>
+                </select>
+                <input type="date" id="eintrag-date-${emp.id}" style="width:100%; padding:0.5rem; border-radius:8px; border:1px solid var(--color-border); margin-bottom:0.5rem; font-size:0.85rem; box-sizing:border-box;">
+                <div style="display:flex; gap:0.5rem; margin-bottom:0.5rem;">
+                    <input type="number" id="eintrag-hours-${emp.id}" placeholder="Stunden" step="0.25" min="0" style="flex:1; padding:0.5rem; border-radius:8px; border:1px solid var(--color-border); font-size:0.85rem;" oninput="syncEintragDays('${emp.id}', ${emp.hours_per_vacation_day || 8.0})">
+                    <input type="number" id="eintrag-days-${emp.id}" placeholder="Tage" step="0.01" min="0" style="flex:1; padding:0.5rem; border-radius:8px; border:1px solid var(--color-border); font-size:0.85rem;" oninput="syncEintragHours('${emp.id}', ${emp.hours_per_vacation_day || 8.0})">
+                </div>
+                <input type="text" id="eintrag-comment-${emp.id}" placeholder="Kommentar (optional)" style="width:100%; padding:0.5rem; border-radius:8px; border:1px solid var(--color-border); margin-bottom:0.5rem; font-size:0.85rem; box-sizing:border-box;">
+                <div style="display:flex; gap:0.5rem;">
+                    <button onclick="saveEintrag('${emp.id}')" style="flex:1; padding:0.6rem; background:var(--color-primary); color:white; border:none; border-radius:8px; font-size:0.85rem; cursor:pointer;">Speichern</button>
+                    <button onclick="hideAddEintragForm('${emp.id}')" style="flex:1; padding:0.6rem; background:#F5F5F5; color:var(--color-text); border:1px solid var(--color-border); border-radius:8px; font-size:0.85rem; cursor:pointer;">Abbrechen</button>
+                </div>
+            </div>
         `;
 
         header.onclick = () => {
@@ -2363,6 +2405,52 @@ async function loadUrlaubsverwaltung() {
     });
 }
 
+function showAddEintragForm(empId, hoursPerDay) {
+    document.getElementById(`eintrag-form-${empId}`).style.display = 'block';
+    document.getElementById(`eintrag-date-${empId}`).value = new Date().toISOString().split('T')[0];
+}
+
+function hideAddEintragForm(empId) {
+    document.getElementById(`eintrag-form-${empId}`).style.display = 'none';
+}
+
+function syncEintragDays(empId, hoursPerDay) {
+    const hours = parseFloat(document.getElementById(`eintrag-hours-${empId}`).value) || 0;
+    document.getElementById(`eintrag-days-${empId}`).value = (hours / hoursPerDay).toFixed(2);
+}
+
+function syncEintragHours(empId, hoursPerDay) {
+    const days = parseFloat(document.getElementById(`eintrag-days-${empId}`).value) || 0;
+    document.getElementById(`eintrag-hours-${empId}`).value = (days * hoursPerDay).toFixed(2);
+}
+
+async function saveEintrag(empId) {
+    const type = document.getElementById(`eintrag-type-${empId}`).value;
+    const date = document.getElementById(`eintrag-date-${empId}`).value;
+    const days = parseFloat(document.getElementById(`eintrag-days-${empId}`).value) || 0;
+    const comment = document.getElementById(`eintrag-comment-${empId}`).value.trim();
+
+    if (!date || days <= 0) {
+        alert('Bitte Datum und Stunden/Tage eingeben.');
+        return;
+    }
+
+    const { error } = await db.from('vacation_requests').insert({
+        user_id: adminSession.user.id,
+        employee_id: empId,
+        start_date: date,
+        end_date: date,
+        status: 'approved',
+        type: type,
+        deducted_days: days,
+        reason: comment || null
+    });
+
+    if (error) { alert('Fehler beim Speichern.'); return; }
+    hideAddEintragForm(empId);
+    loadUrlaubsverwaltung();
+}
+
 function changeUrlaubYear(dir) {
     urlaubYear += dir;
     loadUrlaubsverwaltung();
@@ -2372,13 +2460,20 @@ function calculateVacationAccount(emp, year, vacations, prevVacations) {
     const totalDays = emp.vacation_days_per_year ?? 20;
     const today = new Date();
 
-    // Anteiliger Anspruch im ersten Jahr
+    // Jahre vor 2026 → alles 0
+    if (year < 2026) {
+        return { entitlement: 0, carryover: 0, used: 0, remaining: 0 };
+    }
+
+    // Anteiliger Anspruch im Eintrittsjahr
     let entitlement = totalDays;
     if (emp.start_date) {
-        const start = new Date(emp.start_date);
+        const start = new Date(emp.start_date + 'T12:00:00');
         if (start.getFullYear() === year) {
-            const monthsWorked = 12 - start.getMonth();
-            entitlement = Math.round((monthsWorked / 12) * totalDays);
+            const dayOfMonth = start.getDate();
+            const fractionOfMonth = dayOfMonth === 1 ? 1 : dayOfMonth <= 15 ? 1 : 0.5;
+            const monthsWorked = (12 - start.getMonth() - 1) + fractionOfMonth;
+            entitlement = Math.round((monthsWorked / 12) * totalDays * 100) / 100;
         } else if (start.getFullYear() > year) {
             entitlement = 0;
         }
@@ -2389,21 +2484,31 @@ function calculateVacationAccount(emp, year, vacations, prevVacations) {
         .filter(v => v.employee_id === emp.id)
         .reduce((sum, v) => sum + (v.deducted_days || 0), 0);
 
-    // Übertrag vom Vorjahr
+    // Übertrag vom Vorjahr — nur ab 2027
     let carryover = 0;
-    const prevUsed = prevVacations
-        .filter(v => v.employee_id === emp.id)
-        .reduce((sum, v) => sum + (v.deducted_days || 0), 0);
-    const prevEntitlement = totalDays;
-    const prevRemaining = prevEntitlement - prevUsed;
-    if (prevRemaining > 0) {
-        // Verfällt am 31. März
-        const expiry = new Date(year, 2, 31);
-        if (today <= expiry || today.getFullYear() === year) {
-            carryover = prevRemaining;
+    if (year >= 2027) {
+        const prevUsed = prevVacations
+            .filter(v => v.employee_id === emp.id)
+            .reduce((sum, v) => sum + (v.deducted_days || 0), 0);
+        const prevEntitlement = totalDays;
+        const prevRemaining = prevEntitlement - prevUsed;
+        if (prevRemaining > 0) {
+            // Verfällt am 31. März des aktuellen Jahres
+            const expiry = new Date(year, 2, 31);
+            if (today <= expiry) {
+                carryover = prevRemaining;
+            }
+            // Nach 31. März: Übertrag verfallen, wird nicht mehr angezeigt
         }
     }
 
     const remaining = entitlement + carryover - used;
-    return { entitlement, carryover, used, remaining };
+    const hoursPerDay = emp.hours_per_vacation_day || 8.0;
+    return { 
+        entitlement, carryover, used, remaining,
+        entitlementH: entitlement * hoursPerDay,
+        carryoverH: carryover * hoursPerDay,
+        usedH: used * hoursPerDay,
+        remainingH: remaining * hoursPerDay
+    };
 }
