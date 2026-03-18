@@ -74,6 +74,7 @@ function switchTab(tab) {
     if (navBtn) navBtn.classList.add('active');
     if (tab === 'stunden') loadAdminStunden();
     if (tab === 'requests') { loadRequests(); loadRequestsStats(); }
+    if (tab === 'urlaubsverwaltung') loadUrlaubsverwaltung();
     localStorage.setItem('planit_admin_tab', tab);
 }
 
@@ -2257,4 +2258,151 @@ async function deleteSickLeave(id) {
     await db.from('sick_leaves').delete().eq('id', id);
     await loadSickLeaves();
     await loadWeekGrid();
+}
+
+// ── URLAUBSVERWALTUNG ─────────────────────────────────────────
+async function loadUrlaubsverwaltung() {
+    const select = document.getElementById('urlaubsverwaltung-year');
+    if (select.options.length === 0) {
+        const currentYear = new Date().getFullYear();
+        for (let y = currentYear - 2; y <= currentYear + 1; y++) {
+            select.innerHTML += `<option value="${y}" ${y === currentYear ? 'selected' : ''}>${y}</option>`;
+        }
+    }
+    const year = parseInt(select.value);
+    const container = document.getElementById('urlaubsverwaltung-list');
+    container.innerHTML = '<div style="color:var(--color-text-light);">Wird geladen...</div>';
+
+    // Alle genehmigten Urlaubsanträge des Jahres laden
+    const { data: vacations } = await db
+        .from('vacation_requests')
+        .select('*, employees_planit(name)')
+        .eq('user_id', adminSession.user.id)
+        .eq('status', 'approved')
+        .gte('start_date', `${year}-01-01`)
+        .lte('end_date', `${year}-12-31`);
+
+    // Vorjahr laden für Übertrag
+    const { data: prevVacations } = await db
+        .from('vacation_requests')
+        .select('employee_id, deducted_days')
+        .eq('user_id', adminSession.user.id)
+        .eq('status', 'approved')
+        .gte('start_date', `${year-1}-01-01`)
+        .lte('end_date', `${year-1}-12-31`);
+
+    container.innerHTML = '';
+
+    employees.forEach(emp => {
+        const block = document.createElement('div');
+        block.style.cssText = 'border-radius:14px; margin-bottom:1rem; overflow:hidden; background:var(--color-gray);';
+
+        // Urlaubskonto berechnen
+        const account = calculateVacationAccount(emp, year, vacations || [], prevVacations || []);
+
+        const header = document.createElement('div');
+        header.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:1rem 1.25rem; cursor:pointer;';
+        header.innerHTML = `
+            <div style="display:flex; align-items:center; gap:0.75rem;">
+                <div>
+                    <div style="font-weight:700; font-size:1rem;">${emp.name}</div>
+                    <div style="font-size:0.8rem; color:var(--color-text-light);">${emp.department || 'Allgemein'}</div>
+                </div>
+                ${emp.is_apprentice ? '<span style="background:#E8D0FF; color:#9B59B6; font-size:0.7rem; padding:2px 6px; border-radius:8px;">Azubi</span>' : ''}
+            </div>
+            <div style="display:flex; align-items:center; gap:1rem;">
+                <div style="text-align:right;">
+                    <div style="font-size:0.75rem; color:var(--color-text-light);">ÜBRIG</div>
+                    <div style="font-weight:700; color:${account.remaining <= 3 ? '#E57373' : account.remaining <= 7 ? '#C9A24D' : 'var(--color-primary)'};">${account.remaining} Tage</div>
+                </div>
+                <span id="toggle-${emp.id}" style="color:var(--color-text-light); font-size:0.85rem;">▶</span>
+            </div>
+        `;
+
+        const body = document.createElement('div');
+        body.id = `urlaubsbody-${emp.id}`;
+        body.style.cssText = 'display:none; padding:1rem 1.25rem; border-top:1px solid var(--color-border); background:white;';
+
+        // Konto-Übersicht
+        body.innerHTML = `
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:1rem;">
+                <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem;">
+                    <div style="font-size:0.75rem; color:var(--color-text-light);">Jahresanspruch</div>
+                    <div style="font-weight:700;">${account.entitlement} Tage</div>
+                </div>
+                <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem;">
+                    <div style="font-size:0.75rem; color:var(--color-text-light);">Übertrag Vorjahr</div>
+                    <div style="font-weight:700;">${account.carryover} Tage</div>
+                </div>
+                <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem;">
+                    <div style="font-size:0.75rem; color:var(--color-text-light);">Genommen</div>
+                    <div style="font-weight:700;">${account.used} Tage</div>
+                </div>
+                <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem;">
+                    <div style="font-size:0.75rem; color:var(--color-text-light);">Übrig</div>
+                    <div style="font-weight:700; color:${account.remaining <= 3 ? '#E57373' : 'var(--color-primary)'};">${account.remaining} Tage</div>
+                </div>
+            </div>
+            <div style="font-size:0.8rem; color:var(--color-text-light); margin-bottom:0.5rem;">Std. pro Urlaubstag: ${emp.hours_per_vacation_day || 8.0}h · Eintrittsdatum: ${emp.start_date ? formatDate(emp.start_date) : '–'}</div>
+            <div style="font-weight:600; font-size:0.85rem; margin-bottom:0.5rem;">Urlaubsanträge ${year}:</div>
+            ${(vacations || []).filter(v => v.employee_id === emp.id).length === 0 
+                ? '<div style="color:var(--color-text-light); font-size:0.85rem;">Keine Anträge</div>'
+                : (vacations || []).filter(v => v.employee_id === emp.id).map(v => `
+                    <div style="display:flex; justify-content:space-between; padding:0.4rem 0; border-bottom:1px solid var(--color-border); font-size:0.85rem;">
+                        <span>${formatDate(v.start_date)} – ${formatDate(v.end_date)}</span>
+                        <span style="font-weight:600;">${v.deducted_days || 0} Tage</span>
+                    </div>`).join('')
+            }
+        `;
+
+        header.onclick = () => {
+            const isOpen = body.style.display !== 'none';
+            body.style.display = isOpen ? 'none' : 'block';
+            document.getElementById(`toggle-${emp.id}`).textContent = isOpen ? '▶' : '▼';
+        };
+
+        block.appendChild(header);
+        block.appendChild(body);
+        container.appendChild(block);
+    });
+}
+
+function calculateVacationAccount(emp, year, vacations, prevVacations) {
+    const totalDays = emp.vacation_days_per_year ?? 20;
+    const today = new Date();
+
+    // Anteiliger Anspruch im ersten Jahr
+    let entitlement = totalDays;
+    if (emp.start_date) {
+        const start = new Date(emp.start_date);
+        if (start.getFullYear() === year) {
+            const monthsWorked = 12 - start.getMonth();
+            entitlement = Math.round((monthsWorked / 12) * totalDays);
+        } else if (start.getFullYear() > year) {
+            entitlement = 0;
+        }
+    }
+
+    // Genommene Tage dieses Jahr
+    const used = vacations
+        .filter(v => v.employee_id === emp.id)
+        .reduce((sum, v) => sum + (v.deducted_days || 0), 0);
+
+    // Übertrag vom Vorjahr
+    let carryover = 0;
+    const prevUsed = prevVacations
+        .filter(v => v.employee_id === emp.id)
+        .reduce((sum, v) => sum + (v.deducted_days || 0), 0);
+    const prevEntitlement = totalDays;
+    const prevRemaining = prevEntitlement - prevUsed;
+    if (prevRemaining > 0) {
+        // Verfällt am 31. März
+        const expiry = new Date(year, 2, 31);
+        if (today <= expiry || today.getFullYear() === year) {
+            carryover = prevRemaining;
+        }
+    }
+
+    const remaining = entitlement + carryover - used;
+    return { entitlement, carryover, used, remaining };
 }

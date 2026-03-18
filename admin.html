@@ -166,6 +166,10 @@
                 <span>Krankmeldungen</span>
                 <span>›</span>
             </div>
+            <div class="mehr-item" onclick="switchTab('urlaubsverwaltung')">
+                <span>Urlaubsverwaltung</span>
+                <span>›</span>
+            </div>
         </div>
     </div>
 
@@ -602,6 +606,18 @@
             <input type="date" id="extend-sick-leave-end">
         </div>
         <button class="btn-primary" onclick="submitExtendSickLeave()">Speichern</button>
+    </div>
+</div>
+
+<!-- TAB: URLAUBSVERWALTUNG -->
+<div id="tab-urlaubsverwaltung" class="tab-content">
+    <div style="max-width:700px; margin:0 auto; padding-bottom:5rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+            <div class="section-title" style="margin-bottom:0;">Urlaubsverwaltung</div>
+            <select id="urlaubsverwaltung-year" onchange="loadUrlaubsverwaltung()" style="padding:0.5rem 0.75rem; border-radius:10px; border:1px solid #ccc; font-size:0.95rem; background:white; width:auto;">
+            </select>
+        </div>
+        <div id="urlaubsverwaltung-list"></div>
     </div>
 </div>
 
