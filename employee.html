@@ -316,6 +316,14 @@
 -->
 
 <div class="form-group">
+<label>Art des Antrags</label>
+<select id="vacation-type" onchange="toggleVacationFields()" style="width:100%; padding:0.75rem; border-radius:12px; border:1px solid #CCCCCC; font-size:1rem; background:white; appearance:none; -webkit-appearance:none; background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 12 12%22><path fill=%22%23888%22 d=%22M6 8L1 3h10z%22/></svg>'); background-repeat:no-repeat; background-position:right 0.75rem center; cursor:pointer; box-sizing:border-box;">
+<option value="vacation">🏖 Urlaub nehmen</option>
+<option value="payout">💰 Auszahlung beantragen</option>
+</select>
+</div>
+<div id="vacation-date-fields">
+<div class="form-group">
 <label>Von</label>
 <input type="date" id="vacation-start">
 </div>
@@ -323,6 +331,14 @@
 <label>Bis</label>
 <input type="date" id="vacation-end">
 </div>
+</div>
+<div id="vacation-payout-fields" style="display:none;">
+<div class="form-group">
+<label>Urlaubsstunden zur Auszahlung</label>
+<input type="number" id="vacation-payout-hours" min="0.25" step="0.25" placeholder="z.B. 16">
+</div>
+</div>
+
 <!--
 <div class="form-group">
 <label>Anzahl bezahlter Urlaubstage</label>

@@ -402,40 +402,49 @@ async function loadVacationAccount() {
     const year = new Date().getFullYear();
     document.getElementById('vacation-year-label').textContent = year;
 
-    // Urlaubstage pro Jahr vom Mitarbeiter laden
+    // Mitarbeiter-Daten laden
     const { data: emp } = await db
         .from('employees_planit')
-        .select('vacation_days_per_year')
+        .select('vacation_days_per_year, start_date, hours_per_vacation_day')
         .eq('id', currentEmployee.id)
         .maybeSingle();
 
     const totalDays = emp?.vacation_days_per_year ?? 20;
+    const hoursPerDay = emp?.hours_per_vacation_day || 8.0;
+
+    // Anteiligen Anspruch berechnen
+    let entitlement = totalDays;
+    if (emp?.start_date) {
+        const start = new Date(emp.start_date + 'T12:00:00');
+        if (start.getFullYear() === year) {
+            const dayOfMonth = start.getDate();
+            const fractionOfMonth = dayOfMonth === 1 ? 1 : dayOfMonth <= 15 ? 1 : 0.5;
+            const monthsWorked = (12 - start.getMonth() - 1) + fractionOfMonth;
+            entitlement = Math.round((monthsWorked / 12) * totalDays * 100) / 100;
+        } else if (start.getFullYear() > year) {
+            entitlement = 0;
+        }
+    }
 
     // Genehmigte Urlaubsanträge dieses Jahr laden
     const { data: requests } = await db
         .from('vacation_requests')
-        .select('start_date, end_date, deducted_days')
+        .select('deducted_days')
         .eq('employee_id', currentEmployee.id)
         .eq('status', 'approved')
         .gte('start_date', `${year}-01-01`)
         .lte('end_date', `${year}-12-31`);
 
-    // Urlaubstage zählen
-    let usedDays = 0;
-    (requests || []).forEach(r => {
-        usedDays += r.deducted_days || 0;
-    });
+    const usedDays = (requests || []).reduce((sum, r) => sum + (r.deducted_days || 0), 0);
+    const remaining = entitlement - usedDays;
 
-    const remaining = totalDays - usedDays;
+    document.getElementById('vacation-account').textContent = `${remaining.toFixed(2)} Tage / ${(remaining * hoursPerDay).toFixed(2)} Std übrig`;
+    document.getElementById('vacation-used').textContent = `${usedDays.toFixed(2)} Tage genommen`;
+    document.getElementById('vacation-total').textContent = `von ${entitlement.toFixed(2)} Tagen`;
 
-    document.getElementById('vacation-account').textContent = `${remaining} Tage übrig`;
-    document.getElementById('vacation-used').textContent = `${usedDays} genommen`;
-    document.getElementById('vacation-total').textContent = `von ${totalDays} Tagen`;
-
-    // Farbe je nach verbleibenden Tagen
     const accountEl = document.getElementById('vacation-account');
     accountEl.style.color = remaining <= 3 ? '#E57373' :
-                             remaining <= 7 ? '#C9A24D' : 'var(--color-primary)';
+        remaining <= 7 ? '#C9A24D' : 'var(--color-primary)';
 }
 
 let signaturePad = null;
@@ -469,26 +478,42 @@ function clearSignature() {
 }
 
 async function submitVacation() {
-    const start = document.getElementById('vacation-start').value;
-    const end = document.getElementById('vacation-end').value;
+    const type = document.getElementById('vacation-type').value;
     const errorDiv = document.getElementById('vacation-error');
     errorDiv.style.display = 'none';
 
-    if (!start || !end) {
-        errorDiv.textContent = 'Bitte Start- und Enddatum auswählen.';
-        errorDiv.style.display = 'block';
-        return;
+    let start, end, payoutHours, deductedDays;
+
+    if (type === 'payout') {
+        payoutHours = parseFloat(document.getElementById('vacation-payout-hours').value) || 0;
+        if (payoutHours <= 0) {
+            errorDiv.textContent = 'Bitte Urlaubsstunden eingeben.';
+            errorDiv.style.display = 'block';
+            return;
+        }
+        const today = new Date().toISOString().split('T')[0];
+        start = today;
+        end = today;
+    } else {
+        start = document.getElementById('vacation-start').value;
+        end = document.getElementById('vacation-end').value;
+        if (!start || !end) {
+            errorDiv.textContent = 'Bitte Start- und Enddatum auswählen.';
+            errorDiv.style.display = 'block';
+            return;
+        }
     }
 
     // ERST Supabase speichern
     const { error } = await db.from('vacation_requests').insert({
-        user_id: currentEmployee.user_id,
-        employee_id: currentEmployee.id,
-        start_date: start,
-        end_date: end,
-        reason: null,
-        status: 'pending'
-    });
+    user_id: currentEmployee.user_id,
+    employee_id: currentEmployee.id,
+    start_date: start,
+    end_date: end,
+    reason: type === 'payout' ? `Auszahlung: ${payoutHours} Std` : null,
+    status: 'pending',
+    type: type
+        });
 
     if (error) {
         errorDiv.textContent = 'Fehler: ' + error.message;
@@ -513,17 +538,34 @@ async function submitVacation() {
     doc.setFont('helvetica', 'normal');
     doc.text('Datum des Antrags:', 20, 52);
     doc.text(new Date().toLocaleDateString('de-DE'), 70, 52);
-    doc.text('Von:', 20, 64);
-    doc.text(formatDate(start), 70, 64);
-    doc.text('Bis:', 20, 76);
-    doc.text(formatDate(end), 70, 76);
-    if (signature) {
-        doc.text('Unterschrift:', 20, 110);
-        doc.addImage(signature, 'PNG', 20, 115, 60, 25);
+    doc.text('Art:', 20, 64);
+    doc.text(type === 'payout' ? 'Auszahlung' : 'Urlaub', 70, 64);
+    if (type === 'payout') {
+        doc.text('Stunden:', 20, 76);
+        doc.text(`${payoutHours} Std`, 70, 76);
+        if (signature) {
+            doc.text('Unterschrift:', 20, 100);
+            doc.addImage(signature, 'PNG', 20, 105, 60, 25);
+        }
+    } else {
+        doc.text('Von:', 20, 76);
+        doc.text(formatDate(start), 70, 76);
+        doc.text('Bis:', 20, 88);
+        doc.text(formatDate(end), 70, 88);
+        if (signature) {
+            doc.text('Unterschrift:', 20, 122);
+            doc.addImage(signature, 'PNG', 20, 127, 60, 25);
+        }
     }
     doc.save(`Urlaubsantrag_${currentEmployee.name}_${start}.pdf`);
     closeVacationModal();
     setTimeout(() => loadVacations(), 500);
+}
+
+function toggleVacationFields() {
+    const type = document.getElementById('vacation-type').value;
+    document.getElementById('vacation-date-fields').style.display = type === 'payout' ? 'none' : 'block';
+    document.getElementById('vacation-payout-fields').style.display = type === 'payout' ? 'block' : 'none';
 }
 
 // ── VERFÜGBARKEIT ─────────────────────────────────────────
