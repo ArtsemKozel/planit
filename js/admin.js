@@ -5,6 +5,7 @@ let adminAvailDate = new Date();
 let editShiftId = null;
 let planningMode = false;
 let availabilityCache = {};
+let urlaubYear = new Date().getFullYear();
 
 // ── INIT ──────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -2261,15 +2262,10 @@ async function deleteSickLeave(id) {
 }
 
 // ── URLAUBSVERWALTUNG ─────────────────────────────────────────
+
 async function loadUrlaubsverwaltung() {
-    const select = document.getElementById('urlaubsverwaltung-year');
-    if (select.options.length === 0) {
-        const currentYear = new Date().getFullYear();
-        for (let y = currentYear - 2; y <= currentYear + 1; y++) {
-            select.innerHTML += `<option value="${y}" ${y === currentYear ? 'selected' : ''}>${y}</option>`;
-        }
-    }
-    const year = parseInt(select.value);
+    document.getElementById('urlaubsverwaltung-year-label').textContent = urlaubYear;
+    const year = urlaubYear;
     const container = document.getElementById('urlaubsverwaltung-list');
     container.innerHTML = '<div style="color:var(--color-text-light);">Wird geladen...</div>';
 
@@ -2365,6 +2361,11 @@ async function loadUrlaubsverwaltung() {
         block.appendChild(body);
         container.appendChild(block);
     });
+}
+
+function changeUrlaubYear(dir) {
+    urlaubYear += dir;
+    loadUrlaubsverwaltung();
 }
 
 function calculateVacationAccount(emp, year, vacations, prevVacations) {
