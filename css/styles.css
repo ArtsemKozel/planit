@@ -61,12 +61,17 @@ body {
 }
 
 .btn-small {
-    padding: 0.4rem 0.9rem;
-    font-size: 0.85rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: 1rem;
     border-radius: 8px;
     border: none;
     cursor: pointer;
     font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
 }
 
 .btn-approve {
@@ -686,4 +691,29 @@ select {
     color: #C97E7E;
     font-size: 0.7rem;
     font-weight: 600;
+}
+
+.btn-pdf-view {
+    background: var(--color-primary);
+    color: white;
+}
+
+.btn-pdf-save {
+    background: var(--color-primary);
+    color: white;
+}
+
+.btn-delete {
+    background: var(--color-primary);
+    color: white;
+}
+
+.btn-icon svg {
+    width: 1.1rem;
+    height: 1.1rem;
+    stroke: white;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }

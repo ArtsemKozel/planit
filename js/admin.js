@@ -801,18 +801,18 @@ ${v.status === 'approved' ? `<p style="font-size:0.8rem; color:var(--color-prima
                     ${v.status === 'pending' ? 'Ausstehend' : v.status === 'approved' ? 'Genehmigt' : 'Abgelehnt'}
                 </span>
                 ${v.status === 'pending' ? `
-                    <div style="display:flex; gap:0.5rem;">
-                        <button class="btn-small btn-approve" onclick="reviewVacation('${v.id}', 'approved')">✓</button>
-                        <button class="btn-small btn-reject" onclick="reviewVacation('${v.id}', 'rejected')">✕</button>
-                    </div>
-                ` : `
-                    <button class="btn-small btn-approve" onclick="editVacation('${v.id}', '${v.start_date}', '${v.end_date}', ${v.deducted_days || 0}, '${v.type || 'vacation'}')">✎</button>
-                `}
+                                    <div style="display:flex; gap:0.5rem;">
+                                        <button class="btn-small btn-approve" onclick="reviewVacation('${v.id}', 'approved')">✓</button>
+                                        <button class="btn-small btn-reject" onclick="reviewVacation('${v.id}', 'rejected')">✕</button>
+                                    </div>
+                                ` : `
+                                    <button class="btn-small btn-pdf-view btn-icon" onclick="editVacation('${v.id}', '${v.start_date}', '${v.end_date}', ${v.deducted_days || 0}, '${v.type || 'vacation'}')"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                                `}
                 ${v.pdf_url ? `
-                    <button class="btn-small" style="background:#D0E8FF; color:#5B7C9E;" onclick="downloadVacationPdf('${v.pdf_url}')">📄</button>
-                    <button class="btn-small" style="background:#D8F0D8; color:#4CAF50;" onclick="saveVacationPdf('${v.pdf_url}')">⬇️</button>
+                    <button class="btn-small btn-pdf-view btn-icon" onclick="downloadVacationPdf('${v.pdf_url}')"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                    <button class="btn-small btn-pdf-view btn-icon" onclick="saveVacationPdf('${v.pdf_url}')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
                 ` : ''}
-                <button class="btn-small" style="background:#FFD9D9; color:#C97E7E;" onclick="deleteVacation('${v.id}')">🗑</button>
+                <button class="btn-small btn-delete btn-icon" onclick="deleteVacation('${v.id}')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
             </div>
         </div>`;
 
