@@ -357,7 +357,7 @@ function renderVacationCalendar(year, month, vacations) {
         dot.style.borderRadius = '50%';
         dot.style.background = empColors[empId] || '#ccc';
         item.appendChild(dot);
-        item.appendChild(document.createTextNode(empId === currentEmployee.id ? 'Ich' : name.split(' ')[0]));
+        item.appendChild(document.createTextNode(empId === currentEmployee.id ? 'Ich' : name));
         legend.appendChild(item);
     });
 

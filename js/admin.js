@@ -808,7 +808,10 @@ ${v.status === 'approved' ? `<p style="font-size:0.8rem; color:var(--color-prima
                 ` : `
                     <button class="btn-small btn-approve" onclick="editVacation('${v.id}', '${v.start_date}', '${v.end_date}', ${v.deducted_days || 0}, '${v.type || 'vacation'}')">✎</button>
                 `}
-                ${v.pdf_url ? `<button class="btn-small" style="background:#D0E8FF; color:#5B7C9E;" onclick="downloadVacationPdf('${v.pdf_url}')">📄</button>` : ''}
+                ${v.pdf_url ? `
+                    <button class="btn-small" style="background:#D0E8FF; color:#5B7C9E;" onclick="downloadVacationPdf('${v.pdf_url}')">📄</button>
+                    <button class="btn-small" style="background:#D8F0D8; color:#4CAF50;" onclick="saveVacationPdf('${v.pdf_url}')">⬇️</button>
+                ` : ''}
                 <button class="btn-small" style="background:#FFD9D9; color:#C97E7E;" onclick="deleteVacation('${v.id}')">🗑</button>
             </div>
         </div>`;
@@ -845,6 +848,23 @@ ${v.status === 'approved' ? `<p style="font-size:0.8rem; color:var(--color-prima
     }
 
     container.innerHTML = html;
+}
+
+async function saveVacationPdf(filePath) {
+    const { data, error } = await db.storage
+        .from('vacation-pdfs')
+        .createSignedUrl(filePath, 60);
+    if (error || !data?.signedUrl) { alert('PDF konnte nicht geladen werden.'); return; }
+    const response = await fetch(data.signedUrl);
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = `Urlaubsantrag_${filePath.split('/').pop()}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(blobUrl);
 }
 
 async function downloadVacationPdf(filePath) {
