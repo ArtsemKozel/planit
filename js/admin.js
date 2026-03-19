@@ -6,6 +6,7 @@ let editShiftId = null;
 let planningMode = false;
 let availabilityCache = {};
 let urlaubYear = new Date().getFullYear();
+let editVacationApproveAfter = false;
 
 // ── INIT ──────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -791,9 +792,9 @@ async function loadAdminVacations() {
         <div class="list-item">
             <div class="list-item-info">
                 <h4>${v.employees_planit?.name || 'Unbekannt'}</h4>
-                <p>${formatDate(v.start_date)} – ${formatDate(v.end_date)}</p>
-                ${v.reason ? `<p style="font-size:0.8rem;">${v.reason}</p>` : ''}
-                ${v.status === 'approved' ? `<p style="font-size:0.8rem; color:var(--color-primary);">🏖 ${v.deducted_days || 0} Urlaubstage abgezogen</p>` : ''}
+                <p>${v.type === 'payout' ? `Erstellt am ${formatDate(v.start_date)}` : `${formatDate(v.start_date)} – ${formatDate(v.end_date)}`}</p>
+${v.reason ? `<p style="font-size:0.8rem;">${v.reason}</p>` : ''}
+${v.status === 'approved' ? `<p style="font-size:0.8rem; color:var(--color-primary);">🏖 ${v.deducted_days || 0} ${v.type === 'payout' ? 'Urlaubstage ausgezahlt' : 'Urlaubstage abgezogen'}${v.payout_month ? ` · ${v.payout_month}` : ''}</p>` : ''}
             </div>
             <div style="display:flex; flex-direction:column; gap:0.5rem; align-items:flex-end;">
                 <span class="badge badge-${v.status}">
@@ -805,8 +806,9 @@ async function loadAdminVacations() {
                         <button class="btn-small btn-reject" onclick="reviewVacation('${v.id}', 'rejected')">✕</button>
                     </div>
                 ` : `
-                    <button class="btn-small btn-approve" onclick="editVacation('${v.id}', '${v.start_date}', '${v.end_date}', ${v.deducted_days || 0})">✎</button>
+                    <button class="btn-small btn-approve" onclick="editVacation('${v.id}', '${v.start_date}', '${v.end_date}', ${v.deducted_days || 0}, '${v.type || 'vacation'}')">✎</button>
                 `}
+                ${v.pdf_url ? `<button class="btn-small" style="background:#D0E8FF; color:#5B7C9E;" onclick="downloadVacationPdf('${v.pdf_url}')">📄</button>` : ''}
                 <button class="btn-small" style="background:#FFD9D9; color:#C97E7E;" onclick="deleteVacation('${v.id}')">🗑</button>
             </div>
         </div>`;
@@ -843,6 +845,19 @@ async function loadAdminVacations() {
     }
 
     container.innerHTML = html;
+}
+
+async function downloadVacationPdf(filePath) {
+    const { data, error } = await db.storage
+        .from('vacation-pdfs')
+        .createSignedUrl(filePath, 60);
+
+    if (error || !data?.signedUrl) {
+        alert('PDF konnte nicht geladen werden.');
+        return;
+    }
+
+    window.location.href = data.signedUrl;
 }
 
 function toggleVacationArchive() {
@@ -891,12 +906,39 @@ async function reviewVacation(id, status) {
         openRejectModal(id);
         return;
     }
+    // Bei Genehmigung: erst deducted_days prüfen
+    const { data: vac } = await db
+        .from('vacation_requests')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+    if (!vac) return;
+
+    if (!vac.deducted_days || vac.deducted_days === 0) {
+        // Edit-Modal öffnen, dann nach Speichern genehmigen
+        editVacationAndApprove(vac);
+        return;
+    }
+
     await db.from('vacation_requests').update({
         status,
         reviewed_at: new Date().toISOString(),
         reviewed_by: adminSession.user.id
     }).eq('id', id);
     await loadAdminVacations();
+}
+
+function editVacationAndApprove(vac) {
+    editVacationId = vac.id;
+    editVacationApproveAfter = true;
+    const isPayout = vac.type === 'payout';
+    document.getElementById('edit-vacation-date-fields').style.display = isPayout ? 'none' : 'block';
+    document.getElementById('edit-vacation-days-label').textContent = isPayout ? 'Urlaubsstunden' : 'Abzuziehende Urlaubstage';
+    document.getElementById('edit-vacation-start').value = vac.start_date;
+    document.getElementById('edit-vacation-end').value = vac.end_date;
+    document.getElementById('edit-vacation-days').value = vac.deducted_days || 0;
+    document.getElementById('edit-vacation-modal').classList.add('active');
 }
 
 async function downloadAllVacations() {
@@ -945,11 +987,16 @@ async function deleteVacation(id) {
 
 let editVacationId = null;
 
-function editVacation(id, startDate, endDate, deductedDays) {
+function editVacation(id, startDate, endDate, deductedDays, type) {
     editVacationId = id;
+    const isPayout = type === 'payout';
+    document.getElementById('edit-vacation-date-fields').style.display = isPayout ? 'none' : 'block';
+    document.getElementById('edit-vacation-days-label').textContent = isPayout ? 'Urlaubsstunden' : 'Abzuziehende Urlaubstage';
+    document.getElementById('edit-vacation-payout-month-field').style.display = isPayout ? 'block' : 'none';
     document.getElementById('edit-vacation-start').value = startDate;
     document.getElementById('edit-vacation-end').value = endDate;
     document.getElementById('edit-vacation-days').value = deductedDays;
+    document.getElementById('edit-vacation-payout-month').value = '';
     document.getElementById('edit-vacation-modal').classList.add('active');
 }
 
@@ -960,12 +1007,39 @@ function closeEditVacationModal() {
 async function submitEditVacation() {
     const start = document.getElementById('edit-vacation-start').value;
     const end = document.getElementById('edit-vacation-end').value;
-    const days = parseInt(document.getElementById('edit-vacation-days').value) || 0;
-    const { error } = await db.from('vacation_requests').update({
+    const rawValue = parseFloat(document.getElementById('edit-vacation-days').value) || 0;
+
+    // Bei Auszahlung: Wert ist Stunden → in Tage umrechnen
+    const { data: vac } = await db
+        .from('vacation_requests')
+        .select('type, employees_planit(hours_per_vacation_day)')
+        .eq('id', editVacationId)
+        .maybeSingle();
+
+    const isPayout = vac?.type === 'payout';
+    const hoursPerDay = vac?.employees_planit?.hours_per_vacation_day || 8.0;
+    const days = isPayout ? rawValue / hoursPerDay : rawValue;
+
+    const payoutMonth = document.getElementById('edit-vacation-payout-month').value.trim() || null;
+    const updateData = {
         start_date: start,
         end_date: end,
-        deducted_days: days
-    }).eq('id', editVacationId);
+        deducted_days: days,
+        ...(isPayout && payoutMonth ? { payout_month: payoutMonth } : {})
+    };
+
+    if (editVacationApproveAfter) {
+        updateData.status = 'approved';
+        updateData.reviewed_at = new Date().toISOString();
+        updateData.reviewed_by = adminSession.user.id;
+        editVacationApproveAfter = false;
+    }
+
+    const { error } = await db.from('vacation_requests')
+        .update(updateData)
+        .eq('id', editVacationId);
+    if (error) console.log('Update error:', JSON.stringify(error));
+
     if (!error) {
         closeEditVacationModal();
         await loadAdminVacations();

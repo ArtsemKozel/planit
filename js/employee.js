@@ -557,6 +557,32 @@ async function submitVacation() {
             doc.addImage(signature, 'PNG', 20, 127, 60, 25);
         }
     }
+    // PDF in Supabase Storage speichern
+    const pdfBlob = doc.output('blob');
+    const fileName = `${currentEmployee.user_id}/${currentEmployee.id}_${start}_${Date.now()}.pdf`;
+    const { data: uploadData, error: uploadError } = await db.storage
+        .from('vacation-pdfs')
+        .upload(fileName, pdfBlob, { contentType: 'application/pdf' });
+
+    if (!uploadError) {
+        // PDF URL in vacation_requests speichern
+        const { data: latest } = await db
+            .from('vacation_requests')
+            .select('id')
+            .eq('employee_id', currentEmployee.id)
+            .eq('start_date', start)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(); 
+
+        if (latest) {
+            await db.from('vacation_requests')
+                .update({ pdf_url: fileName })
+                .eq('id', latest.id);
+        }
+    }
+
+    // Lokal speichern
     doc.save(`Urlaubsantrag_${currentEmployee.name}_${start}.pdf`);
     closeVacationModal();
     setTimeout(() => loadVacations(), 500);
