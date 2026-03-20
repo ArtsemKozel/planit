@@ -415,7 +415,6 @@ async function loadVacationAccount() {
         .select('*')
         .eq('employee_id', currentEmployee.id)
         .order('start_date');
-    console.log('phases:', phases, 'error:', phasesError);
 
     const totalDays = emp?.vacation_days_per_year ?? 20;
     const hoursPerDay = emp?.hours_per_vacation_day || 8.0;
@@ -677,7 +676,6 @@ async function renderAvailGrid(year, month) {
         .eq('status', 'approved')
         .gte('start_date', monthStart)
         .lte('end_date', monthEnd);
-    console.log('Vacations:', vacations, 'Error:', vacError);
 
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const firstWeekday = new Date(year, month, 1).getDay();
@@ -1003,8 +1001,6 @@ async function loadOverview() {
         .order('start_date')
         .limit(1)
         .maybeSingle();
-
-    console.log('SickLeave result:', sickLeave, 'Employee:', currentEmployee.id);
 
     const sickCard = document.getElementById('sick-leave-card');
     if (sickLeave) {
