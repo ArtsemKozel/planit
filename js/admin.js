@@ -1624,7 +1624,75 @@ function openEditEmployeeModal(id) {
     document.getElementById('edit-emp-start-date').value = emp.start_date || '';
     document.getElementById('edit-emp-hours-per-vacation-day').value = emp.hours_per_vacation_day || 8.0;
     document.getElementById('edit-emp-apprentice').checked = emp.is_apprentice || false;
+    // Phasen laden
+    currentPhases = [];
+    renderEmploymentPhases();
+    db.from('employment_phases')
+        .select('*')
+        .eq('employee_id', id)
+        .order('start_date')
+        .then(({ data }) => {
+            currentPhases = data || [];
+            renderEmploymentPhases();
+        });
     document.getElementById('edit-employee-modal').classList.add('open');
+}
+
+let currentPhases = [];
+
+function renderEmploymentPhases() {
+    const container = document.getElementById('edit-emp-phases');
+    if (currentPhases.length === 0) {
+        container.innerHTML = '<div style="font-size:0.85rem; color:var(--color-text-light); margin-bottom:0.5rem;">Keine Phasen — Standardwerte gelten fürs ganze Jahr.</div>';
+        return;
+    }
+    container.innerHTML = currentPhases.map((p, i) => `
+        <div style="background:#F5F5F5; border-radius:8px; padding:0.75rem; margin-bottom:0.5rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                <span style="font-size:0.8rem; font-weight:600;">Phase ${i + 1}</span>
+                <button onclick="removeEmploymentPhase(${i})" style="background:none; border:none; color:var(--color-text-light); cursor:pointer; font-size:1rem;">✕</button>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:0.5rem;">
+                <div>
+                    <label style="font-size:0.75rem;">Von</label>
+                    <input type="date" value="${p.start_date || ''}" onchange="updatePhase(${i}, 'start_date', this.value)" style="padding:0.4rem; font-size:0.8rem;">
+                </div>
+                <div>
+                    <label style="font-size:0.75rem;">Bis (leer = offen)</label>
+                    <input type="date" value="${p.end_date || ''}" onchange="updatePhase(${i}, 'end_date', this.value)" style="padding:0.4rem; font-size:0.8rem;">
+                </div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+                <div>
+                    <label style="font-size:0.75rem;">Urlaubstage/Jahr</label>
+                    <input type="number" value="${p.vacation_days_per_year || 20}" min="0" max="365" onchange="updatePhase(${i}, 'vacation_days_per_year', parseFloat(this.value))" style="padding:0.4rem; font-size:0.8rem;">
+                </div>
+                <div>
+                    <label style="font-size:0.75rem;">Std/Urlaubstag</label>
+                    <input type="number" value="${p.hours_per_vacation_day || 8}" min="0.5" max="24" step="0.5" onchange="updatePhase(${i}, 'hours_per_vacation_day', parseFloat(this.value))" style="padding:0.4rem; font-size:0.8rem;">
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function addEmploymentPhase() {
+    currentPhases.push({
+        start_date: '',
+        end_date: '',
+        vacation_days_per_year: 20,
+        hours_per_vacation_day: 8.0
+    });
+    renderEmploymentPhases();
+}
+
+function removeEmploymentPhase(index) {
+    currentPhases.splice(index, 1);
+    renderEmploymentPhases();
+}
+
+function updatePhase(index, field, value) {
+    currentPhases[index][field] = value;
 }
 
 function closeEditEmployeeModal() {
@@ -1660,6 +1728,27 @@ async function submitEditEmployee() {
         errorDiv.style.display = 'block';
         return;
     }
+    // Phasen speichern
+    await db.from('employment_phases')
+        .delete()
+        .eq('employee_id', editEmployeeId);
+
+    if (currentPhases.length > 0) {
+        const phasesToInsert = currentPhases
+            .filter(p => p.start_date)
+            .map(p => ({
+                user_id: adminSession.user.id,
+                employee_id: editEmployeeId,
+                start_date: p.start_date,
+                end_date: p.end_date || null,
+                hours_per_vacation_day: p.hours_per_vacation_day,
+                vacation_days_per_year: p.vacation_days_per_year
+            }));
+        if (phasesToInsert.length > 0) {
+            await db.from('employment_phases').insert(phasesToInsert);
+        }
+    }
+
     closeEditEmployeeModal();
     await loadEmployees();
     await loadTeam();
@@ -2373,6 +2462,13 @@ async function loadUrlaubsverwaltung() {
     const container = document.getElementById('urlaubsverwaltung-list');
     container.innerHTML = '<div style="color:var(--color-text-light);">Wird geladen...</div>';
 
+    // Beschäftigungsphasen laden
+    const { data: allPhases } = await db
+        .from('employment_phases')
+        .select('*')
+        .eq('user_id', adminSession.user.id)
+        .order('start_date');
+
     // Alle genehmigten Urlaubsanträge des Jahres laden
     const { data: vacations } = await db
         .from('vacation_requests')
@@ -2398,7 +2494,8 @@ async function loadUrlaubsverwaltung() {
         block.style.cssText = 'border-radius:14px; margin-bottom:1rem; overflow:hidden; background:var(--color-gray);';
 
         // Urlaubskonto berechnen
-        const account = calculateVacationAccount(emp, year, vacations || [], prevVacations || []);
+        const empPhases = (allPhases || []).filter(p => p.employee_id === emp.id);
+        const account = calculateVacationAccount(emp, year, vacations || [], prevVacations || [], empPhases);
 
         const header = document.createElement('div');
         header.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:1rem 1.25rem; cursor:pointer;';
@@ -2447,7 +2544,19 @@ async function loadUrlaubsverwaltung() {
                     <div style="font-size:0.75rem; color:var(--color-text-light);">${account.remainingH.toFixed(2)} Std</div>
                 </div>
             </div>
-            <div style="font-size:0.8rem; color:var(--color-text-light); margin-bottom:1rem;">Std. pro Urlaubstag: ${emp.hours_per_vacation_day || 8.0}h · Eintrittsdatum: ${emp.start_date ? formatDate(emp.start_date) : '–'}</div>
+            ${empPhases.length > 0
+                ? empPhases.map(p => {
+                    const formatShort = d => {
+                        const parts = d.split('-');
+                        return `${parts[2]}.${parts[1]}.${parts[0].slice(2)}`;
+                    };
+                    const von = formatShort(p.start_date);
+                    const bis = p.end_date ? formatShort(p.end_date) : 'offen';
+                    return `<div style="font-size:0.8rem; color:var(--color-text-light); margin-bottom:0.25rem;">Std. pro UT: ${p.hours_per_vacation_day}h (${von} – ${bis})</div>`;
+                }).join('')
+                : `<div style="font-size:0.8rem; color:var(--color-text-light); margin-bottom:0.25rem;">Std. pro UT: ${emp.hours_per_vacation_day || 8.0}h</div>`
+            }
+            <div style="font-size:0.8rem; color:var(--color-text-light); margin-bottom:1rem;">Eintrittsdatum: ${emp.start_date ? formatDate(emp.start_date) : '–'}</div>
             <div style="font-weight:600; font-size:0.85rem; margin-bottom:0.5rem;">Einträge ${year}:</div>
             <div id="eintraege-${emp.id}">
                 ${(vacations || []).filter(v => v.employee_id === emp.id).length === 0
@@ -2550,27 +2659,75 @@ function changeUrlaubYear(dir) {
     loadUrlaubsverwaltung();
 }
 
-function calculateVacationAccount(emp, year, vacations, prevVacations) {
-    const totalDays = emp.vacation_days_per_year ?? 20;
+function calculateVacationAccount(emp, year, vacations, prevVacations, phases = []) {
     const today = new Date();
 
     // Jahre vor 2026 → alles 0
     if (year < 2026) {
-        return { entitlement: 0, carryover: 0, used: 0, remaining: 0 };
+        return { entitlement: 0, carryover: 0, used: 0, remaining: 0, entitlementH: 0, carryoverH: 0, usedH: 0, remainingH: 0 };
     }
 
-    // Anteiliger Anspruch im Eintrittsjahr
-    let entitlement = totalDays;
-    if (emp.start_date) {
-        const start = new Date(emp.start_date + 'T12:00:00');
-        if (start.getFullYear() === year) {
-            const dayOfMonth = start.getDate();
-            const fractionOfMonth = dayOfMonth === 1 ? 1 : dayOfMonth <= 15 ? 1 : 0.5;
-            const monthsWorked = (12 - start.getMonth() - 1) + fractionOfMonth;
-            entitlement = Math.round((monthsWorked / 12) * totalDays * 100) / 100;
-        } else if (start.getFullYear() > year) {
-            entitlement = 0;
+    // Phasen für dieses Jahr filtern
+    const yearStart = `${year}-01-01`;
+    const yearEnd = `${year}-12-31`;
+    const activePhases = phases.filter(p =>
+        p.start_date <= yearEnd && (!p.end_date || p.end_date >= yearStart)
+    );
+
+    let entitlement = 0;
+    let entitlementH = 0;
+
+    if (activePhases.length > 0) {
+        // Mit Phasen berechnen
+        for (const phase of activePhases) {
+            const phaseStartRaw = new Date(phase.start_date + 'T12:00:00');
+            const yearStartDate = new Date(yearStart + 'T12:00:00');
+            const phaseStart = phaseStartRaw > yearStartDate ? phaseStartRaw : yearStartDate;
+
+            const phaseEndRaw = phase.end_date ? new Date(phase.end_date + 'T12:00:00') : new Date(yearEnd + 'T12:00:00');
+            const yearEndDate = new Date(yearEnd + 'T12:00:00');
+            const phaseEnd = phaseEndRaw < yearEndDate ? phaseEndRaw : yearEndDate;
+
+            // Monate dieser Phase
+            const startMonth = phaseStart.getMonth();
+            const endMonth = phaseEnd.getMonth();
+            const startDay = phaseStart.getDate();
+            const endDay = phaseEnd.getDate();
+            const daysInStartMonth = new Date(year, startMonth + 1, 0).getDate();
+            const daysInEndMonth = new Date(year, endMonth + 1, 0).getDate();
+
+            const startFraction = startDay === 1 ? 1 : startDay <= 15 ? 1 : 0.5;
+            const endFraction = endDay >= daysInEndMonth ? 1 : endDay >= 15 ? 1 : 0.5;
+
+            let months = 0;
+            if (startMonth === endMonth) {
+                months = endFraction;
+            } else {
+                months = startFraction + (endMonth - startMonth - 1) + endFraction;
+            }
+
+            const phaseDays = Math.round((months / 12) * (phase.vacation_days_per_year || 20) * 100) / 100;
+            const phaseHours = phaseDays * (phase.hours_per_vacation_day || 8.0);
+            entitlement += phaseDays;
+            entitlementH += phaseHours;
         }
+    } else {
+        // Ohne Phasen — Standardberechnung
+        const totalDays = emp.vacation_days_per_year ?? 20;
+        const hoursPerDay = emp.hours_per_vacation_day || 8.0;
+        entitlement = totalDays;
+        if (emp.start_date) {
+            const start = new Date(emp.start_date + 'T12:00:00');
+            if (start.getFullYear() === year) {
+                const dayOfMonth = start.getDate();
+                const fractionOfMonth = dayOfMonth === 1 ? 1 : dayOfMonth <= 15 ? 1 : 0.5;
+                const monthsWorked = (12 - start.getMonth() - 1) + fractionOfMonth;
+                entitlement = Math.round((monthsWorked / 12) * totalDays * 100) / 100;
+            } else if (start.getFullYear() > year) {
+                entitlement = 0;
+            }
+        }
+        entitlementH = entitlement * hoursPerDay;
     }
 
     // Genommene Tage dieses Jahr
@@ -2584,25 +2741,24 @@ function calculateVacationAccount(emp, year, vacations, prevVacations) {
         const prevUsed = prevVacations
             .filter(v => v.employee_id === emp.id)
             .reduce((sum, v) => sum + (v.deducted_days || 0), 0);
-        const prevEntitlement = totalDays;
+        const prevEntitlement = emp.vacation_days_per_year ?? 20;
         const prevRemaining = prevEntitlement - prevUsed;
         if (prevRemaining > 0) {
-            // Verfällt am 31. März des aktuellen Jahres
             const expiry = new Date(year, 2, 31);
             if (today <= expiry) {
                 carryover = prevRemaining;
             }
-            // Nach 31. März: Übertrag verfallen, wird nicht mehr angezeigt
         }
     }
 
-    const remaining = entitlement + carryover - used;
     const hoursPerDay = emp.hours_per_vacation_day || 8.0;
-    return { 
+    const remaining = entitlement + carryover - used;
+    const remainingH = entitlementH + (carryover * hoursPerDay) - used * hoursPerDay;
+    return {
         entitlement, carryover, used, remaining,
-        entitlementH: entitlement * hoursPerDay,
+        entitlementH,
         carryoverH: carryover * hoursPerDay,
         usedH: used * hoursPerDay,
-        remainingH: remaining * hoursPerDay
+        remainingH
     };
 }
