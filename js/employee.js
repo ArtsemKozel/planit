@@ -409,21 +409,68 @@ async function loadVacationAccount() {
         .eq('id', currentEmployee.id)
         .maybeSingle();
 
+    // Phasen laden
+    const { data: phases, error: phasesError } = await db
+        .from('employment_phases')
+        .select('*')
+        .eq('employee_id', currentEmployee.id)
+        .order('start_date');
+    console.log('phases:', phases, 'error:', phasesError);
+
     const totalDays = emp?.vacation_days_per_year ?? 20;
     const hoursPerDay = emp?.hours_per_vacation_day || 8.0;
+    const yearStart = `${year}-01-01`;
+    const yearEnd = `${year}-12-31`;
 
-    // Anteiligen Anspruch berechnen
-    let entitlement = totalDays;
-    if (emp?.start_date) {
-        const start = new Date(emp.start_date + 'T12:00:00');
-        if (start.getFullYear() === year) {
-            const dayOfMonth = start.getDate();
-            const fractionOfMonth = dayOfMonth === 1 ? 1 : dayOfMonth <= 15 ? 1 : 0.5;
-            const monthsWorked = (12 - start.getMonth() - 1) + fractionOfMonth;
-            entitlement = Math.round((monthsWorked / 12) * totalDays * 100) / 100;
-        } else if (start.getFullYear() > year) {
-            entitlement = 0;
+    // Anspruch berechnen
+    let entitlement = 0;
+    let entitlementH = 0;
+    const activePhases = (phases || []).filter(p =>
+        p.start_date <= yearEnd && (!p.end_date || p.end_date >= yearStart)
+    );
+
+    if (activePhases.length > 0) {
+        for (const phase of activePhases) {
+            const phaseStartRaw = new Date(phase.start_date + 'T12:00:00');
+            const yearStartDate = new Date(yearStart + 'T12:00:00');
+            const phaseStart = phaseStartRaw > yearStartDate ? phaseStartRaw : yearStartDate;
+            const phaseEndRaw = phase.end_date ? new Date(phase.end_date + 'T12:00:00') : new Date(yearEnd + 'T12:00:00');
+            const yearEndDate = new Date(yearEnd + 'T12:00:00');
+            const phaseEnd = phaseEndRaw < yearEndDate ? phaseEndRaw : yearEndDate;
+
+            const startMonth = phaseStart.getMonth();
+            const endMonth = phaseEnd.getMonth();
+            const startDay = phaseStart.getDate();
+            const endDay = phaseEnd.getDate();
+            const daysInEndMonth = new Date(year, endMonth + 1, 0).getDate();
+            const startFraction = startDay === 1 ? 1 : startDay <= 15 ? 1 : 0.5;
+            const endFraction = endDay >= daysInEndMonth ? 1 : endDay >= 15 ? 1 : 0.5;
+
+            let months = 0;
+            if (startMonth === endMonth) {
+                months = endFraction;
+            } else {
+                months = startFraction + (endMonth - startMonth - 1) + endFraction;
+            }
+
+            const phaseDays = Math.round((months / 12) * (phase.vacation_days_per_year || 20) * 100) / 100;
+            entitlement += phaseDays;
+            entitlementH += phaseDays * (phase.hours_per_vacation_day || 8.0);
         }
+    } else {
+        entitlement = totalDays;
+        if (emp?.start_date) {
+            const start = new Date(emp.start_date + 'T12:00:00');
+            if (start.getFullYear() === year) {
+                const dayOfMonth = start.getDate();
+                const fractionOfMonth = dayOfMonth === 1 ? 1 : dayOfMonth <= 15 ? 1 : 0.5;
+                const monthsWorked = (12 - start.getMonth() - 1) + fractionOfMonth;
+                entitlement = Math.round((monthsWorked / 12) * totalDays * 100) / 100;
+            } else if (start.getFullYear() > year) {
+                entitlement = 0;
+            }
+        }
+        entitlementH = entitlement * hoursPerDay;
     }
 
     // Genehmigte Urlaubsanträge dieses Jahr laden
@@ -436,15 +483,36 @@ async function loadVacationAccount() {
         .lte('end_date', `${year}-12-31`);
 
     const usedDays = (requests || []).reduce((sum, r) => sum + (r.deducted_days || 0), 0);
+    const usedH = usedDays * hoursPerDay;
     const remaining = entitlement - usedDays;
+    const remainingH = entitlementH - usedH;
 
-    document.getElementById('vacation-account').textContent = `${remaining.toFixed(2)} Tage / ${(remaining * hoursPerDay).toFixed(2)} Std übrig`;
-    document.getElementById('vacation-used').textContent = `${usedDays.toFixed(2)} Tage genommen`;
-    document.getElementById('vacation-total').textContent = `von ${entitlement.toFixed(2)} Tagen`;
+    // vacation-account wird im Detail-Block angezeigt, nicht im Header
+    // vacation-used und vacation-total werden nicht mehr im Header gebraucht
 
     const accountEl = document.getElementById('vacation-account');
     accountEl.style.color = remaining <= 3 ? '#E57373' :
         remaining <= 7 ? '#C9A24D' : 'var(--color-primary)';
+
+    // Details füllen
+    document.getElementById('vac-entitlement').innerHTML = `${entitlement.toFixed(2)} Tage<br><span style="font-size:0.75rem; color:var(--color-text-light);">${entitlementH.toFixed(2)} Std</span>`;
+    document.getElementById('vac-carryover').innerHTML = `0.00 Tage<br><span style="font-size:0.75rem; color:var(--color-text-light);">0.00 Std</span>`;
+    document.getElementById('vac-used-detail').innerHTML = `${usedDays.toFixed(2)} Tage<br><span style="font-size:0.75rem; color:var(--color-text-light);">${usedH.toFixed(2)} Std</span>`;
+    document.getElementById('vac-remaining-detail').innerHTML = `${remaining.toFixed(2)} Tage<br><span style="font-size:0.75rem; color:var(--color-text-light);">${remainingH.toFixed(2)} Std</span>`;
+
+    // Phasen-Info
+    const phasesInfo = document.getElementById('vac-phases-info');
+    if (activePhases.length > 0) {
+        const formatShort = d => {
+            const parts = d.split('-');
+            return `${parts[2]}.${parts[1]}.${parts[0].slice(2)}`;
+        };
+        phasesInfo.innerHTML = activePhases.map(p =>
+            `Std. pro UT: ${p.hours_per_vacation_day}h (${formatShort(p.start_date)} – ${p.end_date ? formatShort(p.end_date) : 'offen'})`
+        ).join('<br>');
+    } else {
+        phasesInfo.innerHTML = `Std. pro UT: ${hoursPerDay}h`;
+    }
 }
 
 let signaturePad = null;
@@ -1341,4 +1409,12 @@ async function loadMyRequests() {
     }).join('');
 
     document.getElementById('my-requests-list').innerHTML = html;
+}
+
+function toggleVacationDetails() {
+    const details = document.getElementById('vacation-details');
+    const toggle = document.getElementById('vacation-toggle');
+    const isOpen = details.style.display !== 'none';
+    details.style.display = isOpen ? 'none' : 'block';
+    toggle.textContent = isOpen ? '▶' : '▼';
 }

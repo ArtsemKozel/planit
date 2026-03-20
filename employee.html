@@ -100,14 +100,35 @@
     <!-- TAB 2: URLAUB -->
     <div id="tab-urlaub" class="tab-content">
         <!-- Urlaubskonto -->
-        <div class="card" style="margin-bottom:1.5rem; display:flex; justify-content:space-between; align-items:center;">
-            <div>
-                <div style="font-size:0.85rem; color:var(--color-text-light);">Urlaubstage <span id="vacation-year-label"></span></div>
-                <div id="vacation-account" style="font-size:1.5rem; font-weight:700; color:var(--color-primary);">— Tage übrig</div>
+        <div class="card" style="margin-bottom:1.5rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleVacationDetails()">
+                <div>
+                    <div style="font-weight:700; font-size:1rem;">Urlaubskonto</div>
+                    <span id="vacation-year-label" style="display:none;"></span>
+                    <div id="vacation-account" style="display:none;"></div>
+                </div>
+                <span id="vacation-toggle" style="color:var(--color-text-light); font-size:0.85rem;">▶</span>
             </div>
-            <div style="text-align:right; font-size:0.85rem; color:var(--color-text-light);">
-                <div id="vacation-used">0 genommen</div>
-                <div id="vacation-total">von 0 Tagen</div>
+            <div id="vacation-details" style="display:none; margin-top:1rem; border-top:1px solid var(--color-border); padding-top:1rem;">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:0.75rem;">
+                    <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem;">
+                        <div style="font-size:0.75rem; color:var(--color-text-light);">Jahresanspruch</div>
+                        <div id="vac-entitlement" style="font-weight:700;">–</div>
+                    </div>
+                    <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem;">
+                        <div style="font-size:0.75rem; color:var(--color-text-light);">Übertrag Vorjahr</div>
+                        <div id="vac-carryover" style="font-weight:700;">–</div>
+                    </div>
+                    <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem;">
+                        <div style="font-size:0.75rem; color:var(--color-text-light);">Genommen</div>
+                        <div id="vac-used-detail" style="font-weight:700;">–</div>
+                    </div>
+                    <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem;">
+                        <div style="font-size:0.75rem; color:var(--color-text-light);">Übrig</div>
+                        <div id="vac-remaining-detail" style="font-weight:700; color:var(--color-primary);">–</div>
+                    </div>
+                </div>
+                <div id="vac-phases-info" style="font-size:0.8rem; color:var(--color-text-light);"></div>
             </div>
         </div>
         <!-- Kalender -->
