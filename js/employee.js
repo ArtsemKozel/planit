@@ -453,9 +453,9 @@ async function loadVacationAccount() {
                 months = startFraction + (endMonth - startMonth - 1) + endFraction;
             }
 
-            const phaseDays = Math.round((months / 12) * (phase.vacation_days_per_year || 20) * 100) / 100;
+            const phaseDays = phase.hours_per_vacation_day === 0 ? 0 : Math.round((months / 12) * (phase.vacation_days_per_year || 20) * 100) / 100;
             entitlement += phaseDays;
-            entitlementH += phaseDays * (phase.hours_per_vacation_day || 8.0);
+            entitlementH += phaseDays * (phase.hours_per_vacation_day || 0);
         }
     } else {
         entitlement = totalDays;
@@ -508,7 +508,7 @@ async function loadVacationAccount() {
             return `${parts[2]}.${parts[1]}.${parts[0].slice(2)}`;
         };
         phasesInfo.innerHTML = activePhases.map(p =>
-            `Std. pro UT: ${p.hours_per_vacation_day}h (${formatShort(p.start_date)} – ${p.end_date ? formatShort(p.end_date) : 'offen'})`
+            `Std. pro UT: ${p.hours_per_vacation_day}h (${formatShort(p.start_date)} – ${p.end_date ? formatShort(p.end_date) : 'offen'})${p.notes ? ` · ${p.notes}` : ''}`
         ).join('<br>');
     } else {
         phasesInfo.innerHTML = `Std. pro UT: ${hoursPerDay}h`;

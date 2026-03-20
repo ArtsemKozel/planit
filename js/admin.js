@@ -1662,15 +1662,19 @@ function renderEmploymentPhases() {
                     <input type="date" value="${p.end_date || ''}" onchange="updatePhase(${i}, 'end_date', this.value)" style="padding:0.4rem; font-size:0.8rem;">
                 </div>
             </div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:0.5rem;">
                 <div>
                     <label style="font-size:0.75rem;">Urlaubstage/Jahr</label>
-                    <input type="number" value="${p.vacation_days_per_year || 20}" min="0" max="365" onchange="updatePhase(${i}, 'vacation_days_per_year', parseFloat(this.value))" style="padding:0.4rem; font-size:0.8rem;">
+                    <input type="number" value="${p.vacation_days_per_year ?? 20}" min="0" max="365" onchange="updatePhase(${i}, 'vacation_days_per_year', parseFloat(this.value) || 0)" style="padding:0.4rem; font-size:0.8rem;">
                 </div>
                 <div>
                     <label style="font-size:0.75rem;">Std/Urlaubstag</label>
-                    <input type="number" value="${p.hours_per_vacation_day || 8}" min="0.5" max="24" step="0.5" onchange="updatePhase(${i}, 'hours_per_vacation_day', parseFloat(this.value))" style="padding:0.4rem; font-size:0.8rem;">
+                    <input type="number" value="${p.hours_per_vacation_day ?? 8}" min="0" max="24" step="0.5" onchange="updatePhase(${i}, 'hours_per_vacation_day', parseFloat(this.value) || 0)" style="padding:0.4rem; font-size:0.8rem;">
                 </div>
+            </div>
+            <div>
+                <label style="font-size:0.75rem;">Kommentar (optional)</label>
+                <input type="text" value="${p.notes || ''}" placeholder="z.B. Vollzeit, Minijob, Elternzeit..." onchange="updatePhase(${i}, 'notes', this.value)" style="padding:0.4rem; font-size:0.8rem;">
             </div>
         </div>
     `).join('');
@@ -1693,6 +1697,7 @@ function removeEmploymentPhase(index) {
 
 function updatePhase(index, field, value) {
     currentPhases[index][field] = value;
+    console.log('updatePhase:', index, field, value, currentPhases[index]);
 }
 
 function closeEditEmployeeModal() {
@@ -1737,13 +1742,14 @@ async function submitEditEmployee() {
         const phasesToInsert = currentPhases
             .filter(p => p.start_date)
             .map(p => ({
-                user_id: adminSession.user.id,
-                employee_id: editEmployeeId,
-                start_date: p.start_date,
-                end_date: p.end_date || null,
-                hours_per_vacation_day: p.hours_per_vacation_day,
-                vacation_days_per_year: p.vacation_days_per_year
-            }));
+            user_id: adminSession.user.id,
+            employee_id: editEmployeeId,
+            start_date: p.start_date,
+            end_date: p.end_date || null,
+            hours_per_vacation_day: p.hours_per_vacation_day,
+            vacation_days_per_year: p.vacation_days_per_year,
+            notes: p.notes || null
+        }));
         if (phasesToInsert.length > 0) {
             await db.from('employment_phases').insert(phasesToInsert);
         }
@@ -2552,7 +2558,7 @@ async function loadUrlaubsverwaltung() {
                     };
                     const von = formatShort(p.start_date);
                     const bis = p.end_date ? formatShort(p.end_date) : 'offen';
-                    return `<div style="font-size:0.8rem; color:var(--color-text-light); margin-bottom:0.25rem;">Std. pro UT: ${p.hours_per_vacation_day}h (${von} – ${bis})</div>`;
+                    return `<div style="font-size:0.8rem; color:var(--color-text-light); margin-bottom:0.25rem;">Std. pro UT: ${p.hours_per_vacation_day}h (${von} – ${bis})${p.notes ? ` · ${p.notes}` : ''}</div>`;
                 }).join('')
                 : `<div style="font-size:0.8rem; color:var(--color-text-light); margin-bottom:0.25rem;">Std. pro UT: ${emp.hours_per_vacation_day || 8.0}h</div>`
             }
@@ -2706,10 +2712,11 @@ function calculateVacationAccount(emp, year, vacations, prevVacations, phases = 
                 months = startFraction + (endMonth - startMonth - 1) + endFraction;
             }
 
-            const phaseDays = Math.round((months / 12) * (phase.vacation_days_per_year || 20) * 100) / 100;
-            const phaseHours = phaseDays * (phase.hours_per_vacation_day || 8.0);
+            const phaseDays = phase.hours_per_vacation_day === 0 ? 0 : Math.round((months / 12) * (phase.vacation_days_per_year || 20) * 100) / 100;
+            const phaseHours = phaseDays * (phase.hours_per_vacation_day || 0);
             entitlement += phaseDays;
             entitlementH += phaseHours;
+            console.log('phaseDays:', phaseDays, 'phaseHours:', phaseHours, 'total entitlementH:', entitlementH);
         }
     } else {
         // Ohne Phasen — Standardberechnung
