@@ -1058,8 +1058,6 @@ async function submitEditVacation() {
     const { error } = await db.from('vacation_requests')
         .update(updateData)
         .eq('id', editVacationId);
-    if (error) console.log('Update error:', JSON.stringify(error));
-
     if (!error) {
         closeEditVacationModal();
         await loadAdminVacations();
@@ -1697,7 +1695,6 @@ function removeEmploymentPhase(index) {
 
 function updatePhase(index, field, value) {
     currentPhases[index][field] = value;
-    console.log('updatePhase:', index, field, value, currentPhases[index]);
 }
 
 function closeEditEmployeeModal() {
@@ -2404,7 +2401,6 @@ async function submitExtendSickLeave() {
             .eq('open_note', 'Krankmeldung')
             .gt('shift_date', newEnd)
             .lte('shift_date', sick.end_date);
-            console.log('Shifts to restore:', shifts, 'newEnd:', newEnd, 'sick.end_date:', sick.end_date);
         if (shifts && shifts.length > 0) {
             for (const shift of shifts) {
                 await db.from('shifts').update({
@@ -2716,7 +2712,6 @@ function calculateVacationAccount(emp, year, vacations, prevVacations, phases = 
             const phaseHours = phaseDays * (phase.hours_per_vacation_day || 0);
             entitlement += phaseDays;
             entitlementH += phaseHours;
-            console.log('phaseDays:', phaseDays, 'phaseHours:', phaseHours, 'total entitlementH:', entitlementH);
         }
     } else {
         // Ohne Phasen — Standardberechnung
