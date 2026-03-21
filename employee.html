@@ -213,6 +213,12 @@
             <div class="empty-state"><p>Keine Schichten vorhanden.</p></div>
         </div>
         <div style="margin-top:1.5rem;">
+            <div class="section-title">Eingehende Requests</div>
+            <div id="swap-incoming-list">
+                <div style="color:var(--color-text-light); font-size:0.85rem;">Keine eingehenden Requests.</div>
+            </div>
+        </div>
+        <div style="margin-top:1.5rem;">
             <div class="section-title">Meine Tausch-Requests</div>
             <div id="swap-requests-list">
                 <div class="empty-state"><p>Keine Requests vorhanden.</p></div>
@@ -396,7 +402,13 @@
         <p style="margin-bottom:1rem; font-size:0.9rem;" id="swap-shift-info"></p>
         <div class="form-group">
             <label>Tauschen mit:</label>
-            <select id="swap-colleague"></select>
+            <select id="swap-colleague" onchange="loadColleagueShifts()"></select>
+        </div>
+        <div class="form-group">
+            <label>Schicht von Kollege:</label>
+            <select id="swap-target-shift">
+                <option value="">— Kollege wählen —</option>
+            </select>
         </div>
         <div id="swap-error" style="color:var(--color-red); font-size:0.85rem; margin-bottom:1rem; display:none;"></div>
         <button class="btn-primary" onclick="submitSwap()">Request senden</button>

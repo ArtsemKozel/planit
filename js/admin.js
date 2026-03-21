@@ -1541,44 +1541,65 @@ async function submitNewEmployee() {
 async function loadAdminSwaps() {
     const { data: swaps } = await db
         .from('shift_swaps')
-        .select('*, shifts(shift_date, start_time, end_time), from:from_employee_id(name), to:to_employee_id(name)')
+        .select('*, shifts!shift_id(shift_date, start_time, end_time), target:shifts!target_shift_id(shift_date, start_time, end_time), from_emp:employees_planit!from_employee_id(name), to_emp:employees_planit!to_employee_id(name)')
         .eq('user_id', adminSession.user.id)
+        .eq('to_employee_status', 'accepted')
         .order('created_at', { ascending: false });
 
     const container = document.getElementById('admin-swap-list');
-
     if (!swaps || swaps.length === 0) {
         container.innerHTML = '<div class="empty-state"><p>Keine Requests vorhanden.</p></div>';
         return;
     }
 
-    container.innerHTML = swaps.map(s => `
-        <div class="list-item">
-            <div class="list-item-info">
-                <h4>${s.from?.name || '?'} → ${s.to?.name || '?'}</h4>
-                <p>${s.shifts ? formatDate(s.shifts.shift_date) : ''} | ${s.shifts ? s.shifts.start_time.slice(0,5) + ' – ' + s.shifts.end_time.slice(0,5) : ''}</p>
-            </div>
-            <div style="display:flex; flex-direction:column; gap:0.5rem; align-items:flex-end;">
-                <span class="badge badge-${s.status}">
-                    ${s.status === 'pending' ? 'Ausstehend' : s.status === 'approved' ? 'Genehmigt' : 'Abgelehnt'}
-                </span>
-                ${s.status === 'pending' ? `
-                    <div style="display:flex; gap:0.5rem;">
-                        <button class="btn-small btn-approve" onclick="reviewSwap('${s.id}', 'approved')">✓</button>
-                        <button class="btn-small btn-reject" onclick="reviewSwap('${s.id}', 'rejected')">✕</button>
+    container.innerHTML = swaps.map(s => {
+        const colleagueStatus = s.to_employee_status === 'pending' ? '⏳ Wartet auf Kollege' 
+            : s.to_employee_status === 'accepted' ? '✓ Kollege akzeptiert' 
+            : '✗ Kollege abgelehnt';
+        const canReview = s.status === 'pending' && s.to_employee_status === 'accepted';
+        return `
+            <div class="list-item" style="flex-direction:column; align-items:flex-start; gap:0.5rem;">
+                <div style="display:flex; justify-content:space-between; width:100%;">
+                    <h4>${s.from_emp?.name || '?'} ↔ ${s.to_emp?.name || '?'}</h4>
+                    <span class="badge badge-${s.status}">
+                        ${s.status === 'pending' ? 'Ausstehend' : s.status === 'approved' ? 'Genehmigt' : 'Abgelehnt'}
+                    </span>
+                </div>
+                <div style="font-size:0.85rem; color:var(--color-text-light);">
+                    ${s.from_emp?.name || '?'}: ${s.shifts ? formatDate(s.shifts.shift_date) + ' ' + s.shifts.start_time.slice(0,5) + ' – ' + s.shifts.end_time.slice(0,5) : '—'}
+                </div>
+                <div style="font-size:0.85rem; color:var(--color-text-light);">
+                    ${s.to_emp?.name || '?'}: ${s.target ? formatDate(s.target.shift_date) + ' ' + s.target.start_time.slice(0,5) + ' – ' + s.target.end_time.slice(0,5) : '—'}
+                </div>
+                <div style="font-size:0.75rem; color:var(--color-text-light);">${colleagueStatus}</div>
+                ${canReview ? `
+                    <div style="display:flex; gap:0.5rem; margin-top:0.25rem;">
+                        <button class="btn-small btn-approve btn-icon" onclick="reviewSwap('${s.id}', 'approved', '${s.shift_id}', '${s.target_shift_id}', '${s.from_employee_id}', '${s.to_employee_id}')">
+                            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                        </button>
+                        <button class="btn-small btn-reject btn-icon" onclick="reviewSwap('${s.id}', 'rejected', null, null, null, null)">
+                            <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
                     </div>
                 ` : ''}
-            </div>
-        </div>
-    `).join('');
+            </div>`;
+    }).join('');
 }
 
-async function reviewSwap(id, status) {
+async function reviewSwap(id, status, shiftId, targetShiftId, fromEmpId, toEmpId) {
     await db.from('shift_swaps').update({
         status,
         reviewed_at: new Date().toISOString()
     }).eq('id', id);
+
+    // Bei Genehmigung: Schichten tauschen
+    if (status === 'approved') {
+        await db.from('shifts').update({ employee_id: toEmpId }).eq('id', shiftId);
+        await db.from('shifts').update({ employee_id: fromEmpId }).eq('id', targetShiftId);
+    }
+
     await loadAdminSwaps();
+    await loadWeekGrid();
 }
 
 // ── HELPER ────────────────────────────────────────────────

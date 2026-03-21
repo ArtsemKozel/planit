@@ -703,6 +703,15 @@ select {
     color: white;
 }
 
+.btn-text {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.85rem;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+}
+
 .btn-delete {
     background: var(--color-primary);
     color: white;

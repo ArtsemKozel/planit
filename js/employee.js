@@ -909,27 +909,78 @@ async function loadSwaps() {
     // Meine Requests laden
     const { data: swaps } = await db
         .from('shift_swaps')
-        .select('*')
+        .select('*, shifts!shift_id(shift_date, start_time, end_time), target:shifts!target_shift_id(shift_date, start_time, end_time), to_emp:employees_planit!to_employee_id(name)')
         .eq('from_employee_id', currentEmployee.id)
         .order('created_at', { ascending: false });
 
     const requestsList = document.getElementById('swap-requests-list');
-
     if (!swaps || swaps.length === 0) {
         requestsList.innerHTML = '<div class="empty-state"><p>Keine Requests vorhanden.</p></div>';
     } else {
-        requestsList.innerHTML = swaps.map(s => `
-            <div class="list-item">
-                <div class="list-item-info">
-                    <h4>Tausch-Request</h4>
-                    <p>${formatDate(s.created_at)}</p>
-                </div>
-                <span class="badge badge-${s.status}">
-                    ${s.status === 'pending' ? 'Ausstehend' : s.status === 'approved' ? 'Genehmigt' : 'Abgelehnt'}
-                </span>
-            </div>
-        `).join('');
+        requestsList.innerHTML = swaps.map(s => {
+            const myShift = s.shifts;
+            const theirShift = s.target;
+            const colleague = s.to_emp;
+            const colleagueStatus = s.to_employee_status === 'pending' ? 'Wartet auf Kollege' : s.to_employee_status === 'accepted' ? 'Kollege ✓' : 'Kollege ✗';
+            const adminStatus = s.status === 'pending' ? 'Wartet auf Admin' : s.status === 'approved' ? 'Genehmigt' : 'Abgelehnt';
+            return `
+                <div class="list-item" style="flex-direction:column; align-items:flex-start; gap:0.5rem;">
+                    <div style="display:flex; justify-content:space-between; width:100%;">
+                        <h4 style="font-size:0.95rem;">${colleague?.name || '—'}</h4>
+                        <span class="badge badge-${s.status}">${adminStatus}</span>
+                    </div>
+                    <div style="font-size:0.85rem; color:var(--color-text-light);">
+                        Meine Schicht: ${myShift ? formatDate(myShift.shift_date) + ' ' + myShift.start_time.slice(0,5) + ' – ' + myShift.end_time.slice(0,5) : '—'}
+                    </div>
+                    <div style="font-size:0.85rem; color:var(--color-text-light);">
+                        Ihre Schicht: ${theirShift ? formatDate(theirShift.shift_date) + ' ' + theirShift.start_time.slice(0,5) + ' – ' + theirShift.end_time.slice(0,5) : '—'}
+                    </div>
+                    <span style="font-size:0.75rem; color:var(--color-text-light);">${colleagueStatus}</span>
+                </div>`;
+        }).join('');
     }
+
+    // Eingehende Requests laden
+    const { data: incomingSwaps } = await db
+        .from('shift_swaps')
+        .select('*, shifts!shift_id(shift_date, start_time, end_time), target:shifts!target_shift_id(shift_date, start_time, end_time), from_emp:employees_planit!from_employee_id(name)')
+        .eq('to_employee_id', currentEmployee.id)
+        .eq('to_employee_status', 'pending')
+        .order('created_at', { ascending: false });
+
+    const incomingList = document.getElementById('swap-incoming-list');
+    if (!incomingSwaps || incomingSwaps.length === 0) {
+        incomingList.innerHTML = '<div style="color:var(--color-text-light); font-size:0.85rem;">Keine eingehenden Requests.</div>';
+    } else {
+        incomingList.innerHTML = incomingSwaps.map(s => {
+            const myShift = s.target;
+            const theirShift = s.shifts;
+            const colleague = s.from_emp;
+            return `
+                <div class="list-item" style="flex-direction:column; align-items:flex-start; gap:0.5rem;">
+                    <div style="font-weight:700; font-size:0.95rem;">${colleague?.name || '—'} möchte tauschen</div>
+                    <div style="font-size:0.85rem; color:var(--color-text-light);">
+                        Ihre Schicht: ${theirShift ? formatDate(theirShift.shift_date) + ' ' + theirShift.start_time.slice(0,5) + ' – ' + theirShift.end_time.slice(0,5) : '—'}
+                    </div>
+                    <div style="font-size:0.85rem; color:var(--color-text-light);">
+                        Meine Schicht: ${myShift ? formatDate(myShift.shift_date) + ' ' + myShift.start_time.slice(0,5) + ' – ' + myShift.end_time.slice(0,5) : '—'}
+                    </div>
+                    <div style="display:flex; gap:0.5rem; margin-top:0.25rem;">
+                        <button class="btn-text btn-approve" onclick="respondSwap('${s.id}', 'accepted')">✓ Akzeptieren</button>
+                        <button class="btn-text btn-reject" onclick="respondSwap('${s.id}', 'rejected')">✕ Ablehnen</button>
+                    </div>
+                </div>`;
+        }).join('');
+    }
+}
+
+async function respondSwap(swapId, response) {
+    const { error } = await db
+        .from('shift_swaps')
+        .update({ to_employee_status: response })
+        .eq('id', swapId);
+
+    if (!error) await loadSwaps();
 }
 
 async function openSwapModal(shiftId, date, start, end) {
@@ -954,20 +1005,59 @@ async function openSwapModal(shiftId, date, start, end) {
     document.getElementById('swap-error').style.display = 'none';
 }
 
+async function loadColleagueShifts() {
+    const colleagueId = document.getElementById('swap-colleague').value;
+    const select = document.getElementById('swap-target-shift');
+    select.innerHTML = '<option value="">Wird geladen...</option>';
+    
+    if (!colleagueId) {
+        select.innerHTML = '<option value="">— Kollege wählen —</option>';
+        return;
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const { data: shifts } = await db
+        .from('shifts')
+        .select('*')
+        .eq('employee_id', colleagueId)
+        .eq('user_id', currentEmployee.user_id)
+        .gte('shift_date', today)
+        .order('shift_date');
+
+    if (!shifts || shifts.length === 0) {
+        select.innerHTML = '<option value="">Keine Schichten gefunden</option>';
+        return;
+    }
+
+    select.innerHTML = shifts.map(s =>
+        `<option value="${s.id}">${formatDate(s.shift_date)} | ${s.start_time.slice(0,5)} – ${s.end_time.slice(0,5)} Uhr</option>`
+    ).join('');
+}
+
 function closeSwapModal() {
     document.getElementById('swap-modal').classList.remove('open');
 }
 
 async function submitSwap() {
     const toEmployee = document.getElementById('swap-colleague').value;
+    const targetShiftId = document.getElementById('swap-target-shift').value;
     const errorDiv = document.getElementById('swap-error');
+    errorDiv.style.display = 'none';
+
+    if (!targetShiftId) {
+        errorDiv.textContent = 'Bitte eine Schicht des Kollegen auswählen.';
+        errorDiv.style.display = 'block';
+        return;
+    }
 
     const { error } = await db.from('shift_swaps').insert({
         user_id: currentEmployee.user_id,
         shift_id: selectedSwapShift,
         from_employee_id: currentEmployee.id,
         to_employee_id: toEmployee,
-        status: 'pending'
+        target_shift_id: targetShiftId,
+        status: 'pending',
+        to_employee_status: 'pending'
     });
 
     if (error) {
@@ -975,7 +1065,6 @@ async function submitSwap() {
         errorDiv.style.display = 'block';
         return;
     }
-
     closeSwapModal();
     await loadSwaps();
 }
