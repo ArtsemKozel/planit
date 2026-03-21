@@ -1584,6 +1584,100 @@ async function loadAdminSwaps() {
                 ` : ''}
             </div>`;
     }).join('');
+
+    // Abzugebende Schichten laden
+    const { data: handoverShifts } = await db
+        .from('shifts')
+        .select('*, employees_planit!shifts_employee_id_fkey(name, department)')
+        .eq('user_id', adminSession.user.id)
+        .eq('handover_requested', true)
+        .gte('shift_date', new Date().toISOString().split('T')[0])
+        .order('shift_date');
+
+    const handoverContainer = document.getElementById('admin-handover-list');
+    if (!handoverShifts || handoverShifts.length === 0) {
+        handoverContainer.innerHTML = '<div class="empty-state"><p>Keine Requests vorhanden.</p></div>';
+        return;
+    }
+
+    // Pro Schicht alle Interessenten laden
+    const handoverHTML = await Promise.all(handoverShifts.map(async s => {
+        const { data: applicants } = await db
+            .from('shift_handovers')
+            .select('*, to_emp:employees_planit!to_employee_id(name)')
+            .eq('shift_id', s.id)
+            .eq('status', 'pending');
+
+        const applicantsList = applicants && applicants.length > 0
+            ? applicants.map(a => `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:0.3rem 0; border-bottom:1px solid var(--color-border);">
+                    <span style="font-size:0.85rem;">${a.to_emp?.name || '—'}</span>
+                    <button class="btn-small btn-pdf-view btn-icon" onclick="approveHandover('${s.id}', '${a.to_employee_id}')">
+                        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                    </button>
+                </div>`).join('')
+            : '<div style="font-size:0.85rem; color:var(--color-text-light);">Noch niemand gemeldet.</div>';
+
+        return `
+            <div class="list-item" style="flex-direction:column; align-items:flex-start; gap:0.5rem;">
+                <div style="display:flex; justify-content:space-between; width:100%;">
+                    <h4>${s.employees_planit?.name || '?'} gibt ab</h4>
+                    <button class="btn-small btn-pdf-view btn-icon" onclick="cancelHandover('${s.id}')">
+                        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+                <div style="font-size:0.85rem; color:var(--color-text-light);">
+                    ${formatDate(s.shift_date)} | ${s.start_time.slice(0,5)} – ${s.end_time.slice(0,5)} Uhr · ${s.employees_planit?.department || ''}
+                </div>
+                <div style="font-weight:600; font-size:0.8rem; margin-top:0.25rem;">Interessenten:</div>
+                ${applicantsList}
+            </div>`;
+    }));
+
+    handoverContainer.innerHTML = handoverHTML.join('');
+}
+
+async function approveHandover(shiftId, toEmpId) {
+    // Schicht übertragen
+    await db.from('shifts')
+        .update({ employee_id: toEmpId, handover_requested: false })
+        .eq('id', shiftId);
+    // Alle anderen Requests ablehnen
+    await db.from('shift_handovers')
+        .update({ status: 'rejected' })
+        .eq('shift_id', shiftId);
+    // Genehmigten Request updaten
+    await db.from('shift_handovers')
+        .update({ status: 'approved' })
+        .eq('shift_id', shiftId)
+        .eq('to_employee_id', toEmpId);
+    await loadAdminSwaps();
+    await loadWeekGrid();
+}
+
+async function cancelHandover(shiftId) {
+    await db.from('shifts')
+        .update({ handover_requested: false })
+        .eq('id', shiftId);
+    await db.from('shift_handovers')
+        .update({ status: 'rejected' })
+        .eq('shift_id', shiftId);
+    await loadAdminSwaps();
+}
+
+async function reviewHandover(id, status, shiftId, toEmpId) {
+    await db.from('shift_handovers')
+        .update({ status })
+        .eq('id', id);
+
+    if (status === 'approved' && shiftId && toEmpId) {
+        await db.from('shifts')
+            .update({ employee_id: toEmpId })
+            .eq('id', shiftId);
+    }
+
+    await loadAdminSwaps();
+    await loadWeekGrid();
 }
 
 async function reviewSwap(id, status, shiftId, targetShiftId, fromEmpId, toEmpId) {

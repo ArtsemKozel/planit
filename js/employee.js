@@ -896,12 +896,12 @@ async function loadSwaps() {
         shiftsList.innerHTML = '<div class="empty-state"><p>Keine Schichten vorhanden.</p></div>';
     } else {
         shiftsList.innerHTML = shifts.map(s => `
-            <div class="list-item" onclick="openSwapModal('${s.id}', '${s.shift_date}', '${s.start_time}', '${s.end_time}')">
+            <div class="list-item" onclick="openShiftActionModal('${s.id}', '${s.shift_date}', '${s.start_time}', '${s.end_time}')">
                 <div class="list-item-info">
                     <h4>${formatDate(s.shift_date)}</h4>
                     <p>${s.start_time.slice(0,5)} – ${s.end_time.slice(0,5)} Uhr</p>
                 </div>
-                <span style="color:var(--color-text-light); font-size:0.85rem;">Tauschen →</span>
+                <span style="color:var(--color-text-light); font-size:0.85rem;">›</span>
             </div>
         `).join('');
     }
@@ -940,6 +940,32 @@ async function loadSwaps() {
         }).join('');
     }
 
+    // Meine Abgabe-Requests laden
+    const { data: handovers } = await db
+        .from('shift_handovers')
+        .select('*, shifts(shift_date, start_time, end_time), to_emp:employees_planit!to_employee_id(name)')
+        .eq('from_employee_id', currentEmployee.id)
+        .order('created_at', { ascending: false });
+
+    const handoverList = document.getElementById('handover-requests-list');
+    if (!handovers || handovers.length === 0) {
+        handoverList.innerHTML = '<div style="color:var(--color-text-light); font-size:0.85rem;">Keine Abgabe-Requests.</div>';
+    } else {
+        handoverList.innerHTML = handovers.map(h => {
+            const status = h.status === 'pending' ? 'Ausstehend' : h.status === 'approved' ? 'Genehmigt' : 'Abgelehnt';
+            return `
+                <div class="list-item" style="flex-direction:column; align-items:flex-start; gap:0.5rem;">
+                    <div style="display:flex; justify-content:space-between; width:100%;">
+                        <h4 style="font-size:0.95rem;">→ ${h.to_emp?.name || '—'}</h4>
+                        <span class="badge badge-${h.status}">${status}</span>
+                    </div>
+                    <div style="font-size:0.85rem; color:var(--color-text-light);">
+                        ${h.shifts ? formatDate(h.shifts.shift_date) + ' ' + h.shifts.start_time.slice(0,5) + ' – ' + h.shifts.end_time.slice(0,5) : '—'}
+                    </div>
+                </div>`;
+        }).join('');
+    }
+
     // Eingehende Requests laden
     const { data: incomingSwaps } = await db
         .from('shift_swaps')
@@ -972,6 +998,50 @@ async function loadSwaps() {
                 </div>`;
         }).join('');
     }
+
+    // Schichten die abgegeben werden (eigene Abteilung)
+    const { data: handoverShifts, error: handoverError } = await db
+        .from('shifts')
+        .select('*, employees_planit!shifts_employee_id_fkey(name)')
+        .eq('handover_requested', true)
+        .neq('employee_id', currentEmployee.id)
+        .gte('shift_date', new Date().toISOString().split('T')[0])
+        .order('shift_date');
+
+    console.log('handoverShifts:', handoverShifts, 'dept:', currentEmployee.department, 'user_id:', currentEmployee.user_id);
+    console.log('handoverError:', handoverError);
+    const handoverShiftsList = document.getElementById('handover-shifts-list');
+    if (!handoverShifts || handoverShifts.length === 0) {
+        handoverShiftsList.innerHTML = '<div style="color:var(--color-text-light); font-size:0.85rem;">Keine Schichten zur Übernahme.</div>';
+    } else {
+        handoverShiftsList.innerHTML = handoverShifts.map(s => `
+            <div class="list-item" style="flex-direction:column; align-items:flex-start; gap:0.5rem;">
+                <div>
+                    <div style="font-weight:700; font-size:0.95rem;">${s.employees_planit?.name || '—'} gibt ab</div>
+                    <div style="font-size:0.85rem; color:var(--color-text-light);">
+                        ${formatDate(s.shift_date)} | ${s.start_time.slice(0,5)} – ${s.end_time.slice(0,5)} Uhr
+                    </div>
+                </div>
+                <button class="btn-text btn-approve" onclick="applyForHandover('${s.id}')">Ich übernehme</button>
+            </div>
+        `).join('');
+    }
+}
+
+async function applyForHandover(shiftId) {
+    console.log('applyForHandover:', shiftId, currentEmployee.user_id);
+    const { error } = await db.from('shift_handovers').insert({
+        user_id: currentEmployee.user_id,
+        shift_id: shiftId,
+        from_employee_id: null,
+        to_employee_id: currentEmployee.id,
+        status: 'pending'
+    });
+    console.log('insert error:', error);
+    if (!error) {
+        alert('Du hast dich für die Schicht gemeldet!');
+        await loadSwaps();
+    }
 }
 
 async function respondSwap(swapId, response) {
@@ -1003,6 +1073,34 @@ async function openSwapModal(shiftId, date, start, end) {
 
     document.getElementById('swap-modal').classList.add('open');
     document.getElementById('swap-error').style.display = 'none';
+}
+
+let selectedActionShift = null;
+
+function openShiftActionModal(shiftId, date, start, end) {
+    selectedActionShift = { id: shiftId, date, start, end };
+    document.getElementById('shift-action-info').textContent = 
+        `${formatDate(date)} | ${start.slice(0,5)} – ${end.slice(0,5)} Uhr`;
+    document.getElementById('shift-action-modal').classList.add('active');
+}
+
+function openSwapFromAction() {
+    document.getElementById('shift-action-modal').classList.remove('active');
+    openSwapModal(selectedActionShift.id, selectedActionShift.date, selectedActionShift.start, selectedActionShift.end);
+}
+
+async function openHandoverFromAction() {
+    document.getElementById('shift-action-modal').classList.remove('active');
+    if (!confirm('⚠️ Wenn niemand deine Schicht übernimmt oder der Admin ablehnt, musst du trotzdem erscheinen. Bist du sicher?')) return;
+    
+    const { error } = await db.from('shifts')
+        .update({ handover_requested: true })
+        .eq('id', selectedActionShift.id);
+    console.log('handover update error:', error, 'shiftId:', selectedActionShift.id);
+    if (!error) {
+        alert('Abgabe-Request wurde gesendet. Deine Kollegen werden informiert.');
+        await loadSwaps();
+    }
 }
 
 async function loadColleagueShifts() {
@@ -1188,7 +1286,6 @@ async function loadOverview() {
         .select('*')
         .eq('user_id', currentEmployee.user_id)
         .eq('is_open', true)
-        .eq('department', currentEmployee.department)
         .is('employee_id', null)
         .gte('shift_date', monthStart)
         .lte('shift_date', monthEnd)

@@ -213,6 +213,12 @@
             <div class="empty-state"><p>Keine Schichten vorhanden.</p></div>
         </div>
         <div style="margin-top:1.5rem;">
+            <div class="section-title">Schichten zur Übernahme</div>
+            <div id="handover-shifts-list">
+                <div style="color:var(--color-text-light); font-size:0.85rem;">Keine Schichten zur Übernahme.</div>
+            </div>
+        </div>
+        <div style="margin-top:1.5rem;">
             <div class="section-title">Eingehende Requests</div>
             <div id="swap-incoming-list">
                 <div style="color:var(--color-text-light); font-size:0.85rem;">Keine eingehenden Requests.</div>
@@ -222,6 +228,12 @@
             <div class="section-title">Meine Tausch-Requests</div>
             <div id="swap-requests-list">
                 <div class="empty-state"><p>Keine Requests vorhanden.</p></div>
+            </div>
+        </div>
+        <div style="margin-top:1.5rem;">
+            <div class="section-title">Meine Abgabe-Requests</div>
+            <div id="handover-requests-list">
+                <div style="color:var(--color-text-light); font-size:0.85rem;">Keine Abgabe-Requests.</div>
             </div>
         </div>
     </div>
@@ -392,6 +404,21 @@
 </div>
 </div>
 
+<!-- MODAL: SCHICHT AKTIONEN -->
+<div id="shift-action-modal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">Schicht</div>
+            <button class="modal-close" onclick="document.getElementById('shift-action-modal').classList.remove('active')">✕</button>
+        </div>
+        <p style="font-size:0.9rem; margin-bottom:1.5rem;" id="shift-action-info"></p>
+        <div style="display:flex; flex-direction:column; gap:0.75rem;">
+            <button class="btn-primary" onclick="openSwapFromAction()">🔄 Tauschen</button>
+            <button class="btn-secondary" onclick="openHandoverFromAction()">↩️ Abgeben</button>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL: SCHICHTTAUSCH -->
 <div id="swap-modal" class="modal-overlay">
     <div class="modal">
@@ -414,6 +441,8 @@
         <button class="btn-primary" onclick="submitSwap()">Request senden</button>
     </div>
 </div>
+
+
 
 <!-- MODAL: VERFÜGBARKEIT -->
 <div id="avail-modal" class="modal-overlay">
