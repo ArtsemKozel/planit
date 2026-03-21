@@ -1008,8 +1008,6 @@ async function loadSwaps() {
         .gte('shift_date', new Date().toISOString().split('T')[0])
         .order('shift_date');
 
-    console.log('handoverShifts:', handoverShifts, 'dept:', currentEmployee.department, 'user_id:', currentEmployee.user_id);
-    console.log('handoverError:', handoverError);
     const handoverShiftsList = document.getElementById('handover-shifts-list');
     if (!handoverShifts || handoverShifts.length === 0) {
         handoverShiftsList.innerHTML = '<div style="color:var(--color-text-light); font-size:0.85rem;">Keine Schichten zur Übernahme.</div>';
@@ -1029,7 +1027,6 @@ async function loadSwaps() {
 }
 
 async function applyForHandover(shiftId) {
-    console.log('applyForHandover:', shiftId, currentEmployee.user_id);
     const { error } = await db.from('shift_handovers').insert({
         user_id: currentEmployee.user_id,
         shift_id: shiftId,
@@ -1037,7 +1034,6 @@ async function applyForHandover(shiftId) {
         to_employee_id: currentEmployee.id,
         status: 'pending'
     });
-    console.log('insert error:', error);
     if (!error) {
         alert('Du hast dich für die Schicht gemeldet!');
         await loadSwaps();
