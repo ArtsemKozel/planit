@@ -453,8 +453,8 @@ async function loadVacationAccount() {
             }
 
             const phaseDays = phase.hours_per_vacation_day === 0 ? 0 : Math.round((months / 12) * (phase.vacation_days_per_year || 20) * 100) / 100;
-            entitlement += phaseDays;
-            entitlementH += phaseDays * (phase.hours_per_vacation_day || 0);
+            entitlement = Math.round((entitlement + phaseDays) * 100) / 100;
+            entitlementH = Math.round((entitlementH + phaseDays * (phase.hours_per_vacation_day || 0)) * 100) / 100;
         }
     } else {
         entitlement = totalDays;
