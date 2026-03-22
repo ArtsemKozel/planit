@@ -2916,11 +2916,11 @@ async function loadTasks() {
                         <span id="task-toggle-${t.id}" style="color:var(--color-text-light);">▶</span>
                     </div>
                 </div>
-                <div id="task-body-${t.id}" style="display:none; padding:0 1.25rem 1rem; background:white; border-top:1px solid var(--color-border);">
+                <div id="task-body-${t.id}" style="display:none; padding:0 1.25rem 1rem; background:white; border-top:1px solid var(--color-border);" onclick="event.stopPropagation()">
                     <div id="task-steps-${t.id}" style="margin-top:0.75rem;">
                         ${steps.sort((a,b) => a.position - b.position).map(s => `
                             <div style="display:flex; align-items:center; gap:0.75rem; padding:0.4rem 0; border-bottom:1px solid var(--color-border);">
-                                <input type="checkbox" ${s.is_done ? 'checked' : ''} onchange="toggleStep('${s.id}', this.checked)" style="width:auto; cursor:pointer;">
+                                <input type="checkbox" ${s.is_done ? 'checked' : ''} onchange="toggleStep('${s.id}', this.checked, '${t.id}')" onclick="event.stopPropagation()" style="width:auto; cursor:pointer;">
                                 <span style="${s.is_done ? 'text-decoration:line-through; color:var(--color-text-light);' : ''}">${s.title}</span>
                             </div>
                         `).join('')}
@@ -2945,9 +2945,13 @@ function toggleTask(taskId) {
     toggle.textContent = isOpen ? '▶' : '▼';
 }
 
-async function toggleStep(stepId, isDone) {
+async function toggleStep(stepId, isDone, taskId) {
     await db.from('task_steps').update({ is_done: isDone }).eq('id', stepId);
     await loadTasks();
+    // Body wieder öffnen
+    const body = document.getElementById(`task-body-${taskId}`);
+    const toggle = document.getElementById(`task-toggle-${taskId}`);
+    if (body) { body.style.display = 'block'; toggle.textContent = '▼'; }
 }
 
 async function addStep(taskId) {
