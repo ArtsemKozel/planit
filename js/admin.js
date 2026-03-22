@@ -77,6 +77,7 @@ function switchTab(tab) {
     if (tab === 'stunden') loadAdminStunden();
     if (tab === 'requests') { loadRequests(); loadRequestsStats(); }
     if (tab === 'urlaubsverwaltung') loadUrlaubsverwaltung();
+    if (tab === 'tasks') loadTasks();
     localStorage.setItem('planit_admin_tab', tab);
 }
 
@@ -706,11 +707,13 @@ function openEditTemplateModal(id) {
     document.getElementById('edit-template-start').value = t.start_time.slice(0,5);
     document.getElementById('edit-template-end').value = t.end_time.slice(0,5);
     document.getElementById('edit-template-break').value = t.break_minutes || 0;
-    document.getElementById('edit-template-modal').classList.add('active');
+    const modal = document.getElementById('edit-task-template-modal');
+    console.log('modal:', modal);
+    modal.classList.add('active');
 }
 
 function closeEditTemplateModal() {
-    document.getElementById('edit-template-modal').classList.remove('active');
+    document.getElementById('edit-task-template-modal').classList.remove('active');
 }
 
 async function submitEditTemplate() {
@@ -2878,4 +2881,364 @@ function calculateVacationAccount(emp, year, vacations, prevVacations, phases = 
         usedH: used * hoursPerDay,
         remainingH
     };
+}
+
+// ── AUFGABEN ─────────────────────────────────────────
+async function loadTasks() {
+    await loadTaskTemplates();
+    const { data: tasks } = await db
+        .from('tasks')
+        .select('*, task_steps(*)')
+        .eq('user_id', adminSession.user.id)
+        .order('created_at', { ascending: false });
+
+    const container = document.getElementById('tasks-list');
+    if (!tasks || tasks.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>Keine Aufgaben vorhanden.</p></div>';
+        return;
+    }
+
+    container.innerHTML = tasks.map(t => {
+        const steps = t.task_steps || [];
+        const done = steps.filter(s => s.is_done).length;
+        const total = steps.length;
+        const progress = total > 0 ? Math.round((done / total) * 100) : 0;
+
+        return `
+            <div style="background:var(--color-gray); border-radius:14px; margin-bottom:1rem; overflow:hidden;">
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:1rem 1.25rem; cursor:pointer;" onclick="toggleTask('${t.id}')">
+                    <div>
+                        <div style="font-weight:700; font-size:1rem;">${t.title}</div>
+                        <div style="font-size:0.8rem; color:var(--color-text-light); margin-top:0.2rem;">${done}/${total} Schritte erledigt</div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:1rem;">
+                        <div style="font-weight:700; color:${progress === 100 ? 'var(--color-green)' : 'var(--color-primary)'};">${progress}%</div>
+                        <span id="task-toggle-${t.id}" style="color:var(--color-text-light);">▶</span>
+                    </div>
+                </div>
+                <div id="task-body-${t.id}" style="display:none; padding:0 1.25rem 1rem; background:white; border-top:1px solid var(--color-border);">
+                    <div id="task-steps-${t.id}" style="margin-top:0.75rem;">
+                        ${steps.sort((a,b) => a.position - b.position).map(s => `
+                            <div style="display:flex; align-items:center; gap:0.75rem; padding:0.4rem 0; border-bottom:1px solid var(--color-border);">
+                                <input type="checkbox" ${s.is_done ? 'checked' : ''} onchange="toggleStep('${s.id}', this.checked)" style="width:auto; cursor:pointer;">
+                                <span style="${s.is_done ? 'text-decoration:line-through; color:var(--color-text-light);' : ''}">${s.title}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div style="display:flex; gap:0.5rem; margin-top:0.75rem;">
+                        <input type="text" id="new-step-${t.id}" placeholder="Neuer Schritt..." style="flex:1; padding:0.5rem; border-radius:8px; border:1px solid var(--color-border); font-size:0.85rem;">
+                        <button class="btn-small btn-pdf-view btn-icon" onclick="addStep('${t.id}')">
+                            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        </button>
+                    </div>
+                    <button onclick="deleteTask('${t.id}')" style="margin-top:0.75rem; background:none; border:none; color:var(--color-text-light); font-size:0.8rem; cursor:pointer;">🗑 Aufgabe löschen</button>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+function toggleTask(taskId) {
+    const body = document.getElementById(`task-body-${taskId}`);
+    const toggle = document.getElementById(`task-toggle-${taskId}`);
+    const isOpen = body.style.display !== 'none';
+    body.style.display = isOpen ? 'none' : 'block';
+    toggle.textContent = isOpen ? '▶' : '▼';
+}
+
+async function toggleStep(stepId, isDone) {
+    await db.from('task_steps').update({ is_done: isDone }).eq('id', stepId);
+    await loadTasks();
+}
+
+async function addStep(taskId) {
+    const input = document.getElementById(`new-step-${taskId}`);
+    const title = input.value.trim();
+    if (!title) return;
+
+    const { data: steps } = await db.from('task_steps').select('position').eq('task_id', taskId).order('position', { ascending: false }).limit(1);
+    const nextPos = steps && steps.length > 0 ? steps[0].position + 1 : 0;
+
+    await db.from('task_steps').insert({
+        user_id: adminSession.user.id,
+        task_id: taskId,
+        title,
+        position: nextPos
+    });
+    await loadTasks();
+}
+
+async function deleteTask(taskId) {
+    if (!confirm('Aufgabe wirklich löschen?')) return;
+    await db.from('tasks').delete().eq('id', taskId);
+    await loadTasks();
+}
+
+async function openNewTaskModal() {
+    document.getElementById('new-task-title').value = '';
+    document.getElementById('new-task-error').style.display = 'none';
+
+    // Vorlagen laden für Dropdown
+    const { data: templates } = await db
+        .from('task_templates')
+        .select('id, title')
+        .eq('user_id', adminSession.user.id)
+        .order('title');
+
+    const select = document.getElementById('new-task-template-id');
+    select.innerHTML = '<option value="">— Keine Vorlage —</option>';
+    if (templates) {
+        select.innerHTML += templates.map(t =>
+            `<option value="${t.id}">${t.title}</option>`
+        ).join('');
+    }
+
+    document.getElementById('new-task-modal').classList.add('active');
+}
+
+function closeNewTaskModal() {
+    document.getElementById('new-task-modal').classList.remove('active');
+}
+
+async function submitNewTask() {
+    const title = document.getElementById('new-task-title').value.trim();
+    const templateId = document.getElementById('new-task-template-id').value;
+    const errorDiv = document.getElementById('new-task-error');
+    errorDiv.style.display = 'none';
+
+    if (!title) {
+        errorDiv.textContent = 'Bitte Titel eingeben.';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    const { data: task, error } = await db.from('tasks').insert({
+        user_id: adminSession.user.id,
+        title
+    }).select().maybeSingle();
+
+    if (error || !task) return;
+
+    // Wenn Vorlage gewählt — Schritte kopieren
+    if (templateId) {
+        const { data: templateSteps } = await db
+            .from('task_template_steps')
+            .select('*')
+            .eq('template_id', templateId)
+            .order('position');
+
+        if (templateSteps && templateSteps.length > 0) {
+            await db.from('task_steps').insert(
+                templateSteps.map(s => ({
+                    user_id: adminSession.user.id,
+                    task_id: task.id,
+                    title: s.title,
+                    position: s.position
+                }))
+            );
+        }
+    }
+
+    closeNewTaskModal();
+    await loadTasks();
+}
+
+// ── VORLAGEN ─────────────────────────────────────────
+let newTemplateSteps = [];
+
+function openNewTemplateModal() {
+    document.getElementById('new-template-title').value = '';
+    document.getElementById('new-template-error').style.display = 'none';
+    newTemplateSteps = [];
+    renderTemplateSteps();
+    document.getElementById('new-template-modal').classList.add('active');
+}
+
+function closeNewTemplateModal() {
+    document.getElementById('new-template-modal').classList.remove('active');
+}
+
+function addTemplateStep() {
+    const input = document.getElementById('new-template-step-input');
+    const title = input.value.trim();
+    if (!title) return;
+    newTemplateSteps.push(title);
+    input.value = '';
+    renderTemplateSteps();
+}
+
+function removeTemplateStep(index) {
+    newTemplateSteps.splice(index, 1);
+    renderTemplateSteps();
+}
+
+function renderTemplateSteps() {
+    const container = document.getElementById('template-steps-list');
+    if (newTemplateSteps.length === 0) {
+        container.innerHTML = '<div style="font-size:0.85rem; color:var(--color-text-light);">Noch keine Schritte.</div>';
+        return;
+    }
+    container.innerHTML = newTemplateSteps.map((s, i) => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0; border-bottom:1px solid var(--color-border); font-size:0.85rem;">
+            <span>${i + 1}. ${s}</span>
+            <button onclick="removeTemplateStep(${i})" style="background:none; border:none; color:var(--color-text-light); cursor:pointer;">✕</button>
+        </div>
+    `).join('');
+}
+
+async function submitNewTemplate() {
+    const title = document.getElementById('new-template-title').value.trim();
+    const errorDiv = document.getElementById('new-template-error');
+    errorDiv.style.display = 'none';
+
+    if (!title) {
+        errorDiv.textContent = 'Bitte Name eingeben.';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    if (newTemplateSteps.length === 0) {
+        errorDiv.textContent = 'Bitte mindestens einen Schritt hinzufügen.';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    const { data: template, error } = await db.from('task_templates').insert({
+        user_id: adminSession.user.id,
+        title
+    }).select().maybeSingle();
+
+    if (error || !template) return;
+
+    await db.from('task_template_steps').insert(
+        newTemplateSteps.map((s, i) => ({
+            user_id: adminSession.user.id,
+            template_id: template.id,
+            title: s,
+            position: i
+        }))
+    );
+
+    closeNewTemplateModal();
+    await loadTasks();
+}
+
+async function loadTaskTemplates() {
+    const { data: templates } = await db
+        .from('task_templates')
+        .select('*, task_template_steps(*)')
+        .eq('user_id', adminSession.user.id)
+        .order('created_at', { ascending: false });
+
+    const container = document.getElementById('templates-list');
+    if (!templates || templates.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>Keine Vorlagen vorhanden.</p></div>';
+        return;
+    }
+
+    container.innerHTML = templates.map(t => {
+        const steps = (t.task_template_steps || []).sort((a, b) => a.position - b.position);
+        return `
+            <div style="background:var(--color-gray); border-radius:12px; padding:1rem 1.25rem; margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div style="font-weight:700;">${t.title}</div>
+                    <div style="font-size:0.8rem; color:var(--color-text-light);">${steps.length} Schritte</div>
+                </div>
+                <div style="display:flex; gap:0.5rem;">
+                    <button class="btn-small btn-pdf-view btn-icon" onclick="editTaskTemplate('${t.id}')">
+                        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    </button>
+                    <button class="btn-small btn-delete btn-icon" onclick="deleteTemplate('${t.id}')">
+                        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                    </button>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+async function deleteTemplate(templateId) {
+    if (!confirm('Vorlage wirklich löschen?')) return;
+    await db.from('task_templates').delete().eq('id', templateId);
+    await loadTasks();
+}
+
+function useTemplate(templateId, templateTitle) {
+    document.getElementById('new-task-title').value = templateTitle;
+    document.getElementById('new-task-template-id').value = templateId;
+    document.getElementById('new-task-error').style.display = 'none';
+    document.getElementById('new-task-modal').classList.add('active');
+}
+
+let editTemplateSteps = [];
+
+async function editTaskTemplate(templateId) {
+    editTemplateId = templateId;
+    const { data: template } = await db
+        .from('task_templates')
+        .select('*, task_template_steps(*)')
+        .eq('id', templateId)
+        .maybeSingle();
+
+    if (!template) return;
+
+    document.getElementById('edit-template-title').value = template.title;
+    editTemplateSteps = (template.task_template_steps || [])
+        .sort((a, b) => a.position - b.position)
+        .map(s => ({ id: s.id, title: s.title }));
+    renderEditTemplateSteps();
+    document.getElementById('edit-task-template-modal').classList.add('active');
+}
+
+function closeEditTaskTemplateModal() {
+    document.getElementById('edit-task-template-modal').classList.remove('active');
+}
+
+function renderEditTemplateSteps() {
+    const container = document.getElementById('edit-template-steps-list');
+    if (editTemplateSteps.length === 0) {
+        container.innerHTML = '<div style="font-size:0.85rem; color:var(--color-text-light); margin-bottom:0.5rem;">Noch keine Schritte.</div>';
+        return;
+    }
+    container.innerHTML = editTemplateSteps.map((s, i) => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0; border-bottom:1px solid var(--color-border); font-size:0.85rem;">
+            <span>${i + 1}. ${s.title}</span>
+            <button onclick="removeEditTemplateStep(${i})" style="background:none; border:none; color:var(--color-text-light); cursor:pointer;">✕</button>
+        </div>
+    `).join('');
+}
+
+function addEditTemplateStep() {
+    const input = document.getElementById('edit-template-step-input');
+    const title = input.value.trim();
+    if (!title) return;
+    editTemplateSteps.push({ id: null, title });
+    input.value = '';
+    renderEditTemplateSteps();
+}
+
+function removeEditTemplateStep(index) {
+    editTemplateSteps.splice(index, 1);
+    renderEditTemplateSteps();
+}
+
+async function submitEditTaskTemplate() {
+    const title = document.getElementById('edit-template-title').value.trim();
+    if (!title) return;
+
+    await db.from('task_templates').update({ title }).eq('id', editTemplateId);
+
+    // Alle alten Schritte löschen und neu einfügen
+    await db.from('task_template_steps').delete().eq('template_id', editTemplateId);
+    if (editTemplateSteps.length > 0) {
+        await db.from('task_template_steps').insert(
+            editTemplateSteps.map((s, i) => ({
+                user_id: adminSession.user.id,
+                template_id: editTemplateId,
+                title: s.title,
+                position: i
+            }))
+        );
+    }
+
+    closeEditTaskTemplateModal();
+    await loadTasks();
 }
