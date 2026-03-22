@@ -78,6 +78,7 @@ function switchTab(tab) {
     if (tab === 'requests') { loadRequests(); loadRequestsStats(); }
     if (tab === 'urlaubsverwaltung') loadUrlaubsverwaltung();
     if (tab === 'tasks') loadTasks();
+    if (tab === 'notes') loadNotes();
     localStorage.setItem('planit_admin_tab', tab);
 }
 
@@ -3250,4 +3251,95 @@ async function submitEditTaskTemplate() {
 
 function updateEditTemplateStep(index, value) {
     editTemplateSteps[index].title = value;
+}
+
+// ── NOTIZEN ─────────────────────────────────────────
+let editNoteId = null;
+
+async function loadNotes() {
+    const { data: notes } = await db
+        .from('notes')
+        .select('*')
+        .eq('user_id', adminSession.user.id)
+        .order('updated_at', { ascending: false });
+
+    const container = document.getElementById('notes-list');
+    if (!notes || notes.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>Keine Notizen vorhanden.</p></div>';
+        return;
+    }
+
+    container.innerHTML = notes.map(n => `
+        <div style="background:var(--color-gray); border-radius:12px; padding:1rem 1.25rem; margin-bottom:0.75rem;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.5rem;">
+                <div style="font-weight:700; font-size:1rem;">${n.title}</div>
+                <div style="display:flex; gap:0.5rem;">
+                    <button class="btn-small btn-pdf-view btn-icon" onclick="openEditNoteModal('${n.id}', \`${n.title.replace(/`/g, '\\`')}\`, \`${(n.content || '').replace(/`/g, '\\`')}\`)">
+                        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    </button>
+                    <button class="btn-small btn-delete btn-icon" onclick="deleteNote('${n.id}')">
+                        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                    </button>
+                </div>
+            </div>
+            <div style="font-size:0.85rem; color:var(--color-text-light); white-space:pre-wrap;">${n.content || ''}</div>
+            <div style="font-size:0.75rem; color:var(--color-text-light); margin-top:0.5rem;">${new Date(n.updated_at).toLocaleDateString('de-DE')}</div>
+        </div>
+    `).join('');
+}
+
+function openNewNoteModal() {
+    editNoteId = null;
+    document.getElementById('note-modal-title').textContent = 'Neue Notiz';
+    document.getElementById('note-title').value = '';
+    document.getElementById('note-content').value = '';
+    document.getElementById('note-error').style.display = 'none';
+    document.getElementById('note-modal').classList.add('active');
+}
+
+function openEditNoteModal(id, title, content) {
+    editNoteId = id;
+    document.getElementById('note-modal-title').textContent = 'Notiz bearbeiten';
+    document.getElementById('note-title').value = title;
+    document.getElementById('note-content').value = content;
+    document.getElementById('note-error').style.display = 'none';
+    document.getElementById('note-modal').classList.add('active');
+}
+
+function closeNoteModal() {
+    document.getElementById('note-modal').classList.remove('active');
+}
+
+async function submitNote() {
+    const title = document.getElementById('note-title').value.trim();
+    const content = document.getElementById('note-content').value.trim();
+    const errorDiv = document.getElementById('note-error');
+    errorDiv.style.display = 'none';
+
+    if (!title) {
+        errorDiv.textContent = 'Bitte Titel eingeben.';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    if (editNoteId) {
+        await db.from('notes').update({
+            title, content,
+            updated_at: new Date().toISOString()
+        }).eq('id', editNoteId);
+    } else {
+        await db.from('notes').insert({
+            user_id: adminSession.user.id,
+            title, content
+        });
+    }
+
+    closeNoteModal();
+    await loadNotes();
+}
+
+async function deleteNote(id) {
+    if (!confirm('Notiz wirklich löschen?')) return;
+    await db.from('notes').delete().eq('id', id);
+    await loadNotes();
 }
