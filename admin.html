@@ -286,20 +286,18 @@
                 Mehr
             </button>
             <div style="font-size:1.1rem; font-weight:700; color:var(--color-text); text-align:center;">Aufgaben</div>
-            <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
-                <button class="btn-secondary" style="width:auto;" onclick="openNewTemplateModal()">+ Vorlage</button>
-                <button class="btn-primary" style="width:auto;" onclick="openNewTaskModal()">+ Aufgabe</button>
-            </div>
         </div>
         <div style="font-size:0.85rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.05em; margin-bottom:0.75rem;">VORLAGEN</div>
         <div id="templates-list">
             <div class="empty-state"><p>Keine Vorlagen vorhanden.</p></div>
         </div>
+        <button class="btn-secondary" style="width:100%; margin-bottom:1.5rem;" onclick="openNewTemplateModal()">+ Vorlage</button>
         <div style="margin-top:1.5rem;">
             <div style="font-size:0.85rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.05em; margin-bottom:0.75rem;">AKTIVE AUFGABEN</div>
             <div id="tasks-list">
                 <div class="empty-state"><p>Keine Aufgaben vorhanden.</p></div>
             </div>
+            <button class="btn-primary" style="width:100%; margin-top:0.75rem;" onclick="openNewTaskModal()">+ Aufgabe</button>
         </div>
     </div>
 </div>
