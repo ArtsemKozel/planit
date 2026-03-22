@@ -3199,9 +3199,10 @@ function renderEditTemplateSteps() {
         return;
     }
     container.innerHTML = editTemplateSteps.map((s, i) => `
-        <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0; border-bottom:1px solid var(--color-border); font-size:0.85rem;">
-            <span>${i + 1}. ${s.title}</span>
-            <button onclick="removeEditTemplateStep(${i})" style="background:none; border:none; color:var(--color-text-light); cursor:pointer;">✕</button>
+        <div style="display:flex; align-items:center; gap:0.5rem; padding:0.4rem 0; border-bottom:1px solid var(--color-border);">
+            <span style="font-size:0.85rem; color:var(--color-text-light);">${i + 1}.</span>
+            <input type="text" value="${s.title}" onchange="updateEditTemplateStep(${i}, this.value)" style="flex:1; padding:0.3rem 0.5rem; border-radius:6px; border:1px solid var(--color-border); font-size:0.85rem;">
+            <button onclick="removeEditTemplateStep(${i})" style="background:none; border:none; color:var(--color-text-light); cursor:pointer; flex-shrink:0;">✕</button>
         </div>
     `).join('');
 }
@@ -3241,4 +3242,8 @@ async function submitEditTaskTemplate() {
 
     closeEditTaskTemplateModal();
     await loadTasks();
+}
+
+function updateEditTemplateStep(index, value) {
+    editTemplateSteps[index].title = value;
 }
