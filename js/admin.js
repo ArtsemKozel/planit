@@ -1994,6 +1994,14 @@ async function loadAdminStunden() {
         .select('*')
         .eq('month', monthStr);
 
+    // Ist-Stunden laden
+    const { data: actualHours } = await db
+        .from('actual_hours')
+        .select('*')
+        .eq('month', monthStr);
+
+    // Vormonat carry_over direkt aus actual_hours des aktuellen Monats
+
     const html = employees.map(emp => {
         // Geplante Stunden berechnen
         const empShifts = (shifts || []).filter(s => s.employee_id === emp.id);
@@ -2013,32 +2021,128 @@ async function loadAdminStunden() {
         const am = approvedMinutes !== null ? String(approvedMinutes % 60).padStart(2, '0') : '';
         const approvedDisplay = approvedMinutes !== null ? `${ah}h ${am}m` : '–';
 
+        // Ist-Stunden (actual)
+        const actualEntry = (actualHours || []).find(a => a.employee_id === emp.id);
+        const actualMinutes = actualEntry ? actualEntry.actual_minutes : null;
+        const actualDisplay = actualMinutes !== null ? `${Math.floor(actualMinutes/60)}h ${String(actualMinutes%60).padStart(2,'0')}m` : '–';
+
+        // Vormonat-Differenz
+        const prevDiffMinutes = actualEntry ? (actualEntry.carry_over_minutes || 0) : 0;
+
+        // Aktuelle Differenz
+        const diffMinutes = actualMinutes !== null && approvedMinutes !== null
+            ? actualMinutes - approvedMinutes + prevDiffMinutes
+            : null;
+        const diffDisplay = diffMinutes !== null
+            ? `${diffMinutes >= 0 ? '+' : ''}${Math.floor(Math.abs(diffMinutes)/60)}h ${String(Math.abs(diffMinutes)%60).padStart(2,'00')}m`
+            : '–';
+        const diffColor = diffMinutes === null ? 'var(--color-text-light)' : diffMinutes > 0 ? '#2d7a2d' : diffMinutes < 0 ? 'var(--color-red)' : 'var(--color-text-light)';
+
         return `
         <div class="card" style="margin-bottom:0.75rem;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
                 <div style="font-weight:600;">${emp.name}</div>
                 <div style="font-size:0.8rem; color:var(--color-text-light);">${emp.department}</div>
             </div>
-            <div style="display:flex; justify-content:space-between; margin-bottom:0.75rem;">
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:1rem;">
                 <div>
-                    <div style="font-size:0.75rem; color:var(--color-text-light);">GEPLANT</div>
-                    <div style="font-weight:600; color:var(--color-primary);">${ph}h ${String(pm).padStart(2,'0')}m</div>
+                    <div style="font-size:0.75rem; color:var(--color-text-light); margin-bottom:0.3rem;">ABGERECHNET</div>
+                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                        <span style="font-weight:600;">${approvedDisplay}</span>
+                        <button class="btn-small btn-pdf-view btn-icon" data-empid="${emp.id}" data-name="${emp.name}" data-month="${monthStr}" data-minutes="${approvedMinutes !== null ? approvedMinutes : 0}" onclick="openApproveModal(this)">
+                            <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        </button>
+                    </div>
                 </div>
                 <div>
-                    <div style="font-size:0.75rem; color:var(--color-text-light);">GELEISTET</div>
-                    <div style="font-weight:600;">${approvedDisplay}</div>
+                    <div style="font-size:0.75rem; color:var(--color-text-light); margin-bottom:0.3rem;">GEARBEITET</div>
+                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                        <span style="font-weight:600;">${actualDisplay}</span>
+                        <button class="btn-small btn-pdf-view btn-icon" data-empid="${emp.id}" data-name="${emp.name}" data-month="${monthStr}" data-minutes="${actualMinutes !== null ? actualMinutes : 0}" onclick="openActualModal(this)">
+                            <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        </button>
+                    </div>
                 </div>
-                <div style="display:flex; align-items:flex-end;">
-                    <button class="btn-secondary" style="width:auto; font-size:0.85rem; padding:0.4rem 0.75rem;" 
-                        data-empid="${emp.id}" data-name="${emp.name}" data-month="${monthStr}" data-minutes="${approvedMinutes !== null ? approvedMinutes : 0}" onclick="openApproveModal(this)">
-                        Eintragen
-                    </button>
+                <div>
+                    <div style="font-size:0.75rem; color:var(--color-text-light); margin-bottom:0.3rem;">VORMONAT</div>
+                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                        <span style="font-weight:600;">${prevDiffMinutes >= 0 ? '+' : '-'}${Math.floor(Math.abs(prevDiffMinutes)/60)}h ${String(Math.abs(prevDiffMinutes)%60).padStart(2,'0')}m</span>
+                        <button class="btn-small btn-pdf-view btn-icon" data-empid="${emp.id}" data-name="${emp.name}" data-month="${monthStr}" data-minutes="${prevDiffMinutes}" onclick="openCarryOverModal(this)">
+                            <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        </button>
+                    </div>
                 </div>
+            </div>
+            <div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid var(--color-border);">
+                <div style="font-size:0.75rem; color:var(--color-text-light); margin-bottom:0.2rem;">SALDO</div>
+                <div style="font-weight:700; font-size:1.1rem; color:${diffColor};">${diffDisplay}</div>
             </div>
         </div>`;
     }).join('');
 
     document.getElementById('admin-stunden-list').innerHTML = html;
+}
+
+function openActualModal(btn) {
+    const empId = btn.dataset.empid;
+    const name = btn.dataset.name;
+    const month = btn.dataset.month;
+    const minutes = parseInt(btn.dataset.minutes) || 0;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+
+    document.getElementById('approve-modal-title').textContent = `Gearbeitet: ${name}`;
+    document.getElementById('approve-hours').value = hours;
+    document.getElementById('approve-minutes').value = mins;
+
+    document.querySelector('#approve-modal .btn-primary').onclick = () => submitActualHours(empId, month);
+    document.getElementById('approve-modal').classList.add('active');
+}
+
+function openCarryOverModal(btn) {
+    const empId = btn.dataset.empid;
+    const name = btn.dataset.name;
+    const month = btn.dataset.month;
+    const minutes = parseInt(btn.dataset.minutes) || 0;
+    const isNegative = minutes < 0;
+    const absMinutes = Math.abs(minutes);
+    document.getElementById('approve-modal-title').textContent = `Vormonat: ${name}`;
+    document.getElementById('approve-hours').value = Math.floor(absMinutes / 60) * (isNegative ? -1 : 1);
+    document.getElementById('approve-minutes').value = absMinutes % 60;
+    document.querySelector('#approve-modal .btn-primary').onclick = () => submitCarryOver(empId, month);
+    document.getElementById('approve-modal').classList.add('active');
+}
+
+async function submitCarryOver(empId, month) {
+    const h = parseInt(document.getElementById('approve-hours').value) || 0;
+    const m = parseInt(document.getElementById('approve-minutes').value) || 0;
+    const totalMinutes = h * 60 + (h < 0 ? -m : m);
+    const { error } = await db.from('actual_hours').upsert({
+        employee_id: empId,
+        month: month,
+        carry_over_minutes: totalMinutes,
+        user_id: (await db.auth.getUser()).data.user.id
+    }, { onConflict: 'employee_id,month' });
+    if (error) { alert('Fehler: ' + error.message); return; }
+    document.getElementById('approve-modal').classList.remove('active');
+    loadAdminStunden();
+}
+
+async function submitActualHours(empId, month) {
+    const h = parseInt(document.getElementById('approve-hours').value) || 0;
+    const m = parseInt(document.getElementById('approve-minutes').value) || 0;
+    const totalMinutes = h * 60 + m;
+
+    const { error } = await db.from('actual_hours').upsert({
+        employee_id: empId,
+        month: month,
+        actual_minutes: totalMinutes,
+        user_id: (await db.auth.getUser()).data.user.id
+    }, { onConflict: 'employee_id,month' });
+
+    if (error) { alert('Fehler: ' + error.message); return; }
+    document.getElementById('approve-modal').classList.remove('active');
+    loadAdminStunden();
 }
 
 function openApproveModal(btn) {
@@ -2054,6 +2158,7 @@ function openApproveModal(btn) {
     document.getElementById('approve-hours').value = h;
     document.getElementById('approve-minutes').value = m;
     document.getElementById('approve-modal').classList.add('active');
+    document.querySelector('#approve-modal .btn-primary').onclick = () => saveApprovedHours();
 }
 
 function closeApproveModal() {
