@@ -1441,19 +1441,46 @@ async function loadMeineStunden() {
         .eq('month', monthStr)
         .maybeSingle();
 
-    // Anzeige
-    if (approved) {
-        const ah = Math.floor(approved.approved_minutes / 60);
-        const am = String(approved.approved_minutes % 60).padStart(2, '0');
-        document.getElementById('stunden-total').innerHTML = `
-                <span style="color:var(--color-primary);">${ph}h ${pm}m</span>
-                <span style="color:var(--color-text-light); font-size:1rem;"> Geplant</span>
-                <br>
-                <span style="font-weight:700;">${ah}h ${am}m</span>
-                <span style="color:var(--color-text-light); font-size:1rem;"> Geleistet</span>`;
-    } else {
-        document.getElementById('stunden-total').textContent = `${ph}h ${pm}m`;
-    }
+    // Stundenkonto laden
+    const { data: actualEntry } = await db
+        .from('actual_hours')
+        .select('*')
+        .eq('employee_id', session.id)
+        .eq('month', monthStr)
+        .maybeSingle();
+    
+    // Anzeige Stundenkonto
+    const approvedMinutes = approved ? approved.approved_minutes : null;
+    const actualMinutes = actualEntry ? actualEntry.actual_minutes : null;
+    const carryOver = actualEntry ? (actualEntry.carry_over_minutes || 0) : 0;
+    const diffMinutes = actualMinutes !== null && approvedMinutes !== null
+        ? actualMinutes - approvedMinutes + carryOver
+        : null;
+
+    const fmtMin = (m) => `${Math.floor(Math.abs(m)/60)}h ${String(Math.abs(m)%60).padStart(2,'0')}m`;
+    const diffColor = diffMinutes === null ? 'var(--color-text-light)' : diffMinutes > 0 ? '#2d7a2d' : diffMinutes < 0 ? 'var(--color-red)' : 'var(--color-text-light)';
+    const diffDisplay = diffMinutes !== null ? `${diffMinutes >= 0 ? '+' : '-'}${fmtMin(diffMinutes)}` : '–';
+    const carryDisplay = `${carryOver >= 0 ? '+' : '-'}${fmtMin(carryOver)}`;
+
+    document.getElementById('stunden-total').innerHTML = `
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem; margin-bottom:1rem;">
+            <div>
+                <div style="font-size:0.75rem; color:var(--color-text-light); margin-bottom:0.25rem;">ABGERECHNET</div>
+                <div style="font-weight:600;">${approvedMinutes !== null ? fmtMin(approvedMinutes) : '–'}</div>
+            </div>
+            <div>
+                <div style="font-size:0.75rem; color:var(--color-text-light); margin-bottom:0.25rem;">GEARBEITET</div>
+                <div style="font-weight:600;">${actualMinutes !== null ? fmtMin(actualMinutes) : '–'}</div>
+            </div>
+            <div>
+                <div style="font-size:0.75rem; color:var(--color-text-light); margin-bottom:0.25rem;">VORMONAT</div>
+                <div style="font-weight:600;">${carryDisplay}</div>
+            </div>
+        </div>
+        <div style="padding-top:0.75rem; border-top:1px solid var(--color-border);">
+            <div style="font-size:0.75rem; color:var(--color-text-light); margin-bottom:0.25rem;">SALDO</div>
+            <div style="font-weight:700; font-size:1.3rem; color:${diffColor};">${diffDisplay}</div>
+        </div>`;
 
     document.getElementById('stunden-count').textContent = shifts.length;
 
