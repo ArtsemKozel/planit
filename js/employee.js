@@ -102,15 +102,12 @@ async function loadWeekGrid() {
     const lastDay = sunday.toISOString().split('T')[0];
 
     // Alle Schichten der Woche laden (alle Mitarbeiter)
-    const { data: shifts, error: shiftsError } = await db
+    const { data: shifts } = await db
         .from('shifts')
         .select('*')
         .eq('user_id', currentEmployee.user_id)
         .gte('shift_date', firstDay)
         .lte('shift_date', lastDay);
-        console.log('shifts:', shifts);
-        console.log('currentEmployee.user_id:', currentEmployee.user_id);
-        console.log('shiftsError:', shiftsError);
 
     // Alle Mitarbeiter laden
     const { data: colleagues } = await db
