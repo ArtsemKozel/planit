@@ -3469,7 +3469,7 @@ async function deleteNote(id) {
         const dy = e.changedTouches[0].clientY - startY;
         const scrolled = Math.abs(wrapper.scrollLeft - startScrollLeft);
         // Nur swipe wenn: horizontal bewegt, nicht zu viel gescrollt, Schwellenwert 80px
-        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 80 && scrolled < 20) {
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 60 && scrolled < 40) {
             changeWeek(dx < 0 ? 1 : -1);
         }
     }, { passive: true });
