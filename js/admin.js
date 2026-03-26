@@ -193,30 +193,53 @@ async function loadAvailabilityForWeek(days) {
     return cache;
 }
 
-function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
+async function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
     const grid = document.getElementById('week-grid');
     grid.innerHTML = '';
 
     const dayNames = ['Mo','Di','Mi','Do','Fr','Sa','So'];
-
-    // Leere Ecke
-    const corner = document.createElement('div');
-    corner.className = 'week-header';
-    grid.appendChild(corner);
-
-    // Tag-Header
     const weekHolidays = getBWHolidays(days[0].getFullYear());
-    days.forEach((d, i) => {
-        const dateStr = d.toISOString().split('T')[0];
-        const isHoliday = weekHolidays.includes(dateStr);
-        const header = document.createElement('div');
-        header.className = 'week-header';
-        header.innerHTML = `${dayNames[i]}<br><small style="color:${isHoliday ? '#E07070' : 'inherit'};">${d.getDate()}.${d.getMonth()+1}.${isHoliday ? ' 🎌' : ''}</small>`;
-        grid.appendChild(header);
-    });
-    
-    // Mitarbeiter-Zeilen
-    // Mitarbeiter-Zeilen gruppiert nach Abteilung
+    // Monatsstunden laden
+    const monday = days[0];
+    const year = monday.getFullYear();
+    const month = monday.getMonth() + 1;
+    const monthStart = `${year}-${String(month).padStart(2,'0')}-01`;
+    const monthEnd = `${year}-${String(month).padStart(2,'0')}-${new Date(year, month, 0).getDate()}`;
+    const kwNumber = Math.ceil(((monday - new Date(year, 0, 1)) / 86400000 + new Date(year, 0, 1).getDay() + 1) / 7);
+    const monthNames = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+    const { data: monthShifts } = await db
+        .from('shifts')
+        .select('employee_id, start_time, end_time, break_minutes')
+        .eq('user_id', adminSession.user.id)
+        .eq('is_open', false)
+        .gte('shift_date', monthStart)
+        .lte('shift_date', monthEnd);
+
+    const addDayHeaders = (labelText) => {
+        const deptLabel = document.createElement('div');
+        deptLabel.style.gridColumn = '1 / -1';
+        deptLabel.style.textAlign = 'center';
+        deptLabel.style.fontWeight = '600';
+        deptLabel.style.fontSize = '0.8rem';
+        deptLabel.style.color = 'var(--color-primary)';
+        deptLabel.style.padding = '0.75rem 0 0.25rem';
+        deptLabel.style.borderTop = '2px solid var(--color-primary)';
+        deptLabel.textContent = labelText;
+        grid.appendChild(deptLabel);
+
+        const corner = document.createElement('div');
+        corner.className = 'week-header';
+        grid.appendChild(corner);
+        days.forEach((d, i) => {
+            const dateStr = d.toISOString().split('T')[0];
+            const isHoliday = weekHolidays.includes(dateStr);
+            const header = document.createElement('div');
+            header.className = 'week-header';
+            header.innerHTML = `${dayNames[i]}<br><small style="color:${isHoliday ? '#E07070' : 'inherit'};">${d.getDate()}.${d.getMonth()+1}.${isHoliday ? ' 🎌' : ''}</small>`;
+            grid.appendChild(header);
+        });
+    };
+
     if (employees.length === 0) {
         const empty = document.createElement('div');
         empty.style.gridColumn = '1 / -1';
@@ -226,23 +249,11 @@ function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
         return;
     }
 
-    // Abteilungen sammeln
     const departments = [...new Set(employees.map(e => e.department || 'Allgemein'))];
 
     departments.forEach(dept => {
-        // Abteilungs-Trennzeile
-        const deptRow = document.createElement('div');
-        deptRow.style.gridColumn = '1 / -1';
-        deptRow.style.padding = '0.4rem 0.5rem';
-        deptRow.style.fontSize = '0.75rem';
-        deptRow.style.fontWeight = '600';
-        deptRow.style.color = 'var(--color-primary)';
-        deptRow.style.borderTop = '1px solid var(--color-border)';
-        deptRow.style.marginTop = '0.25rem';
-        deptRow.textContent = dept.toUpperCase();
-        grid.appendChild(deptRow);
+        addDayHeaders(dept.toUpperCase());
 
-        // Offene Schichten Zeile ganz oben in der Abteilung
         const deptOpenShifts = shifts.filter(s => s.is_open && s.department === dept);
         const openEmpCell = document.createElement('div');
         openEmpCell.className = 'week-employee';
@@ -262,29 +273,20 @@ function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
             grid.appendChild(cell);
         });
 
-        // Mitarbeiter Zeilen
         const deptEmployees = employees.filter(e => (e.department || 'Allgemein') === dept);
         deptEmployees.forEach(emp => {
             const empCell = document.createElement('div');
             empCell.className = 'week-employee';
             const parts = emp.name.trim().split(' ');
-            const displayName = parts.length > 1 
-                ? `${parts[0]} ${parts[1][0]}.` 
-                : parts[0];
+            const displayName = parts.length > 1 ? `${parts[0]} ${parts[1][0]}.` : parts[0];
 
-            // Wochenstunden berechnen
             const empShifts = shifts.filter(s => s.employee_id === emp.id && !s.is_open);
             let weekMinutes = 0;
             empShifts.forEach(s => {
                 const start = s.start_time.slice(0,5).split(':').map(Number);
                 const end = s.end_time.slice(0,5).split(':').map(Number);
-                const minutes = (end[0]*60+end[1]) - (start[0]*60+start[1]) - (s.break_minutes || 0);
-                weekMinutes += minutes;
+                weekMinutes += (end[0]*60+end[1]) - (start[0]*60+start[1]) - (s.break_minutes || 0);
             });
-            const weekHours = (weekMinutes / 60).toFixed(1);
-            const hoursColor = weekMinutes === 0 ? 'var(--color-text-light)' :
-                            weekMinutes > 600 ? '#E8A0A0' :
-                            weekMinutes < 240 ? '#FFF3CC' : '#D8F0D8';
 
             empCell.textContent = displayName;
             grid.appendChild(empCell);
@@ -297,7 +299,6 @@ function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
                 cell.textContent = shift ? `${shift.start_time.slice(0,5)}\n${shift.end_time.slice(0,5)}` : '+';
                 cell.style.whiteSpace = 'pre';
 
-                // Planungsmodus: Verfügbarkeitsfarbe
                 if (planningMode && !shift) {
                     const empAvail = availCache[emp.id] || {};
                     const entry = empAvail[dateStr];
@@ -316,7 +317,6 @@ function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
                     else if (status === 'off') cell.style.background = '#FFD9D9';
                 }
 
-                // Krankmeldung Orange markieren
                 const isSick = sickLeaves.some(s => s.employee_id === emp.id && s.start_date <= dateStr && s.end_date >= dateStr);
                 if (isSick && !shift) {
                     cell.style.background = '#FFE0CC';
@@ -329,78 +329,54 @@ function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
                 grid.appendChild(cell);
             });
         });
-    });
-}
+        // Stunden-Übersicht für diese Abteilung
+        const deptStundenDiv = document.createElement('div');
+        deptStundenDiv.style.gridColumn = '1 / -1';
+        deptStundenDiv.style.background = 'white';
+        deptStundenDiv.style.borderRadius = '8px';
+        deptStundenDiv.style.padding = '0.5rem 0.75rem';
+        deptStundenDiv.style.marginTop = '0.25rem';
+        deptStundenDiv.style.marginBottom = '0.5rem';
 
-async function renderHoursOverview(days, weekShifts) {
-    const container = document.getElementById('hours-overview');
-    if (!container) return;
-
-    // KW berechnen
-    const monday = days[0];
-    const sunday = days[6];
-    const mondayStr = `${monday.getDate().toString().padStart(2,'0')}.${(monday.getMonth()+1).toString().padStart(2,'0')}`;
-    const sundayStr = `${sunday.getDate().toString().padStart(2,'0')}.${(sunday.getMonth()+1).toString().padStart(2,'0')}`;
-
-    // KW Nummer berechnen
-    const startOfYear = new Date(monday.getFullYear(), 0, 1);
-    const kwNumber = Math.ceil(((monday - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7);
-
-    // Monatsstunden laden
-    const year = monday.getFullYear();
-    const month = monday.getMonth() + 1;
-    const monthStart = `${year}-${String(month).padStart(2,'0')}-01`;
-    const monthEnd = `${year}-${String(month).padStart(2,'0')}-${new Date(year, month, 0).getDate()}`;
-    const monthNames = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
-
-    const { data: monthShifts } = await db
-        .from('shifts')
-        .select('employee_id, start_time, end_time, break_minutes')
-        .eq('user_id', adminSession.user.id)
-        .eq('is_open', false)
-        .gte('shift_date', monthStart)
-        .lte('shift_date', monthEnd);
-
-    const html = employees.map(emp => {
-        // Wochenstunden
-        const empWeekShifts = weekShifts.filter(s => s.employee_id === emp.id && !s.is_open);
-        let weekMinutes = 0;
-        empWeekShifts.forEach(s => {
-            const start = s.start_time.slice(0,5).split(':').map(Number);
-            const end = s.end_time.slice(0,5).split(':').map(Number);
-            weekMinutes += (end[0]*60+end[1]) - (start[0]*60+start[1]) - (s.break_minutes || 0);
-        });
-
-        // Monatsstunden
-        const empMonthShifts = (monthShifts || []).filter(s => s.employee_id === emp.id);
-        let monthMinutes = 0;
-        empMonthShifts.forEach(s => {
-            const start = s.start_time.slice(0,5).split(':').map(Number);
-            const end = s.end_time.slice(0,5).split(':').map(Number);
-            monthMinutes += (end[0]*60+end[1]) - (start[0]*60+start[1]) - (s.break_minutes || 0);
-        });
-
-        const weekH = (weekMinutes / 60).toFixed(1);
-        const monthH = (monthMinutes / 60).toFixed(1);
-
-        const weekColor = weekMinutes === 0 ? 'var(--color-text-light)' :
-                          weekMinutes > 600 ? '#c05050' :
-                          weekMinutes < 240 ? '#b8a020' : '#6aaa6a';
-
-        const parts = emp.name.trim().split(' ');
-        const displayName = parts.length > 1 ? `${parts[0]} ${parts[1][0]}.` : parts[0];
-
-        return `
-            <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem 0; border-bottom:1px solid var(--color-border);">
+        const deptEmps = employees.filter(e => (e.department || 'Allgemein') === dept);
+        deptStundenDiv.innerHTML = deptEmps.map(emp => {
+            const empWeekShifts = shifts.filter(s => s.employee_id === emp.id && !s.is_open);
+            let weekMinutes = 0;
+            empWeekShifts.forEach(s => {
+                const start = s.start_time.slice(0,5).split(':').map(Number);
+                const end = s.end_time.slice(0,5).split(':').map(Number);
+                weekMinutes += (end[0]*60+end[1]) - (start[0]*60+start[1]) - (s.break_minutes || 0);
+            });
+            const empMonthShifts = (monthShifts || []).filter(s => s.employee_id === emp.id);
+            let monthMinutes = 0;
+            empMonthShifts.forEach(s => {
+                const start = s.start_time.slice(0,5).split(':').map(Number);
+                const end = s.end_time.slice(0,5).split(':').map(Number);
+                monthMinutes += (end[0]*60+end[1]) - (start[0]*60+start[1]) - (s.break_minutes || 0);
+            });
+            const weekH = (weekMinutes / 60).toFixed(1);
+            const monthH = (monthMinutes / 60).toFixed(1);
+            const weekColor = weekMinutes === 0 ? 'var(--color-text-light)' :
+                weekMinutes > 600 ? '#c05050' :
+                weekMinutes < 240 ? '#b8a020' : '#6aaa6a';
+            const parts = emp.name.trim().split(' ');
+            const displayName = parts.length > 1 ? `${parts[0]} ${parts[1][0]}.` : parts[0];
+            return `<div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0; border-bottom:1px solid var(--color-border);">
                 <span style="font-size:0.9rem; font-weight:600;">${displayName}</span>
-                <div style="text-align:right; font-size:0.85rem;">
+                <div style="font-size:0.85rem;">
                     <span style="color:${weekColor}; font-weight:600;">${weekH}h KW${kwNumber}</span>
                     <span style="color:var(--color-text-light); margin-left:0.5rem;">/ ${monthH}h ${monthNames[month-1]}</span>
                 </div>
             </div>`;
-    }).join('');
+        }).join('');
+        grid.appendChild(deptStundenDiv);
+    });
+}
 
-    container.innerHTML = html || '<div class="empty-state"><p>Keine Mitarbeiter.</p></div>';
+async function renderHoursOverview(days, weekShifts) {
+    // Leer lassen - wird jetzt in renderWeekGrid pro Abteilung gezeigt
+    const container = document.getElementById('hours-overview');
+    if (container) container.innerHTML = '';
 }
 
 function changeWeek(dir) {
@@ -3449,24 +3425,3 @@ async function deleteNote(id) {
     await db.from('notes').delete().eq('id', id);
     await loadNotes();
 }
-
-//--------- Swipe ---------
-
-// Swipe für Schichtplan
-(function() {
-    let startX = 0;
-    let startY = 0;
-    const container = document.getElementById('tab-schichtplanung');
-    if (!container) return;
-    container.addEventListener('touchstart', e => {
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
-    }, { passive: true });
-    container.addEventListener('touchend', e => {
-        const dx = e.changedTouches[0].clientX - startX;
-        const dy = e.changedTouches[0].clientY - startY;
-        if (Math.abs(dx) > Math.abs(dy) * 1.5 && Math.abs(dx) > 60) {
-            changeWeek(dx < 0 ? 1 : -1);
-        }
-    }, { passive: true });
-})();

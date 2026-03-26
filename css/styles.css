@@ -388,9 +388,8 @@ input[type="time"] {
 /* WEEK VIEW (Admin) */
 .week-grid {
     display: grid;
-    grid-template-columns: 80px repeat(7, minmax(52px, 1fr));
+    grid-template-columns: 80px repeat(7, 1fr);
     gap: 3px;
-    min-width: fit-content;
 }
 .week-employee {
     font-size: 0.75rem;
@@ -429,7 +428,6 @@ input[type="time"] {
     border-radius: 8px;
     padding: 0.4rem;
     min-height: 60px;
-    width: 52px;
     cursor: pointer;
     font-size: 0.75rem;
     display: flex;
