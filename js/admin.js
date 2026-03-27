@@ -2976,12 +2976,23 @@ function calculateVacationAccount(emp, year, vacations, prevVacations, phases = 
 
 // ── AUFGABEN ─────────────────────────────────────────
 async function loadTasks() {
+    const archiveContainerCleanup = document.getElementById('tasks-archive');
+    if (archiveContainerCleanup) archiveContainerCleanup.innerHTML = '';
     await loadTaskTemplates();
     const { data: tasks } = await db
         .from('tasks')
         .select('*, task_steps(*)')
         .eq('user_id', adminSession.user.id)
+        .eq('is_archived', false)
         .order('created_at', { ascending: false });
+
+    const { data: archivedTasks } = await db
+        .from('tasks')
+        .select('*, task_steps(*)')
+        .eq('user_id', adminSession.user.id)
+        .eq('is_archived', true)
+        .order('created_at', { ascending: false });
+        console.log('archiveContainer:', document.getElementById('tasks-archive'));
 
     const container = document.getElementById('tasks-list');
     if (!tasks || tasks.length === 0) {
@@ -3036,10 +3047,60 @@ async function loadTasks() {
                             <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                         </button>
                     </div>
-                    <button onclick="deleteTask('${t.id}')" style="margin-top:0.75rem; background:none; border:none; color:var(--color-text-light); font-size:0.8rem; cursor:pointer;">🗑 Aufgabe löschen</button>
+                    <button onclick="archiveTask('${t.id}')" style="margin-top:0.75rem; background:none; border:none; color:var(--color-primary); font-size:0.85rem; cursor:pointer; font-weight:600;">✓ Archivieren</button>
+                    <button onclick="deleteTask('${t.id}')" style="margin-top:0.5rem; margin-left:1rem; background:none; border:none; color:var(--color-text-light); font-size:0.8rem; cursor:pointer;">🗑 Aufgabe löschen</button>
                 </div>
             </div>`;
     }).join('');
+
+    // Archiv
+    const archiveHtml = (archivedTasks || []).map(t => {
+        const steps = t.task_steps || [];
+        const done = steps.filter(s => s.is_done).length;
+        const total = steps.length;
+        return `
+        <div style="background:var(--color-gray); border-radius:14px; margin-bottom:0.75rem; overflow:hidden; opacity:0.7;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:1rem 1.25rem; cursor:pointer;" onclick="toggleTask('${t.id}')">
+                <div>
+                    <div style="font-weight:700; font-size:1rem;">${t.title}</div>
+                    <div style="font-size:0.8rem; color:var(--color-text-light); margin-top:0.2rem;">${done}/${total} Schritte erledigt</div>
+                </div>
+                <div style="display:flex; align-items:center; gap:1rem;">
+                    <span style="font-size:0.75rem; color:var(--color-text-light);">Archiviert</span>
+                    <span id="task-toggle-${t.id}" style="color:var(--color-text-light);">▶</span>
+                </div>
+            </div>
+            <div id="task-body-${t.id}" style="display:none; padding:0 1.25rem 1rem; background:white; border-top:1px solid var(--color-border);">
+                <div style="margin-top:0.75rem;">
+                    ${steps.sort((a,b) => a.position - b.position).map(s => `
+                        <div style="display:flex; align-items:center; gap:0.75rem; padding:0.4rem 0; border-bottom:1px solid var(--color-border);">
+                            <input type="checkbox" ${s.is_done ? 'checked' : ''} disabled style="width:auto;">
+                            <span style="${s.is_done ? 'text-decoration:line-through; color:var(--color-text-light);' : ''}">${s.title}</span>
+                        </div>
+                    `).join('')}
+                </div>
+                <button onclick="unarchiveTask('${t.id}')" style="margin-top:0.75rem; background:none; border:none; color:var(--color-primary); font-size:0.85rem; cursor:pointer; font-weight:600;">↩ Wiederherstellen</button>
+                <button onclick="deleteTask('${t.id}')" style="margin-top:0.5rem; margin-left:1rem; background:none; border:none; color:var(--color-text-light); font-size:0.8rem; cursor:pointer;">🗑 Löschen</button>
+            </div>
+        </div>`;
+    }).join('');
+
+    const archiveContainer = document.getElementById('tasks-archive');
+    if (archiveContainer) {
+        archiveContainer.innerHTML = '';
+        if (archivedTasks && archivedTasks.length > 0) {
+            console.log('archiveHtml length:', archiveHtml.length);
+            archiveContainer.innerHTML = `
+        <div>
+            <div style="font-size:0.85rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.05em; margin-bottom:0.75rem; cursor:pointer; display:flex; justify-content:space-between;" onclick="toggleArchive()">
+                <span>ARCHIV (${archivedTasks.length})</span>
+                <span id="tasks-archive-toggle">▶</span>
+            </div>
+            <div id="tasks-archive-list" style="display:none;">${archiveHtml}</div>
+        </div>`;
+        console.log('archive set, list:', document.getElementById('tasks-archive-list')?.innerHTML.slice(0, 50));
+        }
+    }
 
     // Offene Tasks wiederherstellen
     openTaskIds.forEach(taskId => {
@@ -3050,6 +3111,26 @@ async function loadTasks() {
             toggle.textContent = '▼';
         }
     });
+}
+
+async function archiveTask(taskId) {
+    await db.from('tasks').update({ is_archived: true }).eq('id', taskId);
+    console.log([...openTaskIds])
+    openTaskIds.delete(taskId);
+    await loadTasks();
+}
+
+async function unarchiveTask(taskId) {
+    await db.from('tasks').update({ is_archived: false }).eq('id', taskId);
+    await loadTasks();
+}
+
+function toggleArchive() {
+    const list = document.getElementById('tasks-archive-list');
+    const toggle = document.getElementById('tasks-archive-toggle');
+    const isOpen = list.style.display === 'block';
+    list.style.display = isOpen ? 'none' : 'block';
+    toggle.textContent = isOpen ? '▶' : '▼';
 }
 
 async function moveStep(stepId, taskId, direction) {
