@@ -3124,30 +3124,40 @@ function touchStepStart(e) {
     touchDragTaskId = el.dataset.taskId;
     touchDragEl = el;
 
-    // Visuelles Clone-Element
     touchClone = el.cloneNode(true);
     touchClone.style.position = 'fixed';
-    touchClone.style.opacity = '0.7';
+    touchClone.style.opacity = '0.8';
     touchClone.style.pointerEvents = 'none';
     touchClone.style.width = el.offsetWidth + 'px';
     touchClone.style.zIndex = '9999';
     touchClone.style.background = 'var(--color-gray)';
     touchClone.style.borderRadius = '8px';
+    touchClone.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
     document.body.appendChild(touchClone);
 
+    const touch = e.touches[0];
+    touchClone.style.left = (touch.clientX - el.offsetWidth / 2) + 'px';
+    touchClone.style.top = (touch.clientY - 20) + 'px';
+
     el.style.opacity = '0.3';
-    e.preventDefault();
+
+    // Non-passive touchmove
+    document.addEventListener('touchmove', touchStepMoveGlobal, { passive: false });
+    document.addEventListener('touchend', touchStepEndGlobal, { passive: false });
 }
 
-function touchStepMove(e) {
+function touchStepMoveGlobal(e) {
     if (!touchClone) return;
+    e.preventDefault();
     const touch = e.touches[0];
     touchClone.style.left = (touch.clientX - touchClone.offsetWidth / 2) + 'px';
     touchClone.style.top = (touch.clientY - 20) + 'px';
-    e.preventDefault();
 }
 
-async function touchStepEnd(e) {
+async function touchStepEndGlobal(e) {
+    document.removeEventListener('touchmove', touchStepMoveGlobal);
+    document.removeEventListener('touchend', touchStepEndGlobal);
+
     if (!touchClone || !touchDragEl) return;
     touchClone.remove();
     touchClone = null;
