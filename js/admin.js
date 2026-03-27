@@ -3003,14 +3003,14 @@ async function loadTasks() {
                 <div id="task-body-${t.id}" style="display:none; padding:0 1.25rem 1rem; background:white; border-top:1px solid var(--color-border);" onclick="event.stopPropagation()">
                     <div id="task-steps-${t.id}" style="margin-top:0.75rem;">
                         ${steps.sort((a,b) => a.position - b.position).map((s, idx) => `
-                            <div style="display:flex; align-items:center; gap:0.75rem; padding:0.4rem 0; border-bottom:1px solid var(--color-border);" draggable="true" data-step-id="${s.id}" data-task-id="${t.id}" data-position="${idx}" ondragstart="dragStepStart(event)" ondragover="dragStepOver(event)" ondrop="dragStepDrop(event)">
+                            <div style="display:flex; align-items:center; gap:0.5rem; padding:0.4rem 0; border-bottom:1px solid var(--color-border);" draggable="true" data-step-id="${s.id}" data-task-id="${t.id}" data-position="${idx}" ondragstart="dragStepStart(event)" ondragover="dragStepOver(event)" ondrop="dragStepDrop(event)">
                                 <span style="cursor:grab; color:var(--color-text-light); font-size:1.1rem; padding:0 0.25rem;">⠿</span>
                                 <input type="checkbox" ${s.is_done ? 'checked' : ''} onchange="toggleStep('${s.id}', this.checked, '${t.id}')" onclick="event.stopPropagation()" style="width:auto; cursor:pointer;">
-                                <span style="flex:1; ${s.is_done ? 'text-decoration:line-through; color:var(--color-text-light);' : ''}">${s.title}</span>
-                                <button class="btn-small btn-pdf-view btn-icon" onclick="editStep('${s.id}', \`${s.title.replace(/`/g, '\\`')}\`, '${t.id}')" style="flex-shrink:0;">
+                                <span style="flex:1; min-width:0; word-break:break-word; ${s.is_done ? 'text-decoration:line-through; color:var(--color-text-light);' : ''}">${s.title}</span>
+                                <button class="btn-small btn-pdf-view btn-icon" onclick="editStep('${s.id}', \`${s.title.replace(/`/g, '\\`')}\`, '${t.id}')" style="width:2rem; height:2rem; flex-shrink:0;">
                                     <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                 </button>
-                                <button class="btn-small btn-pdf-view btn-icon" onclick="deleteStep('${s.id}', '${t.id}')" style="flex-shrink:0;">
+                                <button class="btn-small btn-pdf-view btn-icon" onclick="deleteStep('${s.id}', '${t.id}')" style="width:2rem; height:2rem; flex-shrink:0;">
                                     <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                                 </button>
                             </div>
