@@ -3010,7 +3010,8 @@ async function loadTasks() {
                 <div id="task-body-${t.id}" style="display:none; padding:0 1.25rem 1rem; background:white; border-top:1px solid var(--color-border);" onclick="event.stopPropagation()">
                     <div id="task-steps-${t.id}" style="margin-top:0.75rem;">
                         ${steps.sort((a,b) => a.position - b.position).map((s, idx) => `
-                            <div style="display:flex; align-items:center; gap:0.5rem; padding:0.4rem 0; border-bottom:1px solid var(--color-border);" draggable="true" data-step-id="${s.id}" data-task-id="${t.id}" data-position="${idx}" ondragstart="dragStepStart(event)" ondragover="dragStepOver(event)" ondrop="dragStepDrop(event)">
+                            <div style="display:flex; align-items:center; gap:0.5rem; padding:0.4rem 0; border-bottom:1px solid var(--color-border);" draggable="true" data-step-id="${s.id}" data-task-id="${t.id}" data-position="${idx}" ondragstart="dragStepStart(event)" ondragover="dragStepOver(event)" ondrop="dragStepDrop(event)"
+ontouchstart="touchStepStart(event)" ontouchmove="touchStepMove(event)" ontouchend="touchStepEnd(event)">
                                 <span style="cursor:grab; color:var(--color-text-light); font-size:1.1rem; padding:0 0.25rem;">⠿</span>
                                 <input type="checkbox" ${s.is_done ? 'checked' : ''} onchange="toggleStep('${s.id}', this.checked, '${t.id}')" onclick="event.stopPropagation()" style="width:auto; cursor:pointer;">
                                 <span style="flex:1; min-width:0; word-break:break-word; ${s.is_done ? 'text-decoration:line-through; color:var(--color-text-light);' : ''}">${s.title}</span>
@@ -3108,6 +3109,81 @@ async function dragStepDrop(e) {
     for (let i = 0; i < reordered.length; i++) {
         await db.from('task_steps').update({ position: i }).eq('id', reordered[i].id);
     }
+    await loadTasks();
+}
+
+// Touch Drag & Drop für Mobile
+let touchDragEl = null;
+let touchDragStepId = null;
+let touchDragTaskId = null;
+let touchClone = null;
+
+function touchStepStart(e) {
+    const el = e.currentTarget;
+    touchDragStepId = el.dataset.stepId;
+    touchDragTaskId = el.dataset.taskId;
+    touchDragEl = el;
+
+    // Visuelles Clone-Element
+    touchClone = el.cloneNode(true);
+    touchClone.style.position = 'fixed';
+    touchClone.style.opacity = '0.7';
+    touchClone.style.pointerEvents = 'none';
+    touchClone.style.width = el.offsetWidth + 'px';
+    touchClone.style.zIndex = '9999';
+    touchClone.style.background = 'var(--color-gray)';
+    touchClone.style.borderRadius = '8px';
+    document.body.appendChild(touchClone);
+
+    el.style.opacity = '0.3';
+    e.preventDefault();
+}
+
+function touchStepMove(e) {
+    if (!touchClone) return;
+    const touch = e.touches[0];
+    touchClone.style.left = (touch.clientX - touchClone.offsetWidth / 2) + 'px';
+    touchClone.style.top = (touch.clientY - 20) + 'px';
+    e.preventDefault();
+}
+
+async function touchStepEnd(e) {
+    if (!touchClone || !touchDragEl) return;
+    touchClone.remove();
+    touchClone = null;
+    touchDragEl.style.opacity = '1';
+
+    const touch = e.changedTouches[0];
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    const targetEl = target?.closest('[data-step-id]');
+
+    if (!targetEl || targetEl === touchDragEl) {
+        touchDragStepId = null;
+        touchDragTaskId = null;
+        touchDragEl = null;
+        return;
+    }
+
+    const targetStepId = targetEl.dataset.stepId;
+    const taskId = touchDragTaskId;
+
+    const { data: steps } = await db.from('task_steps').select('id, position').eq('task_id', taskId).order('position', { ascending: true });
+    if (!steps) return;
+
+    const srcIdx = steps.findIndex(s => s.id === touchDragStepId);
+    const tgtIdx = steps.findIndex(s => s.id === targetStepId);
+    const reordered = [...steps];
+    const [moved] = reordered.splice(srcIdx, 1);
+    reordered.splice(tgtIdx, 0, moved);
+
+    for (let i = 0; i < reordered.length; i++) {
+        await db.from('task_steps').update({ position: i }).eq('id', reordered[i].id);
+    }
+
+    touchDragStepId = null;
+    touchDragTaskId = null;
+    touchDragEl = null;
+
     await loadTasks();
 }
 
