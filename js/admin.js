@@ -8,6 +8,8 @@ let availabilityCache = {};
 let urlaubYear = new Date().getFullYear();
 let editVacationApproveAfter = false;
 let openTaskIds = new Set();
+let currentShiftEmployeeId = null;
+let currentShiftDateStr = null;
 
 // ── INIT ──────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -129,7 +131,7 @@ async function loadWeekGrid() {
         .gte('end_date', firstDay);
 
     const availCache = await loadAvailabilityForWeek(days);
-    renderWeekGrid(days, shifts || [], availCache, sickLeaves || []);
+    await renderWeekGrid(days, shifts || [], availCache, sickLeaves || []);
     await renderHoursOverview(days, shifts || []);
 }
 
@@ -326,6 +328,7 @@ async function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
                     cell.style.fontSize = '0.7rem';
                 }
 
+                cell.dataset.cell = `${emp.id}_${dateStr}`;
                 cell.onclick = () => openShiftModal(emp.id, dateStr, shift);
                 grid.appendChild(cell);
             });
@@ -395,6 +398,8 @@ function getMonday(date) {
 
 // ── SCHICHT MODAL ─────────────────────────────────────────
 async function openShiftModal(employeeId, dateStr, existingShift) {
+    currentShiftEmployeeId = employeeId;
+    currentShiftDateStr = dateStr;
     editShiftId = existingShift ? existingShift.id : null;
 
     document.getElementById('shift-modal-title').textContent =
@@ -579,7 +584,7 @@ async function saveShift(payload, repeat, weeks) {
         return;
     }
     closeShiftModal();
-    await loadWeekGrid();
+    await updateShiftCell(currentShiftEmployeeId, currentShiftDateStr);
 }
 
 async function deleteShift() {
@@ -596,7 +601,7 @@ async function deleteShift() {
         return;
     }
     closeShiftModal();
-    await loadWeekGrid();
+    await updateShiftCell(currentShiftEmployeeId, currentShiftDateStr);
 }
 
 function toggleRepeat() {
@@ -2192,6 +2197,8 @@ function toggleOpenShift() {
 let openShiftData = null; // { dateStr, dept, existingShift }
 
 function openOpenShiftModal(dateStr, dept, existingShift) {
+    currentShiftEmployeeId = null;
+    currentShiftDateStr = dateStr;
     openShiftData = { dateStr, dept, existingShift };
     document.getElementById('open-shift-modal-title').textContent = 
         `Offen – ${dept} – ${new Date(dateStr + 'T00:00:00').toLocaleDateString('de-DE', {day:'numeric', month:'short'})}`;
@@ -3513,4 +3520,33 @@ async function deleteNote(id) {
     if (!confirm('Notiz wirklich löschen?')) return;
     await db.from('notes').delete().eq('id', id);
     await loadNotes();
+}
+
+async function updateShiftCell(employeeId, dateStr) {
+    const { data: shifts } = await db
+        .from('shifts')
+        .select('*')
+        .eq('user_id', adminSession.user.id)
+        .eq('shift_date', dateStr);
+
+    const weekHolidays = getBWHolidays(new Date(dateStr).getFullYear());
+    const sickLeaves = [];
+
+    if (employeeId) {
+        // Normale Mitarbeiter-Zelle
+        const cell = document.querySelector(`[data-cell="${employeeId}_${dateStr}"]`);
+        if (!cell) { await loadWeekGrid(); return; }
+
+        const shift = (shifts || []).find(s => s.employee_id === employeeId && !s.is_open);
+        cell.className = 'week-cell' + (shift ? ' has-shift' : '');
+        cell.textContent = shift ? `${shift.start_time.slice(0,5)}\n${shift.end_time.slice(0,5)}` : '+';
+        cell.style.whiteSpace = 'pre';
+        cell.style.background = '';
+        cell.style.color = '';
+        cell.style.fontSize = '';
+        cell.onclick = () => openShiftModal(employeeId, dateStr, shift || null);
+    } else {
+        // Offene Schicht
+        await loadWeekGrid();
+    }
 }
