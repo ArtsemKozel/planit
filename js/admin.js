@@ -7,6 +7,7 @@ let planningMode = false;
 let availabilityCache = {};
 let urlaubYear = new Date().getFullYear();
 let editVacationApproveAfter = false;
+let openTaskIds = new Set();
 
 // ── INIT ──────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -3001,10 +3002,17 @@ async function loadTasks() {
                 </div>
                 <div id="task-body-${t.id}" style="display:none; padding:0 1.25rem 1rem; background:white; border-top:1px solid var(--color-border);" onclick="event.stopPropagation()">
                     <div id="task-steps-${t.id}" style="margin-top:0.75rem;">
-                        ${steps.sort((a,b) => a.position - b.position).map(s => `
-                            <div style="display:flex; align-items:center; gap:0.75rem; padding:0.4rem 0; border-bottom:1px solid var(--color-border);">
+                        ${steps.sort((a,b) => a.position - b.position).map((s, idx) => `
+                            <div style="display:flex; align-items:center; gap:0.75rem; padding:0.4rem 0; border-bottom:1px solid var(--color-border);" draggable="true" data-step-id="${s.id}" data-task-id="${t.id}" data-position="${idx}" ondragstart="dragStepStart(event)" ondragover="dragStepOver(event)" ondrop="dragStepDrop(event)">
+                                <span style="cursor:grab; color:var(--color-text-light); font-size:1.1rem; padding:0 0.25rem;">⠿</span>
                                 <input type="checkbox" ${s.is_done ? 'checked' : ''} onchange="toggleStep('${s.id}', this.checked, '${t.id}')" onclick="event.stopPropagation()" style="width:auto; cursor:pointer;">
-                                <span style="${s.is_done ? 'text-decoration:line-through; color:var(--color-text-light);' : ''}">${s.title}</span>
+                                <span style="flex:1; ${s.is_done ? 'text-decoration:line-through; color:var(--color-text-light);' : ''}">${s.title}</span>
+                                <button class="btn-small btn-pdf-view btn-icon" onclick="editStep('${s.id}', \`${s.title.replace(/`/g, '\\`')}\`, '${t.id}')" style="flex-shrink:0;">
+                                    <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                </button>
+                                <button class="btn-small btn-pdf-view btn-icon" onclick="deleteStep('${s.id}', '${t.id}')" style="flex-shrink:0;">
+                                    <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                                </button>
                             </div>
                         `).join('')}
                     </div>
@@ -3018,6 +3026,82 @@ async function loadTasks() {
                 </div>
             </div>`;
     }).join('');
+
+    // Offene Tasks wiederherstellen
+    openTaskIds.forEach(taskId => {
+        const body = document.getElementById(`task-body-${taskId}`);
+        const toggle = document.getElementById(`task-toggle-${taskId}`);
+        if (body) {
+            body.style.display = 'block';
+            toggle.textContent = '▼';
+        }
+    });
+}
+
+async function deleteStep(stepId, taskId) {
+    if (!confirm('Schritt löschen?')) return;
+    await db.from('task_steps').delete().eq('id', stepId);
+    await loadTasks();
+}
+
+async function editStep(stepId, currentTitle, taskId) {
+    const newTitle = prompt('Schritt bearbeiten:', currentTitle);
+    if (!newTitle || !newTitle.trim() || newTitle.trim() === currentTitle) return;
+    await db.from('task_steps').update({ title: newTitle.trim() }).eq('id', stepId);
+    await loadTasks();
+}
+
+async function insertStepAfter(taskId, afterPosition) {
+    const title = prompt('Neuer Schritt:');
+    if (!title || !title.trim()) return;
+
+    // Alle Schritte nach dieser Position um 1 erhöhen
+    const { data: steps } = await db.from('task_steps').select('id, position').eq('task_id', taskId).gt('position', afterPosition);
+    for (const s of steps || []) {
+        await db.from('task_steps').update({ position: s.position + 1 }).eq('id', s.id);
+    }
+    await db.from('task_steps').insert({
+        user_id: adminSession.user.id,
+        task_id: taskId,
+        title: title.trim(),
+        position: afterPosition + 1
+    });
+    await loadTasks();
+}
+
+let dragSrcStepId = null;
+let dragSrcTaskId = null;
+
+function dragStepStart(e) {
+    dragSrcStepId = e.currentTarget.dataset.stepId;
+    dragSrcTaskId = e.currentTarget.dataset.taskId;
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function dragStepOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+}
+
+async function dragStepDrop(e) {
+    e.preventDefault();
+    const targetStepId = e.currentTarget.dataset.stepId;
+    if (dragSrcStepId === targetStepId) return;
+
+    const taskId = dragSrcTaskId;
+    const { data: steps } = await db.from('task_steps').select('id, position').eq('task_id', taskId).order('position', { ascending: true });
+    if (!steps) return;
+
+    const srcIdx = steps.findIndex(s => s.id === dragSrcStepId);
+    const tgtIdx = steps.findIndex(s => s.id === targetStepId);
+    const reordered = [...steps];
+    const [moved] = reordered.splice(srcIdx, 1);
+    reordered.splice(tgtIdx, 0, moved);
+
+    for (let i = 0; i < reordered.length; i++) {
+        await db.from('task_steps').update({ position: i }).eq('id', reordered[i].id);
+    }
+    await loadTasks();
 }
 
 function toggleTask(taskId) {
@@ -3026,6 +3110,11 @@ function toggleTask(taskId) {
     const isOpen = body.style.display !== 'none';
     body.style.display = isOpen ? 'none' : 'block';
     toggle.textContent = isOpen ? '▶' : '▼';
+    if (isOpen) {
+        openTaskIds.delete(taskId);
+    } else {
+        openTaskIds.add(taskId);
+    }
 }
 
 async function toggleStep(stepId, isDone, taskId) {
