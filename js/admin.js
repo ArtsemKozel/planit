@@ -3010,9 +3010,15 @@ async function loadTasks() {
                 <div id="task-body-${t.id}" style="display:none; padding:0 1.25rem 1rem; background:white; border-top:1px solid var(--color-border);" onclick="event.stopPropagation()">
                     <div id="task-steps-${t.id}" style="margin-top:0.75rem;">
                         ${steps.sort((a,b) => a.position - b.position).map((s, idx) => `
-                            <div style="display:flex; align-items:center; gap:0.5rem; padding:0.4rem 0; border-bottom:1px solid var(--color-border);" draggable="true" data-step-id="${s.id}" data-task-id="${t.id}" data-position="${idx}" ondragstart="dragStepStart(event)" ondragover="dragStepOver(event)" ondrop="dragStepDrop(event)"
-ontouchstart="touchStepStart(event)" ontouchmove="touchStepMove(event)" ontouchend="touchStepEnd(event)">
-                                <span style="cursor:grab; color:var(--color-text-light); font-size:1.1rem; padding:0 0.25rem;">⠿</span>
+                            <div style="display:flex; align-items:center; gap:0.5rem; padding:0.4rem 0; border-bottom:1px solid var(--color-border);">
+                                <div style="display:flex; flex-direction:column; gap:0.2rem;">
+                                    ${idx > 0 ? `<button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="moveStep('${s.id}', '${t.id}', -1)">
+                                        <svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg>
+                                    </button>` : `<div style="width:1.8rem; height:1.8rem;"></div>`}
+                                    ${idx < steps.length - 1 ? `<button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="moveStep('${s.id}', '${t.id}', 1)">
+                                        <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                                    </button>` : `<div style="width:1.8rem; height:1.8rem;"></div>`}
+                                </div>
                                 <input type="checkbox" ${s.is_done ? 'checked' : ''} onchange="toggleStep('${s.id}', this.checked, '${t.id}')" onclick="event.stopPropagation()" style="width:auto; cursor:pointer;">
                                 <span style="flex:1; min-width:0; word-break:break-word; ${s.is_done ? 'text-decoration:line-through; color:var(--color-text-light);' : ''}">${s.title}</span>
                                 <button class="btn-small btn-pdf-view btn-icon" onclick="editStep('${s.id}', \`${s.title.replace(/`/g, '\\`')}\`, '${t.id}')" style="width:2rem; height:2rem; flex-shrink:0;">
@@ -3046,6 +3052,23 @@ ontouchstart="touchStepStart(event)" ontouchmove="touchStepMove(event)" ontouche
     });
 }
 
+async function moveStep(stepId, taskId, direction) {
+    const { data: steps } = await db.from('task_steps').select('id, position').eq('task_id', taskId).order('position', { ascending: true });
+    if (!steps) return;
+
+    const idx = steps.findIndex(s => s.id === stepId);
+    const swapIdx = idx + direction;
+    if (swapIdx < 0 || swapIdx >= steps.length) return;
+
+    const posA = steps[idx].position;
+    const posB = steps[swapIdx].position;
+
+    await db.from('task_steps').update({ position: posB }).eq('id', steps[idx].id);
+    await db.from('task_steps').update({ position: posA }).eq('id', steps[swapIdx].id);
+
+    await loadTasks();
+}
+
 async function deleteStep(stepId, taskId) {
     if (!confirm('Schritt löschen?')) return;
     await db.from('task_steps').delete().eq('id', stepId);
@@ -3074,126 +3097,6 @@ async function insertStepAfter(taskId, afterPosition) {
         title: title.trim(),
         position: afterPosition + 1
     });
-    await loadTasks();
-}
-
-let dragSrcStepId = null;
-let dragSrcTaskId = null;
-
-function dragStepStart(e) {
-    dragSrcStepId = e.currentTarget.dataset.stepId;
-    dragSrcTaskId = e.currentTarget.dataset.taskId;
-    e.dataTransfer.effectAllowed = 'move';
-}
-
-function dragStepOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-}
-
-async function dragStepDrop(e) {
-    e.preventDefault();
-    const targetStepId = e.currentTarget.dataset.stepId;
-    if (dragSrcStepId === targetStepId) return;
-
-    const taskId = dragSrcTaskId;
-    const { data: steps } = await db.from('task_steps').select('id, position').eq('task_id', taskId).order('position', { ascending: true });
-    if (!steps) return;
-
-    const srcIdx = steps.findIndex(s => s.id === dragSrcStepId);
-    const tgtIdx = steps.findIndex(s => s.id === targetStepId);
-    const reordered = [...steps];
-    const [moved] = reordered.splice(srcIdx, 1);
-    reordered.splice(tgtIdx, 0, moved);
-
-    for (let i = 0; i < reordered.length; i++) {
-        await db.from('task_steps').update({ position: i }).eq('id', reordered[i].id);
-    }
-    await loadTasks();
-}
-
-// Touch Drag & Drop für Mobile
-let touchDragEl = null;
-let touchDragStepId = null;
-let touchDragTaskId = null;
-let touchClone = null;
-
-function touchStepStart(e) {
-    const el = e.currentTarget;
-    touchDragStepId = el.dataset.stepId;
-    touchDragTaskId = el.dataset.taskId;
-    touchDragEl = el;
-
-    touchClone = el.cloneNode(true);
-    touchClone.style.position = 'fixed';
-    touchClone.style.opacity = '0.8';
-    touchClone.style.pointerEvents = 'none';
-    touchClone.style.width = el.offsetWidth + 'px';
-    touchClone.style.zIndex = '9999';
-    touchClone.style.background = 'var(--color-gray)';
-    touchClone.style.borderRadius = '8px';
-    touchClone.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
-    document.body.appendChild(touchClone);
-
-    const touch = e.touches[0];
-    touchClone.style.left = (touch.clientX - el.offsetWidth / 2) + 'px';
-    touchClone.style.top = (touch.clientY - 20) + 'px';
-
-    el.style.opacity = '0.3';
-
-    // Non-passive touchmove
-    document.addEventListener('touchmove', touchStepMoveGlobal, { passive: false });
-    document.addEventListener('touchend', touchStepEndGlobal, { passive: false });
-}
-
-function touchStepMoveGlobal(e) {
-    if (!touchClone) return;
-    e.preventDefault();
-    const touch = e.touches[0];
-    touchClone.style.left = (touch.clientX - touchClone.offsetWidth / 2) + 'px';
-    touchClone.style.top = (touch.clientY - 20) + 'px';
-}
-
-async function touchStepEndGlobal(e) {
-    document.removeEventListener('touchmove', touchStepMoveGlobal);
-    document.removeEventListener('touchend', touchStepEndGlobal);
-
-    if (!touchClone || !touchDragEl) return;
-    touchClone.remove();
-    touchClone = null;
-    touchDragEl.style.opacity = '1';
-
-    const touch = e.changedTouches[0];
-    const target = document.elementFromPoint(touch.clientX, touch.clientY);
-    const targetEl = target?.closest('[data-step-id]');
-
-    if (!targetEl || targetEl === touchDragEl) {
-        touchDragStepId = null;
-        touchDragTaskId = null;
-        touchDragEl = null;
-        return;
-    }
-
-    const targetStepId = targetEl.dataset.stepId;
-    const taskId = touchDragTaskId;
-
-    const { data: steps } = await db.from('task_steps').select('id, position').eq('task_id', taskId).order('position', { ascending: true });
-    if (!steps) return;
-
-    const srcIdx = steps.findIndex(s => s.id === touchDragStepId);
-    const tgtIdx = steps.findIndex(s => s.id === targetStepId);
-    const reordered = [...steps];
-    const [moved] = reordered.splice(srcIdx, 1);
-    reordered.splice(tgtIdx, 0, moved);
-
-    for (let i = 0; i < reordered.length; i++) {
-        await db.from('task_steps').update({ position: i }).eq('id', reordered[i].id);
-    }
-
-    touchDragStepId = null;
-    touchDragTaskId = null;
-    touchDragEl = null;
-
     await loadTasks();
 }
 
