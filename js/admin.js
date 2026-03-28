@@ -3893,7 +3893,7 @@ async function calculateTrinkgeld() {
     if (config.mode === 'monthly') {
         await calculateMonthly(monthStr, totalCard, totalCash, depts, emps, actualHours, vacations, sickLeaves);
     } else {
-        await calculateDaily(monthStr, firstDay, lastDay, daysInMonth, totalCard, totalCash, depts, emps, vacations, sickLeaves);
+        await calculateDaily(monthStr, firstDay, lastDay, daysInMonth, totalCard, totalCash, depts, emps, vacations, sickLeaves, entries);
     }
 
     loadTrinkgeld();
@@ -3961,7 +3961,7 @@ async function calculateMonthly(monthStr, totalCard, totalCash, depts, emps, act
     }
 }
 
-async function calculateDaily(monthStr, firstDay, lastDay, daysInMonth, totalCard, totalCash, depts, emps, vacations, sickLeaves) {
+async function calculateDaily(monthStr, firstDay, lastDay, daysInMonth, totalCard, totalCash, depts, emps, vacations, sickLeaves, entries) {
     // tip_hours laden
     const { data: tipHours } = await db.from('tip_hours').select('*').eq('user_id', adminSession.user.id).gte('work_date', firstDay).lte('work_date', lastDay);
     
@@ -3975,11 +3975,12 @@ async function calculateDaily(monthStr, firstDay, lastDay, daysInMonth, totalCar
     const workDays = [...new Set(tipHours.map(h => h.work_date))];
     if (workDays.length === 0) return;
 
-    const dayCard = totalCard / workDays.length;
-    const dayCash = totalCash / workDays.length;
-
     for (const dateStr of workDays) {
         const dayHours = tipHours.filter(h => h.work_date === dateStr);
+        const dayEntry = (entries || []).find(e => e.entry_date === dateStr);
+        const dayCard = dayEntry ? parseFloat(dayEntry.amount_card) : 0;
+        const dayCash = dayEntry ? parseFloat(dayEntry.amount_cash) : 0;
+        if (dayCard === 0 && dayCash === 0) continue;
 
         for (const dept of depts) {
             if (dept.fixed_hours_per_month) continue;
