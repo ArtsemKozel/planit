@@ -3671,9 +3671,14 @@ async function loadTrinkgeld() {
                         <h4>${new Date(e.entry_date + 'T12:00:00').toLocaleDateString('de-DE', {day:'numeric', month:'short'})}</h4>
                         <p>Karte: ${parseFloat(e.amount_card).toFixed(2)} € | Bar: ${parseFloat(e.amount_cash).toFixed(2)} €</p>
                     </div>
-                    <button class="btn-small btn-pdf-view btn-icon" onclick="openTrinkgeldEntryModal('${e.id}', '${e.entry_date}', ${e.amount_card}, ${e.amount_cash})">
-                        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                    </button>
+                    <div style="display:flex; gap:0.5rem;">
+                        <button class="btn-small btn-pdf-view btn-icon" onclick="openTrinkgeldEntryModal('${e.id}', '${e.entry_date}', ${e.amount_card}, ${e.amount_cash})">
+                            <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        </button>
+                        <button class="btn-small btn-pdf-view btn-icon" onclick="deleteTrinkgeldEntryDirect('${e.id}')">
+                            <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                        </button>
+                    </div>
                 </div>
             `).join('')}
         `;
@@ -3687,10 +3692,15 @@ async function loadTrinkgeld() {
         .eq('month', monthStr);
 
     const resultsContainer = document.getElementById('trinkgeld-results');
-    if (!results || results.length === 0) {
+    // Auch tip_config für fixed_results laden
+    const { data: tipConfig } = await db.from('tip_config').select('fixed_results').eq('user_id', adminSession.user.id).maybeSingle();
+    let fixedResults = tipConfig?.fixed_results || {};
+    if (typeof fixedResults === 'string') fixedResults = JSON.parse(fixedResults);
+
+    if ((!results || results.length === 0) && Object.keys(fixedResults).length === 0) {
         resultsContainer.innerHTML = '<div class="empty-state"><p>Noch nicht berechnet.</p></div>';
     } else {
-        resultsContainer.innerHTML = results.map(r => `
+        let html = (results || []).map(r => `
             <div class="list-item">
                 <div class="list-item-info">
                     <h4>${r.employees_planit.name}</h4>
@@ -3699,7 +3709,21 @@ async function loadTrinkgeld() {
                 <div style="font-weight:700; color:var(--color-primary);">${(parseFloat(r.amount_card) + parseFloat(r.amount_cash)).toFixed(2)} €</div>
             </div>
         `).join('');
+
+        // Fixer Anteil anzeigen
+        html += Object.entries(fixedResults).map(([dept, totals]) => `
+            <div class="list-item" style="opacity:0.7;">
+                <div class="list-item-info">
+                    <h4>${dept}</h4>
+                    <p>Karte: ${(totals.card || 0).toFixed(2)} € | Bar: ${(totals.cash || 0).toFixed(2)} €</p>
+                </div>
+                <div style="font-weight:700; color:var(--color-text-light);">${((totals.card || 0) + (totals.cash || 0)).toFixed(2)} €</div>
+            </div>
+        `).join('');
+
+        resultsContainer.innerHTML = html;
     }
+    await loadTrinkgeldHours();
 }
 
 async function loadTrinkgeldConfig() {
@@ -3938,68 +3962,56 @@ async function calculateMonthly(monthStr, totalCard, totalCash, depts, emps, act
 }
 
 async function calculateDaily(monthStr, firstDay, lastDay, daysInMonth, totalCard, totalCash, depts, emps, vacations, sickLeaves) {
-    // Schichten laden
-    const { data: shifts } = await db.from('shifts').select('*').eq('user_id', adminSession.user.id).eq('is_open', false).gte('shift_date', firstDay).lte('shift_date', lastDay);
+    // tip_hours laden
+    const { data: tipHours } = await db.from('tip_hours').select('*').eq('user_id', adminSession.user.id).gte('work_date', firstDay).lte('work_date', lastDay);
+    
+    if (!tipHours || tipHours.length === 0) { alert('Keine Stunden eingetragen.'); return; }
 
     const empTotals = {};
+    const fixedTotals = {};
     emps.forEach(e => { empTotals[e.id] = { card: 0, cash: 0 }; });
 
-    // Pro Tag berechnen
-    const current = new Date(firstDay + 'T12:00:00');
-    const end = new Date(lastDay + 'T12:00:00');
-
-    while (current <= end) {
-        const dateStr = current.toISOString().split('T')[0];
-        const dayEntries = []; // Kein täglicher Betrag — wir verteilen Gesamtbetrag gleichmäßig auf Tage
-        current.setDate(current.getDate() + 1);
-    }
-
-    // Vereinfacht: Gesamtbetrag durch Anzahl Tage mit Schichten
-    const workDays = [...new Set((shifts || []).map(s => s.shift_date))];
+    // Arbeitstage ermitteln
+    const workDays = [...new Set(tipHours.map(h => h.work_date))];
     if (workDays.length === 0) return;
 
     const dayCard = totalCard / workDays.length;
     const dayCash = totalCash / workDays.length;
 
     for (const dateStr of workDays) {
-        const dayShifts = (shifts || []).filter(s => s.shift_date === dateStr);
+        const dayHours = tipHours.filter(h => h.work_date === dateStr);
 
         for (const dept of depts) {
             if (dept.fixed_hours_per_month) continue;
             const deptDayCard = dayCard * (dept.percentage / 100);
             const deptDayCash = dayCash * (dept.percentage / 100);
 
+            // Fixer Anteil Mitarbeiter die in diesen Pool fließen
             const fixedDepts = depts.filter(d => d.pool_department === dept.department && d.fixed_hours_per_month);
             let totalDeptMinutes = 0;
             fixedDepts.forEach(d => { totalDeptMinutes += (d.fixed_hours_per_month / daysInMonth) * 60; });
 
-            const deptShifts = dayShifts.filter(s => {
-                const emp = emps.find(e => e.id === s.employee_id);
-                return emp && emp.department === dept.department;
-            });
-
+            // Normale Mitarbeiter dieser Abteilung
             const empDayMinutes = {};
-            for (const s of deptShifts) {
-                const isOnVacation = (vacations || []).some(v => v.employee_id === s.employee_id && v.start_date <= dateStr && v.end_date >= dateStr);
-                const isOnSick = (sickLeaves || []).some(sl => sl.employee_id === s.employee_id && sl.start_date <= dateStr && sl.end_date >= dateStr);
+            for (const h of dayHours) {
+                const emp = emps.find(e => e.id === h.employee_id);
+                if (!emp || emp.department !== dept.department) continue;
+                const isOnVacation = (vacations || []).some(v => v.employee_id === h.employee_id && v.start_date <= dateStr && v.end_date >= dateStr);
+                const isOnSick = (sickLeaves || []).some(s => s.employee_id === h.employee_id && s.start_date <= dateStr && s.end_date >= dateStr);
                 if (isOnVacation || isOnSick) continue;
-                const start = s.start_time.split(':').map(Number);
-                const end2 = s.end_time.split(':').map(Number);
-                const minutes = (end2[0]*60+end2[1]) - (start[0]*60+start[1]) - (s.break_minutes || 0);
-                empDayMinutes[s.employee_id] = (empDayMinutes[s.employee_id] || 0) + minutes;
-                totalDeptMinutes += minutes;
+                empDayMinutes[h.employee_id] = h.minutes;
+                totalDeptMinutes += h.minutes;
             }
 
             if (totalDeptMinutes === 0) continue;
 
             // Fixer Anteil
             for (const fixedDept of fixedDepts) {
-                const fixedEmp = emps.find(e => e.department === fixedDept.department);
-                if (!fixedEmp) continue;
                 const fixedMins = (fixedDept.fixed_hours_per_month / daysInMonth) * 60;
                 const share = fixedMins / totalDeptMinutes;
-                empTotals[fixedEmp.id].card += deptDayCard * share;
-                empTotals[fixedEmp.id].cash += deptDayCash * share;
+                if (!fixedTotals[fixedDept.department]) fixedTotals[fixedDept.department] = { card: 0, cash: 0 };
+                fixedTotals[fixedDept.department].card += deptDayCard * share;
+                fixedTotals[fixedDept.department].cash += deptDayCash * share;
             }
 
             // Normale Mitarbeiter
@@ -4011,8 +4023,14 @@ async function calculateDaily(monthStr, firstDay, lastDay, daysInMonth, totalCar
         }
     }
 
-    // Speichern
+    // Fixer Anteil in tip_results als "virtuelle" Einträge speichern mit employee_id = null
+    // Stattdessen in tip_config als JSON speichern
     const userId = (await db.auth.getUser()).data.user.id;
+    await db.from('tip_config').update({ 
+        fixed_results: JSON.stringify(fixedTotals) 
+    }).eq('user_id', userId);
+
+    // Speichern
     for (const [empId, totals] of Object.entries(empTotals)) {
         if (totals.card === 0 && totals.cash === 0) continue;
         await db.from('tip_results').upsert({
@@ -4023,4 +4041,128 @@ async function calculateDaily(monthStr, firstDay, lastDay, daysInMonth, totalCar
             amount_cash: Math.round(totals.cash * 100) / 100
         }, { onConflict: 'user_id,employee_id,month' });
     }
+}
+
+async function openTrinkgeldHoursModal() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('trinkgeld-hours-date').value = today;
+    await loadTrinkgeldHoursEmployees(today);
+    document.getElementById('trinkgeld-hours-modal').classList.add('active');
+}
+
+function closeTrinkgeldHoursModal() {
+    document.getElementById('trinkgeld-hours-modal').classList.remove('active');
+}
+
+async function loadTrinkgeldHoursEmployees(date) {
+    const { data: existing } = await db
+        .from('tip_hours')
+        .select('*')
+        .eq('user_id', adminSession.user.id)
+        .eq('work_date', date);
+
+    const container = document.getElementById('trinkgeld-hours-employees');
+    container.innerHTML = employees.map(emp => {
+        const entry = (existing || []).find(e => e.employee_id === emp.id);
+        const hours = entry ? Math.floor(entry.minutes / 60) : '';
+        const mins = entry ? entry.minutes % 60 : '';
+        return `
+        <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.5rem;">
+            <div style="flex:1; font-size:0.9rem; font-weight:600;">${emp.name}</div>
+            <input type="number" id="tip-hours-h-${emp.id}" value="${hours}" min="0" placeholder="Std" style="width:4rem; padding:0.4rem; font-size:0.85rem; text-align:center;">
+            <span style="color:var(--color-text-light);">h</span>
+            <input type="number" id="tip-hours-m-${emp.id}" value="${mins}" min="0" max="59" placeholder="Min" style="width:4rem; padding:0.4rem; font-size:0.85rem; text-align:center;">
+            <span style="color:var(--color-text-light);">m</span>
+        </div>`;
+    }).join('');
+}
+
+async function saveTrinkgeldHours() {
+    const date = document.getElementById('trinkgeld-hours-date').value;
+    if (!date) { alert('Bitte Datum eingeben.'); return; }
+    const userId = (await db.auth.getUser()).data.user.id;
+
+    for (const emp of employees) {
+        const h = parseInt(document.getElementById(`tip-hours-h-${emp.id}`)?.value) || 0;
+        const m = parseInt(document.getElementById(`tip-hours-m-${emp.id}`)?.value) || 0;
+        const totalMinutes = h * 60 + m;
+        if (totalMinutes === 0) continue;
+        await db.from('tip_hours').upsert({
+            user_id: userId,
+            employee_id: emp.id,
+            work_date: date,
+            minutes: totalMinutes
+        }, { onConflict: 'user_id,employee_id,work_date' });
+    }
+    closeTrinkgeldHoursModal();
+    loadTrinkgeldHours();
+}
+
+async function loadTrinkgeldHours() {
+    const year = trinkgeldDate.getFullYear();
+    const month = trinkgeldDate.getMonth();
+    const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+    const firstDay = `${monthStr}-01`;
+    const lastDay = new Date(year, month + 1, 0).toISOString().split('T')[0];
+
+    const { data: hours } = await db
+        .from('tip_hours')
+        .select('*, employees_planit(name)')
+        .eq('user_id', adminSession.user.id)
+        .gte('work_date', firstDay)
+        .lte('work_date', lastDay)
+        .order('work_date', { ascending: false });
+
+    const container = document.getElementById('trinkgeld-hours-list');
+    if (!hours || hours.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>Keine Stunden eingetragen.</p></div>';
+        return;
+    }
+
+    // Gruppieren nach Datum
+    const byDate = {};
+    hours.forEach(h => {
+        if (!byDate[h.work_date]) byDate[h.work_date] = [];
+        byDate[h.work_date].push(h);
+    });
+
+    container.innerHTML = Object.entries(byDate).map(([date, entries]) => `
+        <div class="card" style="margin-bottom:0.75rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                <div style="font-weight:600;">${new Date(date + 'T12:00:00').toLocaleDateString('de-DE', {weekday:'short', day:'numeric', month:'short'})}</div>
+                <div style="display:flex; gap:0.5rem;">
+                    <button class="btn-small btn-pdf-view btn-icon" onclick="openTrinkgeldHoursModalDate('${date}')">
+                        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    </button>
+                    <button class="btn-small btn-pdf-view btn-icon" onclick="deleteTrinkgeldHoursDate('${date}')">
+                        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                    </button>
+                </div>
+            </div>
+            ${entries.map(e => `
+                <div style="display:flex; justify-content:space-between; font-size:0.85rem; padding:0.2rem 0;">
+                    <span>${e.employees_planit.name.split(' ')[0]}</span>
+                    <span style="font-weight:600;">${Math.floor(e.minutes/60)}h ${String(e.minutes%60).padStart(2,'0')}m</span>
+                </div>
+            `).join('')}
+        </div>
+    `).join('');
+}
+
+async function openTrinkgeldHoursModalDate(date) {
+    document.getElementById('trinkgeld-hours-date').value = date;
+    await loadTrinkgeldHoursEmployees(date);
+    document.getElementById('trinkgeld-hours-modal').classList.add('active');
+}
+
+async function deleteTrinkgeldHoursDate(date) {
+    if (!confirm(`Alle Stunden für ${new Date(date + 'T12:00:00').toLocaleDateString('de-DE')} löschen?`)) return;
+    await db.from('tip_hours').delete().eq('user_id', adminSession.user.id).eq('work_date', date);
+    loadTrinkgeldHours();
+}
+
+async function deleteTrinkgeldEntryDirect(id) {
+    if (!confirm('Eintrag löschen?')) return;
+    await db.from('tip_entries').delete().eq('id', id);
+    loadTrinkgeld();
 }
