@@ -3814,12 +3814,16 @@ async function loadTrinkgeld() {
                 const aName = aEmp ? aEmp.employees_planit.name : aId;
                 const bName = bEmp ? bEmp.employees_planit.name : bId;
                 return aName.localeCompare(bName);
-            }).map(([empId, totals]) => {
-                const emp = (tipHours || []).find(h => h.employee_id === empId);
-                const name = emp ? emp.employees_planit.name : empId;
-                const empTotalMinutes = (tipHours || []).filter(h => h.employee_id === empId).reduce((sum, h) => sum + h.minutes, 0);
-                const empHoursDisplay = empTotalMinutes > 0 ? `${Math.floor(empTotalMinutes/60)}h ${String(empTotalMinutes%60).padStart(2,'0')}m` : '';
-                return `
+            }).map(([empId, totals], idx, arr) => {
+            const emp = (tipHours || []).find(h => h.employee_id === empId);
+            const name = emp ? emp.employees_planit.name : empId;
+            const currentDept = emp ? emp.employees_planit.department : '';
+            const prevEmp = idx > 0 ? (tipHours || []).find(h => h.employee_id === arr[idx-1][0]) : null;
+            const prevDept = prevEmp ? prevEmp.employees_planit.department : '';
+            const deptHeader = currentDept && currentDept !== prevDept ? `<div style="font-size:0.75rem; font-weight:700; color:var(--color-primary); padding:0.5rem 0 0.25rem; letter-spacing:0.05em;">${currentDept.toUpperCase()}</div>` : '';
+            const empTotalMinutes = (tipHours || []).filter(h => h.employee_id === empId).reduce((sum, h) => sum + h.minutes, 0);
+            const empHoursDisplay = empTotalMinutes > 0 ? `${Math.floor(empTotalMinutes/60)}h ${String(empTotalMinutes%60).padStart(2,'0')}m` : '';
+            return `${deptHeader}
                                 <div class="list-item">
                                     <div class="list-item-info">
                                         <h4>${name}</h4>
