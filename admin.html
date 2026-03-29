@@ -309,20 +309,25 @@
             <button onclick="changeTrinkgeldMonth(1)">▶</button>
         </div>
 
-        <!-- Einträge -->
-        <div style="font-size:0.85rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.05em; margin-bottom:0.75rem;">EINTRÄGE</div>
-        <div id="trinkgeld-entries-list"></div>
-        <button class="btn-secondary" style="width:100%; margin-bottom:1.5rem;" onclick="openTrinkgeldEntryModal()">+ Eintrag</button>
+        <!-- Zusammenfassung -->
+        <div id="trinkgeld-summary-block" style="margin-bottom:1rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding:0.75rem 1rem; background:var(--color-gray); border-radius:12px;" onclick="toggleTrinkgeldSummary()">
+                <span style="font-size:0.85rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.05em;">ZUSAMMENFASSUNG</span>
+                <span id="trinkgeld-summary-toggle">▶</span>
+            </div>
+            <div id="trinkgeld-summary" style="display:none; margin-top:0.5rem;">
+                <div id="trinkgeld-results"></div>
+            </div>
+        </div>
 
-        <!-- Stunden -->
-        <div style="font-size:0.85rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.05em; margin-bottom:0.75rem;">STUNDEN</div>
-        <div id="trinkgeld-hours-list"></div>
-        <button class="btn-secondary" style="width:100%; margin-bottom:1.5rem;" onclick="openTrinkgeldHoursModal()">+ Stunden eintragen</button>
-
-        <!-- Auswertung -->
-        <div style="font-size:0.85rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.05em; margin-bottom:0.75rem;">AUSWERTUNG</div>
-        <div id="trinkgeld-results"></div>
-        <button class="btn-secondary" style="width:100%; margin-top:0.75rem;" onclick="calculateTrinkgeld()">Berechnen</button>
+        <!-- Tage -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+            <div style="font-size:0.85rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.05em;">TAGE</div>
+            <button class="btn-small btn-pdf-view btn-icon" onclick="openTrinkgeldDayModal()" title="Tag hinzufügen">
+                <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+        </div>
+        <div id="trinkgeld-days-list"></div>
     </div>
 
     <!-- TAB: TRINKGELD EINSTELLUNGEN -->
@@ -903,42 +908,29 @@
     </div>
 </div>
 
-<!-- MODAL: TRINKGELD EINTRAG -->
-<div id="trinkgeld-entry-modal" class="modal-overlay">
-    <div class="modal">
-        <div class="modal-header">
-            <div class="modal-title" id="trinkgeld-entry-modal-title">Trinkgeld Eintrag</div>
-            <button class="modal-close" onclick="closeTrinkgeldEntryModal()">✕</button>
-        </div>
-        <input type="hidden" id="trinkgeld-entry-id">
-        <div class="form-group">
-            <label>Datum</label>
-            <input type="date" id="trinkgeld-entry-date">
-        </div>
-        <div class="form-group">
-            <label>Karte (€)</label>
-            <input type="number" id="trinkgeld-entry-card" min="0" step="0.01" placeholder="0.00">
-        </div>
-        <div class="form-group">
-            <label>Bar (€)</label>
-            <input type="number" id="trinkgeld-entry-cash" min="0" step="0.01" placeholder="0.00">
-        </div>
-        <button class="btn-primary" onclick="saveTrinkgeldEntry()">Speichern</button>
-        <button id="trinkgeld-entry-delete-btn" onclick="deleteTrinkgeldEntry()" style="display:none; margin-top:0.5rem; background:none; border:none; color:var(--color-text-light); font-size:0.85rem; cursor:pointer; width:100%; text-align:center;">🗑 Löschen</button>
-    </div>
-</div>
-
-<!-- MODAL: TRINKGELD STUNDEN -->
+<!-- MODAL: TRINKGELD TAG -->
 <div id="trinkgeld-hours-modal" class="modal-overlay">
     <div class="modal">
         <div class="modal-header">
-            <div class="modal-title">Stunden eintragen</div>
+            <div class="modal-title">Tag eintragen</div>
             <button class="modal-close" onclick="closeTrinkgeldHoursModal()">✕</button>
         </div>
         <div class="form-group">
             <label>Datum</label>
             <input type="date" id="trinkgeld-hours-date" onchange="loadTrinkgeldHoursEmployees(this.value)">
         </div>
+        <div style="display:flex; gap:1rem; margin-bottom:1rem;">
+            <div class="form-group" style="flex:1; margin-bottom:0;">
+                <label>Karte (€)</label>
+                <input type="number" id="trinkgeld-entry-card" min="0" step="0.01" placeholder="0.00">
+            </div>
+            <div class="form-group" style="flex:1; margin-bottom:0;">
+                <label>Bar (€)</label>
+                <input type="number" id="trinkgeld-entry-cash" min="0" step="0.01" placeholder="0.00">
+            </div>
+        </div>
+        <input type="hidden" id="trinkgeld-entry-id">
+        <div style="font-size:0.85rem; font-weight:700; color:var(--color-text-light); margin-bottom:0.5rem; margin-top:0.5rem;">STUNDEN</div>
         <div id="trinkgeld-hours-employees"></div>
         <button class="btn-primary" onclick="saveTrinkgeldHours()">Speichern</button>
     </div>
