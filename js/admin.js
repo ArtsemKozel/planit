@@ -581,6 +581,12 @@ async function saveShift(payload, repeat, weeks) {
             ({ error } = await db.from('shifts').insert(payload));
         }
     }
+    // Arbeitsrecht-Warnungen
+    const warnings = await checkArbeitszeitWarnings(payload);
+    if (warnings.length > 0) {
+        const proceed = confirm('⚠️ Arbeitsrecht-Hinweise:\n\n' + warnings.join('\n\n') + '\n\nTrotzdem speichern?');
+        if (!proceed) return;
+    }
     if (error) {
         errorDiv.textContent = 'Fehler beim Speichern.';
         errorDiv.style.display = 'block';
@@ -4498,4 +4504,53 @@ async function downloadTrinkgeldPdf() {
     doc.text(String(total), 188, y, { align: 'right' });
 
     doc.save(`Trinkgeld_${monthStr}.pdf`);
+}
+
+async function checkArbeitszeitWarnings(payload) {
+    const warnings = [];
+    const start = payload.start_time.split(':').map(Number);
+    const end = payload.end_time.split(':').map(Number);
+    const startMinutes = start[0] * 60 + start[1];
+    const endMinutes = end[0] * 60 + end[1];
+    const durationMinutes = endMinutes - startMinutes - (payload.break_minutes || 0);
+    const durationHours = durationMinutes / 60;
+
+    // Warnung 1: Schicht über 10h
+    if (durationHours > 10) {
+        warnings.push(`🕐 Schicht zu lang: ${durationHours.toFixed(1)}h (max. 10h erlaubt)`);
+    }
+
+    // Warnung 3: Pausenempfehlung
+    const breakMinutes = payload.break_minutes || 0;
+    if (durationHours >= 9 && breakMinutes < 45) {
+        warnings.push(`☕ Pausenempfehlung: Ab 9h Arbeit mindestens 45 Min Pause (aktuell: ${breakMinutes} Min)`);
+    } else if (durationHours >= 6 && breakMinutes < 30) {
+        warnings.push(`☕ Pausenempfehlung: Ab 6h Arbeit mindestens 30 Min Pause (aktuell: ${breakMinutes} Min)`);
+    }
+
+    // Warnung 2: Ruhezeit unter 11h
+    if (payload.employee_id) {
+        const prevDate = new Date(payload.shift_date + 'T12:00:00');
+        prevDate.setDate(prevDate.getDate() - 1);
+        const prevDateStr = prevDate.toISOString().split('T')[0];
+
+        const { data: prevShift } = await db
+            .from('shifts')
+            .select('end_time')
+            .eq('employee_id', payload.employee_id)
+            .eq('shift_date', prevDateStr)
+            .maybeSingle();
+
+        if (prevShift) {
+            const prevEnd = prevShift.end_time.split(':').map(Number);
+            const prevEndMinutes = prevEnd[0] * 60 + prevEnd[1];
+            const restMinutes = (24 * 60 - prevEndMinutes) + startMinutes;
+            if (restMinutes < 11 * 60) {
+                const restHours = (restMinutes / 60).toFixed(1);
+                warnings.push(`😴 Ruhezeit zu kurz: Nur ${restHours}h zwischen den Schichten (min. 11h erforderlich)`);
+            }
+        }
+    }
+
+    return warnings;
 }
