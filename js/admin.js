@@ -4409,3 +4409,65 @@ async function saveTrinkgeldResults() {
     }
     console.log('saved results:', empMonthTotals);
 }
+
+async function downloadTrinkgeldPdf() {
+    const year = trinkgeldDate.getFullYear();
+    const month = trinkgeldDate.getMonth();
+    const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+    const monthLabel = trinkgeldDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+
+    const { data: results } = await db
+        .from('tip_results')
+        .select('*, employees_planit(name)')
+        .eq('user_id', adminSession.user.id)
+        .eq('month', monthStr)
+        .order('employee_id');
+
+    if (!results || results.length === 0) {
+        alert('Keine Daten für diesen Monat.');
+        return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    // Monat oben rechts
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text(monthLabel, 190, 20, { align: 'right' });
+
+    // Tabellen-Header
+    let y = 35;
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.rect(15, y - 6, 90, 10);
+    doc.rect(105, y - 6, 85, 10);
+    doc.text('Mitarbeiter:', 17, y);
+    doc.text('Trinkgeld, €', 188, y, { align: 'right' });
+
+    y += 10;
+    doc.setFont('helvetica', 'normal');
+
+    let total = 0;
+    for (const r of results) {
+        const amount = Math.round(parseFloat(r.amount_card));
+        total += amount;
+        doc.rect(15, y - 6, 90, 10);
+        doc.rect(105, y - 6, 85, 10);
+        doc.text(r.employees_planit.name, 17, y);
+        doc.text(String(amount), 188, y, { align: 'right' });
+        y += 10;
+    }
+
+    // Leerzeile
+    y += 5;
+
+    // Insgesamt
+    doc.setFont('helvetica', 'bold');
+    doc.rect(15, y - 6, 90, 10);
+    doc.rect(105, y - 6, 85, 10);
+    doc.text('Insgesamt:', 17, y);
+    doc.text(String(total), 188, y, { align: 'right' });
+
+    doc.save(`Trinkgeld_${monthStr}.pdf`);
+}
