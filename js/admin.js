@@ -4265,7 +4265,8 @@ async function saveTrinkgeldHours() {
     }
 
     closeTrinkgeldHoursModal();
-    loadTrinkgeld();
+    await loadTrinkgeld();
+    await saveTrinkgeldResults();
 }
 
 async function loadTrinkgeldHours() {
@@ -4335,4 +4336,76 @@ async function deleteTrinkgeldEntryDirect(id) {
     if (!confirm('Eintrag löschen?')) return;
     await db.from('tip_entries').delete().eq('id', id);
     loadTrinkgeld();
+}
+
+async function saveTrinkgeldResults() {
+    console.log('saveTrinkgeldResults called');
+    const year = trinkgeldDate.getFullYear();
+    const month = trinkgeldDate.getMonth();
+    const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+    const firstDay = `${monthStr}-01`;
+    const lastDay = new Date(year, month + 1, 0).toISOString().split('T')[0];
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    const { data: entries } = await db.from('tip_entries').select('*').eq('user_id', adminSession.user.id).gte('entry_date', firstDay).lte('entry_date', lastDay);
+    const { data: tipHours } = await db.from('tip_hours').select('*, employees_planit(name, department)').eq('user_id', adminSession.user.id).gte('work_date', firstDay).lte('work_date', lastDay);
+    const { data: depts } = await db.from('tip_departments').select('*').eq('user_id', adminSession.user.id);
+    const { data: emps } = await db.from('employees_planit').select('*').eq('user_id', adminSession.user.id).eq('is_active', true);
+    const { data: vacations } = await db.from('vacation_requests').select('*').eq('user_id', adminSession.user.id).eq('status', 'approved').or(`start_date.lte.${lastDay},end_date.gte.${firstDay}`);
+    const { data: sickLeaves } = await db.from('sick_leaves').select('*').eq('user_id', adminSession.user.id).lte('start_date', lastDay).gte('end_date', firstDay);
+
+    if (!entries || entries.length === 0 || !depts || depts.length === 0) return;
+
+    const empMonthTotals = {};
+    const allDates = [...new Set((tipHours || []).map(h => h.work_date))];
+
+    for (const dateStr of allDates) {
+        const dayEntry = (entries || []).find(e => e.entry_date === dateStr);
+        const dayCard = dayEntry ? parseFloat(dayEntry.amount_card) : 0;
+        const dayCash = dayEntry ? parseFloat(dayEntry.amount_cash) : 0;
+        if (dayCard === 0 && dayCash === 0) continue;
+
+        const dayHours = (tipHours || []).filter(h => h.work_date === dateStr);
+
+        for (const dept of depts) {
+            if (dept.fixed_hours_per_month) continue;
+            const deptDayCard = dayCard * (dept.percentage / 100);
+            const deptDayCash = dayCash * (dept.percentage / 100);
+
+            const fixedDepts = depts.filter(d => d.pool_department === dept.department && d.fixed_hours_per_month);
+            let totalDeptMinutes = 0;
+            fixedDepts.forEach(d => { totalDeptMinutes += (d.fixed_hours_per_month / daysInMonth) * 60; });
+
+            const empDayMinutes = {};
+            for (const h of dayHours) {
+                if (h.employees_planit.department !== dept.department) continue;
+                const isOnVacation = (vacations || []).some(v => v.employee_id === h.employee_id && v.start_date <= dateStr && v.end_date >= dateStr);
+                const isOnSick = (sickLeaves || []).some(s => s.employee_id === h.employee_id && s.start_date <= dateStr && s.end_date >= dateStr);
+                if (isOnVacation || isOnSick) continue;
+                empDayMinutes[h.employee_id] = h.minutes;
+                totalDeptMinutes += h.minutes;
+            }
+
+            if (totalDeptMinutes === 0) continue;
+
+            for (const [empId, minutes] of Object.entries(empDayMinutes)) {
+                const share = minutes / totalDeptMinutes;
+                if (!empMonthTotals[empId]) empMonthTotals[empId] = { card: 0, cash: 0 };
+                empMonthTotals[empId].card += deptDayCard * share;
+                empMonthTotals[empId].cash += deptDayCash * share;
+            }
+        }
+    }
+
+    const userId = (await db.auth.getUser()).data.user.id;
+    for (const [empId, totals] of Object.entries(empMonthTotals)) {
+        await db.from('tip_results').upsert({
+            user_id: userId,
+            employee_id: empId,
+            month: monthStr,
+            amount_card: Math.round(totals.card * 100) / 100,
+            amount_cash: Math.round(totals.cash * 100) / 100
+        }, { onConflict: 'user_id,employee_id,month' });
+    }
+    console.log('saved results:', empMonthTotals);
 }
