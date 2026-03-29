@@ -892,7 +892,7 @@
 
 <!-- MODAL: VORLAGE BEARBEITEN -->
 <div id="edit-task-template-modal" class="modal-overlay">
-    <div class="modal">
+    <div class="modal" ontouchstart="event.stopPropagation()">
         <div class="modal-header">
             <div class="modal-title">Vorlage bearbeiten</div>
             <button class="modal-close" onclick="closeEditTaskTemplateModal()">✕</button>
