@@ -4572,8 +4572,19 @@ async function loadInventurConfig() {
         return;
     }
 
+    // Positionen initialisieren BEVOR Rendern
+    for (const s of suppliers || []) {
+        const items = (s.planit_inventory_items || []);
+        for (let idx = 0; idx < items.length; idx++) {
+            if (items[idx].inventory_position === null || items[idx].inventory_position === undefined) {
+                await db.from('planit_inventory_items').update({ inventory_position: idx }).eq('id', items[idx].id);
+                items[idx].inventory_position = idx;
+            }
+        }
+    }
+
     container.innerHTML = suppliers.map(s => {
-        const items = (s.planit_inventory_items || []).sort((a, b) => a.position - b.position);
+        const items = (s.planit_inventory_items || []).sort((a, b) => (a.inventory_position ?? 0) - (b.inventory_position ?? 0));
         return `
         <div class="card" style="margin-bottom:1rem;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
@@ -4588,10 +4599,18 @@ async function loadInventurConfig() {
                 </div>
             </div>
             ${items.length === 0 ? '<div style="font-size:0.85rem; color:var(--color-text-light);">Keine Waren.</div>' :
-            items.map(item => `
+            items.map((item, i) => `
                 <div style="display:flex; align-items:center; gap:0.5rem; padding:0.4rem 0; border-bottom:1px solid var(--color-border); position:relative;">
                     <span style="flex:1; font-size:0.85rem;">${item.name}</span>
                     <span style="font-size:0.8rem; color:var(--color-text-light); position:absolute; left:50%; transform:translateX(-50%);">Soll: ${item.target_amount} ${item.unit} · ${(item.price_per_unit || 0).toFixed(2)} €</span>
+                    <div style="display:flex; flex-direction:column; gap:0.2rem;">
+                        ${i > 0 ? `<button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="moveInventurItem('${s.id}', ${i}, -1, 'inventory')">
+                            <svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg>
+                        </button>` : `<div style="width:1.8rem; height:1.8rem;"></div>`}
+                        ${i < items.length - 1 ? `<button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="moveInventurItem('${s.id}', ${i}, 1, 'inventory')">
+                            <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                        </button>` : `<div style="width:1.8rem; height:1.8rem;"></div>`}
+                    </div>
                     <button class="btn-small btn-pdf-view btn-icon" style="width:2rem; height:2rem;" onclick="editInventurItem('${item.id}', '${item.name}', '${item.unit}', ${item.target_amount}, ${item.price_per_unit || 0})">
                         <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                     </button>
@@ -5029,4 +5048,27 @@ function toggleInventurSupplier(supplierId) {
     const isOpen = body.style.display === 'block';
     body.style.display = isOpen ? 'none' : 'block';
     toggle.textContent = isOpen ? '▶' : '▼';
+}
+
+async function moveInventurItem(supplierId, index, direction, type) {
+    const { data: supplier } = await db
+        .from('planit_suppliers')
+        .select('*, planit_inventory_items(*)')
+        .eq('id', supplierId)
+        .maybeSingle();
+
+    if (!supplier) return;
+    const items = (supplier.planit_inventory_items || [])
+        .sort((a, b) => (a.inventory_position ?? 0) - (b.inventory_position ?? 0));
+
+    const swapIndex = index + direction;
+    if (swapIndex < 0 || swapIndex >= items.length) return;
+
+    const posA = items[index].inventory_position ?? index;
+    const posB = items[swapIndex].inventory_position ?? swapIndex;
+
+    await db.from('planit_inventory_items').update({ inventory_position: posB }).eq('id', items[index].id);
+    await db.from('planit_inventory_items').update({ inventory_position: posA }).eq('id', items[swapIndex].id);
+
+    loadInventurConfig();
 }
