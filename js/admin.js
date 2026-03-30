@@ -4579,24 +4579,23 @@ async function loadInventurConfig() {
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
                 <div style="font-weight:700;">${s.name}</div>
                 <div style="display:flex; gap:0.5rem;">
-                    <button class="btn-small btn-pdf-view btn-icon" onclick="addInventurItem('${s.id}')">
+                    <button class="btn-small btn-pdf-view btn-icon" style="width:2rem; height:2rem;" onclick="addInventurItem('${s.id}')">
                         <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                     </button>
-                    <button class="btn-small btn-pdf-view btn-icon" onclick="deleteSupplier('${s.id}')">
+                    <button class="btn-small btn-pdf-view btn-icon" style="width:2rem; height:2rem;" onclick="deleteSupplier('${s.id}')">
                         <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                     </button>
                 </div>
             </div>
             ${items.length === 0 ? '<div style="font-size:0.85rem; color:var(--color-text-light);">Keine Waren.</div>' :
             items.map(item => `
-                <div style="display:flex; align-items:center; gap:0.5rem; padding:0.4rem 0; border-bottom:1px solid var(--color-border);">
+                <div style="display:flex; align-items:center; gap:0.5rem; padding:0.4rem 0; border-bottom:1px solid var(--color-border); position:relative;">
                     <span style="flex:1; font-size:0.85rem;">${item.name}</span>
-                    <span style="font-size:0.8rem; color:var(--color-text-light);">${item.unit}</span>
-                    <span style="font-size:0.8rem; color:var(--color-text-light);">Soll: ${item.target_amount}</span>
-                    <button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="editInventurItem('${item.id}', '${item.name}', '${item.unit}', ${item.target_amount})">
+                    <span style="font-size:0.8rem; color:var(--color-text-light); position:absolute; left:50%; transform:translateX(-50%);">Soll: ${item.target_amount} ${item.unit} · ${(item.price_per_unit || 0).toFixed(2)} €</span>
+                    <button class="btn-small btn-pdf-view btn-icon" style="width:2rem; height:2rem;" onclick="editInventurItem('${item.id}', '${item.name}', '${item.unit}', ${item.target_amount}, ${item.price_per_unit || 0})">
                         <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                     </button>
-                    <button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="deleteInventurItem('${item.id}')">
+                    <button class="btn-small btn-pdf-view btn-icon" style="width:2rem; height:2rem;" onclick="deleteInventurItem('${item.id}')">
                         <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                     </button>
                 </div>
@@ -4606,10 +4605,7 @@ async function loadInventurConfig() {
 }
 
 async function addSupplier() {
-    const name = prompt('Lieferant Name:');
-    if (!name || !name.trim()) return;
-    await db.from('planit_suppliers').insert({ user_id: adminSession.user.id, name: name.trim() });
-    loadInventurConfig();
+    openInventurSupplierModal();
 }
 
 async function deleteSupplier(id) {
@@ -4619,33 +4615,11 @@ async function deleteSupplier(id) {
 }
 
 async function addInventurItem(supplierId) {
-    const name = prompt('Ware Name:');
-    if (!name || !name.trim()) return;
-    const unit = prompt('Einheit (Stück, kg, Liter, Packung):', 'Stück');
-    if (!unit) return;
-    const target = parseFloat(prompt('Soll-Menge:', '0')) || 0;
-    await db.from('planit_inventory_items').insert({
-        user_id: adminSession.user.id,
-        supplier_id: supplierId,
-        name: name.trim(),
-        unit: unit.trim(),
-        target_amount: target
-    });
-    loadInventurConfig();
+    openInventurItemModal(supplierId);
 }
 
-async function editInventurItem(id, name, unit, target) {
-    const newName = prompt('Ware Name:', name);
-    if (!newName || !newName.trim()) return;
-    const newUnit = prompt('Einheit:', unit);
-    if (!newUnit) return;
-    const newTarget = parseFloat(prompt('Soll-Menge:', target)) || 0;
-    await db.from('planit_inventory_items').update({
-        name: newName.trim(),
-        unit: newUnit.trim(),
-        target_amount: newTarget
-    }).eq('id', id);
-    loadInventurConfig();
+async function editInventurItem(id, name, unit, target, price) {
+    openInventurItemModal('', id, name, unit, target, price);
 }
 
 async function deleteInventurItem(id) {
@@ -4713,6 +4687,41 @@ async function loadInventur() {
             </div>
         </div>`;
     }).join('');
+
+    // Lagerwert berechnen
+    let totalValue = 0;
+    const supplierValues = {};
+
+    for (const s of suppliers || []) {
+        let supplierValue = 0;
+        const items = (s.planit_inventory_items || []);
+        for (const item of items) {
+            const entry = (entries || []).find(e => e.item_id === item.id);
+            if (entry && item.price_per_unit) {
+                const value = parseFloat(entry.actual_amount) * parseFloat(item.price_per_unit);
+                supplierValue += value;
+                totalValue += value;
+            }
+        }
+        if (supplierValue > 0) supplierValues[s.name] = supplierValue;
+    }
+    
+    if (totalValue > 0) {
+        container.innerHTML += `
+        <div class="card" style="margin-top:1rem;">
+            <div style="font-size:0.85rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.05em; margin-bottom:0.75rem;">LAGERWERT</div>
+            ${Object.entries(supplierValues).map(([name, value]) => `
+                <div style="display:flex; justify-content:space-between; font-size:0.85rem; padding:0.3rem 0; border-bottom:1px solid var(--color-border);">
+                    <span>${name}</span>
+                    <span style="font-weight:600;">${value.toFixed(2)} €</span>
+                </div>
+            `).join('')}
+            <div style="display:flex; justify-content:space-between; margin-top:0.75rem; padding-top:0.5rem; border-top:2px solid var(--color-border);">
+                <span style="font-weight:700;">Gesamt</span>
+                <span style="font-weight:700; font-size:1.1rem; color:var(--color-primary);">${totalValue.toFixed(2)} €</span>
+            </div>
+        </div>`;
+    }
 }
 
 function updateOrderValue(input) {
@@ -4831,4 +4840,68 @@ function onInventurDateChange() {
     if (!val) return;
     inventurDate = new Date(val + 'T12:00:00');
     loadInventur();
+}
+
+function openInventurItemModal(supplierId, itemId = null, name = '', unit = 'Stück', target = 0, price = 0) {
+    document.getElementById('inventur-item-id').value = itemId || '';
+    document.getElementById('inventur-item-supplier-id').value = supplierId;
+    document.getElementById('inventur-item-name').value = name;
+    document.getElementById('inventur-item-unit').value = unit;
+    document.getElementById('inventur-item-target').value = target;
+    document.getElementById('inventur-item-price').value = price;
+    document.getElementById('inventur-item-modal-title').textContent = itemId ? 'Ware bearbeiten' : 'Ware hinzufügen';
+    document.getElementById('inventur-item-modal').classList.add('active');
+}
+
+function closeInventurItemModal() {
+    document.getElementById('inventur-item-modal').classList.remove('active');
+}
+
+async function saveInventurItem() {
+    const id = document.getElementById('inventur-item-id').value;
+    const supplierId = document.getElementById('inventur-item-supplier-id').value;
+    const name = document.getElementById('inventur-item-name').value.trim();
+    const unit = document.getElementById('inventur-item-unit').value;
+    const target = parseFloat(document.getElementById('inventur-item-target').value) || 0;
+    const price = parseFloat(document.getElementById('inventur-item-price').value) || 0;
+    if (!name) { alert('Bitte Name eingeben.'); return; }
+
+    if (id) {
+        await db.from('planit_inventory_items').update({ name, unit, target_amount: target, price_per_unit: price }).eq('id', id);
+    } else {
+        await db.from('planit_inventory_items').insert({
+            user_id: adminSession.user.id,
+            supplier_id: supplierId,
+            name,
+            unit,
+            target_amount: target,
+            price_per_unit: price
+        });
+    }
+    closeInventurItemModal();
+    loadInventurConfig();
+}
+
+function openInventurSupplierModal(id = null, name = '') {
+    document.getElementById('inventur-supplier-id').value = id || '';
+    document.getElementById('inventur-supplier-name').value = name;
+    document.getElementById('inventur-supplier-modal').classList.add('active');
+}
+
+function closeInventurSupplierModal() {
+    document.getElementById('inventur-supplier-modal').classList.remove('active');
+}
+
+async function saveInventurSupplier() {
+    const id = document.getElementById('inventur-supplier-id').value;
+    const name = document.getElementById('inventur-supplier-name').value.trim();
+    if (!name) { alert('Bitte Name eingeben.'); return; }
+
+    if (id) {
+        await db.from('planit_suppliers').update({ name }).eq('id', id);
+    } else {
+        await db.from('planit_suppliers').insert({ user_id: adminSession.user.id, name });
+    }
+    closeInventurSupplierModal();
+    loadInventurConfig();
 }
