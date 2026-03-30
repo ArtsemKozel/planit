@@ -4677,6 +4677,8 @@ async function loadInventur() {
                         <input type="number" value="${actual}" min="0" step="0.1" 
                             data-item-id="${item.id}"
                             data-target="${item.target_amount}"
+                            data-price="${item.price_per_unit || 0}"
+                            data-supplier="${s.name}"
                             onchange="updateOrderValue(this)"
                             style="text-align:center; padding:0.3rem; border-radius:6px; border:1px solid var(--color-border); font-size:0.85rem; width:100%;">
                         <div id="order-${item.id}" style="text-align:center; font-size:0.9rem; font-weight:600; color:${order > 0 ? 'var(--color-red)' : 'var(--color-green)'};">
@@ -4688,27 +4690,48 @@ async function loadInventur() {
         </div>`;
     }).join('');
 
-    // Lagerwert berechnen
-    let totalValue = 0;
-    const supplierValues = {};
+    // Lagerwert Container
+    container.innerHTML += `<div class="card" id="lagerwert-block" style="margin-top:1rem;"></div>`;
+    updateLagerwert();
 
-    for (const s of suppliers || []) {
-        let supplierValue = 0;
-        const items = (s.planit_inventory_items || []);
-        for (const item of items) {
-            const entry = (entries || []).find(e => e.item_id === item.id);
-            if (entry && item.price_per_unit) {
-                const value = parseFloat(entry.actual_amount) * parseFloat(item.price_per_unit);
-                supplierValue += value;
-                totalValue += value;
-            }
-        }
-        if (supplierValue > 0) supplierValues[s.name] = supplierValue;
+}
+
+function updateOrderValue(input) {
+    const actual = parseFloat(input.value) || 0;
+    const target = parseFloat(input.dataset.target) || 0;
+    const price = parseFloat(input.dataset.price) || 0;
+    const order = Math.max(0, target - actual);
+    const orderDiv = document.getElementById(`order-${input.dataset.itemId}`);
+    if (orderDiv) {
+        orderDiv.textContent = order;
+        orderDiv.style.color = order > 0 ? 'var(--color-red)' : 'var(--color-green)';
     }
-    
+    // Lagerwert neu berechnen
+    updateLagerwert();
+}
+
+function updateLagerwert() {
+    const inputs = document.querySelectorAll('#inventur-list input[data-item-id]');
+    const supplierValues = {};
+    let totalValue = 0;
+
+    inputs.forEach(input => {
+        const actual = parseFloat(input.value) || 0;
+        const price = parseFloat(input.dataset.price) || 0;
+        const supplier = input.dataset.supplier;
+        const value = actual * price;
+        if (value > 0) {
+            if (!supplierValues[supplier]) supplierValues[supplier] = 0;
+            supplierValues[supplier] += value;
+            totalValue += value;
+        }
+    });
+
+    const lagerwertDiv = document.getElementById('lagerwert-block');
+    if (!lagerwertDiv) return;
+
     if (totalValue > 0) {
-        container.innerHTML += `
-        <div class="card" style="margin-top:1rem;">
+        lagerwertDiv.innerHTML = `
             <div style="font-size:0.85rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.05em; margin-bottom:0.75rem;">LAGERWERT</div>
             ${Object.entries(supplierValues).map(([name, value]) => `
                 <div style="display:flex; justify-content:space-between; font-size:0.85rem; padding:0.3rem 0; border-bottom:1px solid var(--color-border);">
@@ -4719,19 +4742,10 @@ async function loadInventur() {
             <div style="display:flex; justify-content:space-between; margin-top:0.75rem; padding-top:0.5rem; border-top:2px solid var(--color-border);">
                 <span style="font-weight:700;">Gesamt</span>
                 <span style="font-weight:700; font-size:1.1rem; color:var(--color-primary);">${totalValue.toFixed(2)} €</span>
-            </div>
-        </div>`;
-    }
-}
-
-function updateOrderValue(input) {
-    const actual = parseFloat(input.value) || 0;
-    const target = parseFloat(input.dataset.target) || 0;
-    const order = Math.max(0, target - actual);
-    const orderDiv = document.getElementById(`order-${input.dataset.itemId}`);
-    if (orderDiv) {
-        orderDiv.textContent = order;
-        orderDiv.style.color = order > 0 ? 'var(--color-red)' : 'var(--color-green)';
+            </div>`;
+        lagerwertDiv.style.display = 'block';
+    } else {
+        lagerwertDiv.innerHTML = '';
     }
 }
 
