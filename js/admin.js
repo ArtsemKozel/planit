@@ -4654,8 +4654,12 @@ async function loadInventur() {
         const items = (s.planit_inventory_items || []).sort((a, b) => a.position - b.position);
         if (items.length === 0) return '';
         return `
-        <div style="margin-bottom:1.5rem;">
-            <div style="font-size:0.85rem; font-weight:700; color:var(--color-primary); letter-spacing:0.05em; margin-bottom:0.5rem;">${s.name.toUpperCase()}</div>
+        <div style="margin-bottom:0.75rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding:0.75rem 1rem; background:var(--color-gray); border-radius:12px; margin-bottom:0.25rem;" onclick="toggleInventurSupplier('${s.id}')">
+                <div style="font-size:0.85rem; font-weight:700; color:var(--color-primary); letter-spacing:0.05em;">${s.name.toUpperCase()}</div>
+                <span id="inventur-supplier-toggle-${s.id}" style="color:var(--color-text-light);">▶</span>
+            </div>
+            <div id="inventur-supplier-body-${s.id}" style="display:none;">
             <div class="card" style="padding:0;">
                 <div style="display:grid; grid-template-columns:1fr 5rem 5rem 5rem; gap:0.5rem; padding:0.5rem 0.75rem; border-bottom:2px solid var(--color-border);">
                     <div style="font-size:0.75rem; font-weight:700; color:var(--color-text-light);">WARE</div>
@@ -4686,6 +4690,7 @@ async function loadInventur() {
                         </div>
                     </div>`;
                 }).join('')}
+            </div>
             </div>
         </div>`;
     }).join('');
@@ -5016,4 +5021,12 @@ async function downloadJahresberichtPdf() {
 
     doc.save(`Jahresinventur_${date}.pdf`);
     closeJahresberichtModal();
+}
+
+function toggleInventurSupplier(supplierId) {
+    const body = document.getElementById(`inventur-supplier-body-${supplierId}`);
+    const toggle = document.getElementById(`inventur-supplier-toggle-${supplierId}`);
+    const isOpen = body.style.display === 'block';
+    body.style.display = isOpen ? 'none' : 'block';
+    toggle.textContent = isOpen ? '▶' : '▼';
 }
