@@ -4919,3 +4919,101 @@ async function saveInventurSupplier() {
     closeInventurSupplierModal();
     loadInventurConfig();
 }
+
+function openJahresberichtModal() {
+    document.getElementById('jahresbericht-date').value = inventurDate.toISOString().split('T')[0];
+    document.getElementById('jahresbericht-modal').classList.add('active');
+}
+
+function closeJahresberichtModal() {
+    document.getElementById('jahresbericht-modal').classList.remove('active');
+}
+
+async function downloadJahresberichtPdf() {
+    const date = document.getElementById('jahresbericht-date').value;
+    if (!date) { alert('Bitte Datum wählen.'); return; }
+
+    const { data: suppliers } = await db
+        .from('planit_suppliers')
+        .select('*, planit_inventory_items(*)')
+        .eq('user_id', adminSession.user.id)
+        .order('created_at', { ascending: true });
+
+    const { data: entries } = await db
+        .from('planit_inventory_entries')
+        .select('*')
+        .eq('user_id', adminSession.user.id)
+        .eq('entry_date', date);
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const dateLabel = new Date(date + 'T12:00:00').toLocaleDateString('de-DE');
+
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Jahresinventur', 15, 20);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text(dateLabel, 190, 20, { align: 'right' });
+
+    let y = 35;
+    let grandTotal = 0;
+
+    for (const s of suppliers || []) {
+        const items = (s.planit_inventory_items || []).sort((a, b) => a.position - b.position);
+        if (items.length === 0) continue;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text(s.name, 15, y);
+        y += 7;
+
+        // Header
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Ware', 15, y);
+        doc.text('Einheit', 70, y);
+        doc.text('Menge', 100, y, { align: 'right' });
+        doc.text('Preis/Einheit', 140, y, { align: 'right' });
+        doc.text('Gesamtwert', 185, y, { align: 'right' });
+        y += 5;
+        doc.line(15, y, 195, y);
+        y += 5;
+
+        let supplierTotal = 0;
+        doc.setFont('helvetica', 'normal');
+        for (const item of items) {
+            const entry = (entries || []).find(e => e.item_id === item.id);
+            const actual = entry ? parseFloat(entry.actual_amount) : 0;
+            const price = parseFloat(item.price_per_unit) || 0;
+            const value = actual * price;
+            supplierTotal += value;
+            grandTotal += value;
+
+            doc.text(item.name, 15, y);
+            doc.text(item.unit, 70, y);
+            doc.text(String(actual), 100, y, { align: 'right' });
+            doc.text(`${price.toFixed(2)} €`, 140, y, { align: 'right' });
+            doc.text(`${value.toFixed(2)} €`, 185, y, { align: 'right' });
+            y += 7;
+            if (y > 270) { doc.addPage(); y = 20; }
+        }
+
+        // Lieferant Summe
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Gesamt ${s.name}:`, 140, y, { align: 'right' });
+        doc.text(`${supplierTotal.toFixed(2)} €`, 185, y, { align: 'right' });
+        y += 10;
+    }
+
+    // Gesamtsumme
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.line(15, y, 195, y);
+    y += 7;
+    doc.text('GESAMTLAGERWERT:', 140, y, { align: 'right' });
+    doc.text(`${grandTotal.toFixed(2)} €`, 185, y, { align: 'right' });
+
+    doc.save(`Jahresinventur_${date}.pdf`);
+    closeJahresberichtModal();
+}
