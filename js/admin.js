@@ -85,6 +85,8 @@ function switchTab(tab) {
     if (tab === 'notes') loadNotes();
     if (tab === 'trinkgeld') loadTrinkgeld();
     if (tab === 'trinkgeld-config') loadTrinkgeldConfig();
+    if (tab === 'inventur') loadInventur();
+    if (tab === 'inventur-config') loadInventurConfig();
     localStorage.setItem('planit_admin_tab', tab);
 }
 
@@ -4553,4 +4555,280 @@ async function checkArbeitszeitWarnings(payload) {
     }
 
     return warnings;
+}
+
+// ------- INVENTUR ---------
+
+async function loadInventurConfig() {
+    const { data: suppliers } = await db
+        .from('planit_suppliers')
+        .select('*, planit_inventory_items(*)')
+        .eq('user_id', adminSession.user.id)
+        .order('created_at', { ascending: true });
+
+    const container = document.getElementById('suppliers-list');
+    if (!suppliers || suppliers.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>Keine Lieferanten vorhanden.</p></div>';
+        return;
+    }
+
+    container.innerHTML = suppliers.map(s => {
+        const items = (s.planit_inventory_items || []).sort((a, b) => a.position - b.position);
+        return `
+        <div class="card" style="margin-bottom:1rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+                <div style="font-weight:700;">${s.name}</div>
+                <div style="display:flex; gap:0.5rem;">
+                    <button class="btn-small btn-pdf-view btn-icon" onclick="addInventurItem('${s.id}')">
+                        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </button>
+                    <button class="btn-small btn-pdf-view btn-icon" onclick="deleteSupplier('${s.id}')">
+                        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                    </button>
+                </div>
+            </div>
+            ${items.length === 0 ? '<div style="font-size:0.85rem; color:var(--color-text-light);">Keine Waren.</div>' :
+            items.map(item => `
+                <div style="display:flex; align-items:center; gap:0.5rem; padding:0.4rem 0; border-bottom:1px solid var(--color-border);">
+                    <span style="flex:1; font-size:0.85rem;">${item.name}</span>
+                    <span style="font-size:0.8rem; color:var(--color-text-light);">${item.unit}</span>
+                    <span style="font-size:0.8rem; color:var(--color-text-light);">Soll: ${item.target_amount}</span>
+                    <button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="editInventurItem('${item.id}', '${item.name}', '${item.unit}', ${item.target_amount})">
+                        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    </button>
+                    <button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="deleteInventurItem('${item.id}')">
+                        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                    </button>
+                </div>
+            `).join('')}
+        </div>`;
+    }).join('');
+}
+
+async function addSupplier() {
+    const name = prompt('Lieferant Name:');
+    if (!name || !name.trim()) return;
+    await db.from('planit_suppliers').insert({ user_id: adminSession.user.id, name: name.trim() });
+    loadInventurConfig();
+}
+
+async function deleteSupplier(id) {
+    if (!confirm('Lieferant und alle Waren löschen?')) return;
+    await db.from('planit_suppliers').delete().eq('id', id);
+    loadInventurConfig();
+}
+
+async function addInventurItem(supplierId) {
+    const name = prompt('Ware Name:');
+    if (!name || !name.trim()) return;
+    const unit = prompt('Einheit (Stück, kg, Liter, Packung):', 'Stück');
+    if (!unit) return;
+    const target = parseFloat(prompt('Soll-Menge:', '0')) || 0;
+    await db.from('planit_inventory_items').insert({
+        user_id: adminSession.user.id,
+        supplier_id: supplierId,
+        name: name.trim(),
+        unit: unit.trim(),
+        target_amount: target
+    });
+    loadInventurConfig();
+}
+
+async function editInventurItem(id, name, unit, target) {
+    const newName = prompt('Ware Name:', name);
+    if (!newName || !newName.trim()) return;
+    const newUnit = prompt('Einheit:', unit);
+    if (!newUnit) return;
+    const newTarget = parseFloat(prompt('Soll-Menge:', target)) || 0;
+    await db.from('planit_inventory_items').update({
+        name: newName.trim(),
+        unit: newUnit.trim(),
+        target_amount: newTarget
+    }).eq('id', id);
+    loadInventurConfig();
+}
+
+async function deleteInventurItem(id) {
+    if (!confirm('Ware löschen?')) return;
+    await db.from('planit_inventory_items').delete().eq('id', id);
+    loadInventurConfig();
+}
+
+async function loadInventur() {
+    updateInventurDateLabel();
+    const date = document.getElementById('inventur-date').value;
+
+    const { data: suppliers } = await db
+        .from('planit_suppliers')
+        .select('*, planit_inventory_items(*)')
+        .eq('user_id', adminSession.user.id)
+        .order('created_at', { ascending: true });
+
+    const { data: entries } = await db
+        .from('planit_inventory_entries')
+        .select('*')
+        .eq('user_id', adminSession.user.id)
+        .eq('entry_date', date);
+
+    const container = document.getElementById('inventur-list');
+    if (!suppliers || suppliers.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>Keine Waren konfiguriert. Bitte zuerst Einstellungen öffnen.</p></div>';
+        return;
+    }
+
+    container.innerHTML = suppliers.map(s => {
+        const items = (s.planit_inventory_items || []).sort((a, b) => a.position - b.position);
+        if (items.length === 0) return '';
+        return `
+        <div style="margin-bottom:1.5rem;">
+            <div style="font-size:0.85rem; font-weight:700; color:var(--color-primary); letter-spacing:0.05em; margin-bottom:0.5rem;">${s.name.toUpperCase()}</div>
+            <div class="card" style="padding:0;">
+                <div style="display:grid; grid-template-columns:1fr 5rem 5rem 5rem; gap:0.5rem; padding:0.5rem 0.75rem; border-bottom:2px solid var(--color-border);">
+                    <div style="font-size:0.75rem; font-weight:700; color:var(--color-text-light);">WARE</div>
+                    <div style="font-size:0.75rem; font-weight:700; color:var(--color-text-light); text-align:center;">SOLL</div>
+                    <div style="font-size:0.75rem; font-weight:700; color:var(--color-text-light); text-align:center;">IST</div>
+                    <div style="font-size:0.75rem; font-weight:700; color:var(--color-text-light); text-align:center;">BESTELL</div>
+                </div>
+                ${items.map(item => {
+                    const entry = (entries || []).find(e => e.item_id === item.id);
+                    const actual = entry ? entry.actual_amount : '';
+                    const order = actual !== '' ? Math.max(0, item.target_amount - parseFloat(actual)) : '';
+                    return `
+                    <div style="display:grid; grid-template-columns:1fr 5rem 5rem 5rem; gap:0.5rem; padding:0.5rem 0.75rem; border-bottom:1px solid var(--color-border); align-items:center;">
+                        <div>
+                            <div style="font-size:0.9rem; font-weight:600;">${item.name}</div>
+                            <div style="font-size:0.75rem; color:var(--color-text-light);">${item.unit}</div>
+                        </div>
+                        <div style="text-align:center; font-size:0.9rem;">${item.target_amount}</div>
+                        <input type="number" value="${actual}" min="0" step="0.1" 
+                            data-item-id="${item.id}"
+                            data-target="${item.target_amount}"
+                            onchange="updateOrderValue(this)"
+                            style="text-align:center; padding:0.3rem; border-radius:6px; border:1px solid var(--color-border); font-size:0.85rem; width:100%;">
+                        <div id="order-${item.id}" style="text-align:center; font-size:0.9rem; font-weight:600; color:${order > 0 ? 'var(--color-red)' : 'var(--color-green)'};">
+                            ${order !== '' ? order : '–'}
+                        </div>
+                    </div>`;
+                }).join('')}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function updateOrderValue(input) {
+    const actual = parseFloat(input.value) || 0;
+    const target = parseFloat(input.dataset.target) || 0;
+    const order = Math.max(0, target - actual);
+    const orderDiv = document.getElementById(`order-${input.dataset.itemId}`);
+    if (orderDiv) {
+        orderDiv.textContent = order;
+        orderDiv.style.color = order > 0 ? 'var(--color-red)' : 'var(--color-green)';
+    }
+}
+
+async function saveInventur() {
+    const date = document.getElementById('inventur-date').value;
+    if (!date) return;
+    const userId = (await db.auth.getUser()).data.user.id;
+    const inputs = document.querySelectorAll('#inventur-list input[data-item-id]');
+    for (const input of inputs) {
+        const actual = parseFloat(input.value);
+        if (isNaN(actual)) continue;
+        await db.from('planit_inventory_entries').upsert({
+            user_id: userId,
+            item_id: input.dataset.itemId,
+            entry_date: date,
+            actual_amount: actual
+        }, { onConflict: 'user_id,item_id,entry_date' });
+    }
+    alert('Gespeichert!');
+}
+
+async function downloadInventurPdf() {
+    const date = document.getElementById('inventur-date').value;
+    if (!date) { alert('Bitte Datum wählen.'); return; }
+
+    const { data: suppliers } = await db
+        .from('planit_suppliers')
+        .select('*, planit_inventory_items(*)')
+        .eq('user_id', adminSession.user.id)
+        .order('created_at', { ascending: true });
+
+    const { data: entries } = await db
+        .from('planit_inventory_entries')
+        .select('*')
+        .eq('user_id', adminSession.user.id)
+        .eq('entry_date', date);
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const dateLabel = new Date(date + 'T12:00:00').toLocaleDateString('de-DE');
+
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Inventur', 15, 20);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text(dateLabel, 190, 20, { align: 'right' });
+
+    let y = 35;
+
+    for (const s of suppliers || []) {
+        const items = (s.planit_inventory_items || []).sort((a, b) => a.position - b.position);
+        if (items.length === 0) continue;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text(s.name, 15, y);
+        y += 7;
+
+        // Header
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Ware', 15, y);
+        doc.text('Einheit', 90, y);
+        doc.text('Soll', 120, y, { align: 'right' });
+        doc.text('Ist', 150, y, { align: 'right' });
+        doc.text('Bestell', 185, y, { align: 'right' });
+        y += 5;
+        doc.line(15, y, 195, y);
+        y += 5;
+
+        doc.setFont('helvetica', 'normal');
+        for (const item of items) {
+            const entry = (entries || []).find(e => e.item_id === item.id);
+            const actual = entry ? entry.actual_amount : '–';
+            const order = entry ? Math.max(0, item.target_amount - parseFloat(entry.actual_amount)) : '–';
+            doc.text(item.name, 15, y);
+            doc.text(item.unit, 90, y);
+            doc.text(String(item.target_amount), 120, y, { align: 'right' });
+            doc.text(String(actual), 150, y, { align: 'right' });
+            doc.text(String(order), 185, y, { align: 'right' });
+            y += 7;
+            if (y > 270) { doc.addPage(); y = 20; }
+        }
+        y += 5;
+    }
+
+    doc.save(`Inventur_${date}.pdf`);
+}
+
+let inventurDate = new Date();
+
+function changeInventurDate(dir) {
+    inventurDate.setDate(inventurDate.getDate() + dir);
+    updateInventurDateLabel();
+    loadInventur();
+}
+
+function updateInventurDateLabel() {
+    const dateStr = inventurDate.toISOString().split('T')[0];
+    document.getElementById('inventur-date').value = dateStr;
+}
+
+function onInventurDateChange() {
+    const val = document.getElementById('inventur-date').value;
+    if (!val) return;
+    inventurDate = new Date(val + 'T12:00:00');
+    loadInventur();
 }
