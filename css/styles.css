@@ -726,3 +726,25 @@ select {
     stroke-linecap: round;
     stroke-linejoin: round;
 }
+/* Time Picker */
+.time-picker-col {
+    height: 144px;
+    overflow-y: scroll;
+    scroll-snap-type: y mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    width: 64px;
+    text-align: center;
+    position: relative;
+    z-index: 2;
+}
+.time-picker-col::-webkit-scrollbar { display: none; }
+.time-picker-item {
+    height: 48px;
+    line-height: 48px;
+    scroll-snap-align: center;
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: var(--color-text-light);
+    user-select: none;
+}

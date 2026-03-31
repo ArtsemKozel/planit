@@ -4359,17 +4359,78 @@ async function loadTrinkgeldHoursEmployees(date) {
     const container = document.getElementById('trinkgeld-hours-employees');
     container.innerHTML = employees.map(emp => {
         const entry = (existing || []).find(e => e.employee_id === emp.id);
-        const hours = entry ? Math.floor(entry.minutes / 60) : '';
-        const mins = entry ? entry.minutes % 60 : '';
+        const hours = entry ? Math.floor(entry.minutes / 60) : 0;
+        const mins = entry ? entry.minutes % 60 : 0;
+        const label = (hours === 0 && mins === 0) ? '—' : `${hours}h ${String(mins).padStart(2,'0')}m`;
         return `
         <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.5rem;">
             <div style="flex:1; font-size:0.9rem; font-weight:600;">${emp.name}</div>
-            <input type="number" id="tip-hours-h-${emp.id}" value="${hours}" min="0" placeholder="Std" style="width:4rem; padding:0.4rem; font-size:0.85rem; text-align:center;">
-            <span style="color:var(--color-text-light);">h</span>
-            <input type="number" id="tip-hours-m-${emp.id}" value="${mins}" min="0" max="59" placeholder="Min" style="width:4rem; padding:0.4rem; font-size:0.85rem; text-align:center;">
-            <span style="color:var(--color-text-light);">m</span>
+            <input type="hidden" id="tip-hours-h-${emp.id}" value="${hours}">
+            <input type="hidden" id="tip-hours-m-${emp.id}" value="${mins}">
+            <button id="tip-time-btn-${emp.id}"
+                onclick="openTimePicker('${emp.id}', '${emp.name.replace(/'/g, "\\'")}')"
+                style="padding:0.45rem 0.85rem; border-radius:8px; border:1.5px solid var(--color-gray); background:white; font-size:0.9rem; font-weight:600; cursor:pointer; min-width:90px; text-align:center; color:var(--color-text);">
+                ${label}
+            </button>
         </div>`;
     }).join('');
+}
+
+let timePickerEmpId = null;
+
+function openTimePicker(empId, empName) {
+    timePickerEmpId = empId;
+    document.getElementById('time-picker-emp-name').textContent = empName;
+    const currentH = parseInt(document.getElementById(`tip-hours-h-${empId}`)?.value) || 0;
+    const currentM = parseInt(document.getElementById(`tip-hours-m-${empId}`)?.value) || 0;
+    const itemHeight = 48;
+
+    const hCol = document.getElementById('time-picker-hours');
+    const mCol = document.getElementById('time-picker-minutes');
+
+    const buildItems = (count) => {
+        let html = `<div style="height:48px;"></div>`;
+        for (let i = 0; i < count; i++) {
+            html += `<div class="time-picker-item">${String(i).padStart(2, '0')}</div>`;
+        }
+        html += `<div style="height:48px;"></div>`;
+        return html;
+    };
+
+    hCol.innerHTML = buildItems(24);
+    mCol.innerHTML = buildItems(60);
+
+    document.getElementById('time-picker-modal').classList.add('active');
+    setTimeout(() => {
+        hCol.scrollTop = currentH * itemHeight;
+        mCol.scrollTop = currentM * itemHeight;
+    }, 50);
+}
+
+function closeTimePicker() {
+    document.getElementById('time-picker-modal').classList.remove('active');
+    timePickerEmpId = null;
+}
+
+function resetTimePicker() {
+    document.getElementById('time-picker-hours').scrollTop = 0;
+    document.getElementById('time-picker-minutes').scrollTop = 0;
+}
+
+function confirmTimePicker() {
+    if (!timePickerEmpId) return;
+    const itemHeight = 48;
+    const hCol = document.getElementById('time-picker-hours');
+    const mCol = document.getElementById('time-picker-minutes');
+    const h = Math.round(hCol.scrollTop / itemHeight);
+    const m = Math.round(mCol.scrollTop / itemHeight);
+
+    document.getElementById(`tip-hours-h-${timePickerEmpId}`).value = h;
+    document.getElementById(`tip-hours-m-${timePickerEmpId}`).value = m;
+    const label = (h === 0 && m === 0) ? '—' : `${h}h ${String(m).padStart(2, '0')}m`;
+    document.getElementById(`tip-time-btn-${timePickerEmpId}`).textContent = label;
+
+    closeTimePicker();
 }
 
 async function saveTrinkgeldHours() {
