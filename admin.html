@@ -342,6 +342,11 @@
             <div></div>
         </div>
 
+        <div class="login-tabs" style="margin-bottom:1rem;">
+            <button id="inventur-sort-tab-inventory" class="login-tab active" onclick="setInventurSortMode('inventory')">Inventur-Reihenfolge</button>
+            <button id="inventur-sort-tab-order" class="login-tab" onclick="setInventurSortMode('order')">Bestell-Reihenfolge</button>
+        </div>
+
         <div style="font-size:0.85rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.05em; margin-bottom:0.75rem;">LIEFERANTEN</div>
         <div id="suppliers-list"></div>
         <button class="btn-secondary" style="width:100%; margin-bottom:1.5rem;" onclick="addSupplier()">+ Lieferant</button>

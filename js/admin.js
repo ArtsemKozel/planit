@@ -11,6 +11,7 @@ let openTaskIds = new Set();
 let currentShiftEmployeeId = null;
 let currentShiftDateStr = null;
 let trinkgeldDate = new Date();
+let inventurSortMode = 'inventory';
 
 // ── INIT ──────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -4560,6 +4561,13 @@ async function checkArbeitszeitWarnings(payload) {
 // ------- INVENTUR ---------
 
 async function loadInventurConfig() {
+    // Geöffnete Lieferanten merken, damit sie nach dem Re-Render wieder offen sind
+    const openSuppliers = new Set(
+        [...document.querySelectorAll('[id^="inventur-config-supplier-body-"]')]
+            .filter(el => el.style.display === 'block')
+            .map(el => el.id.replace('inventur-config-supplier-body-', ''))
+    );
+
     const { data: suppliers } = await db
         .from('planit_suppliers')
         .select('*, planit_inventory_items(*)')
@@ -4583,8 +4591,9 @@ async function loadInventurConfig() {
         }
     }
 
+    const sortField = inventurSortMode === 'order' ? 'order_position' : 'inventory_position';
     container.innerHTML = suppliers.map(s => {
-        const items = (s.planit_inventory_items || []).sort((a, b) => (a.inventory_position ?? 0) - (b.inventory_position ?? 0));
+        const items = (s.planit_inventory_items || []).sort((a, b) => (a[sortField] ?? 0) - (b[sortField] ?? 0));
         return `
         <div style="margin-bottom:0.75rem;">
             <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding:0.75rem 1rem; background:var(--color-gray); border-radius:12px; margin-bottom:0.25rem;" onclick="toggleInventurConfigSupplier('${s.id}')">
@@ -4609,13 +4618,13 @@ async function loadInventurConfig() {
                             <div style="font-size:0.75rem; color:var(--color-text-light);">Soll: ${item.target_amount} ${item.unit} · ${(item.price_per_unit || 0).toFixed(2)} €</div>
                         </div>
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.2rem;">
-                            ${i > 0 ? `<button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="moveInventurItem('${s.id}', ${i}, -1, 'inventory')">
+                            ${i > 0 ? `<button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="moveInventurItem('${s.id}', ${i}, -1, inventurSortMode)">
                                 <svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg>
                             </button>` : `<div style="width:1.8rem; height:1.8rem;"></div>`}
                             <button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="editInventurItem('${item.id}', '${item.name}', '${item.unit}', ${item.target_amount}, ${item.price_per_unit || 0})">
                                 <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                             </button>
-                            ${i < items.length - 1 ? `<button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="moveInventurItem('${s.id}', ${i}, 1, 'inventory')">
+                            ${i < items.length - 1 ? `<button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="moveInventurItem('${s.id}', ${i}, 1, inventurSortMode)">
                                 <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
                             </button>` : `<div style="width:1.8rem; height:1.8rem;"></div>`}
                             <button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="deleteInventurItem('${item.id}')">
@@ -4628,6 +4637,18 @@ async function loadInventurConfig() {
             </div>
         </div>`;
     }).join('');
+
+    // Geöffnete Lieferanten wiederherstellen
+    openSuppliers.forEach(id => {
+        const body = document.getElementById(`inventur-config-supplier-body-${id}`);
+        const toggle = document.getElementById(`inventur-config-supplier-toggle-${id}`);
+        if (body) body.style.display = 'block';
+        if (toggle) toggle.textContent = '▼';
+    });
+
+    // Aktiven Sort-Tab wiederherstellen
+    document.getElementById('inventur-sort-tab-inventory')?.classList.toggle('active', inventurSortMode === 'inventory');
+    document.getElementById('inventur-sort-tab-order')?.classList.toggle('active', inventurSortMode === 'order');
 }
 
 async function addSupplier() {
@@ -5065,6 +5086,13 @@ function toggleInventurConfigSupplier(supplierId) {
     toggle.textContent = isOpen ? '▶' : '▼';
 }
 
+function setInventurSortMode(mode) {
+    inventurSortMode = mode;
+    document.getElementById('inventur-sort-tab-inventory').classList.toggle('active', mode === 'inventory');
+    document.getElementById('inventur-sort-tab-order').classList.toggle('active', mode === 'order');
+    loadInventurConfig();
+}
+
 async function moveInventurItem(supplierId, index, direction, type) {
     const { data: supplier } = await db
         .from('planit_suppliers')
@@ -5073,17 +5101,18 @@ async function moveInventurItem(supplierId, index, direction, type) {
         .maybeSingle();
 
     if (!supplier) return;
+    const posField = type === 'order' ? 'order_position' : 'inventory_position';
     const items = (supplier.planit_inventory_items || [])
-        .sort((a, b) => (a.inventory_position ?? 0) - (b.inventory_position ?? 0));
+        .sort((a, b) => (a[posField] ?? 0) - (b[posField] ?? 0));
 
     const swapIndex = index + direction;
     if (swapIndex < 0 || swapIndex >= items.length) return;
 
-    const posA = items[index].inventory_position ?? index;
-    const posB = items[swapIndex].inventory_position ?? swapIndex;
+    const posA = items[index][posField] ?? index;
+    const posB = items[swapIndex][posField] ?? swapIndex;
 
-    await db.from('planit_inventory_items').update({ inventory_position: posB }).eq('id', items[index].id);
-    await db.from('planit_inventory_items').update({ inventory_position: posA }).eq('id', items[swapIndex].id);
+    await db.from('planit_inventory_items').update({ [posField]: posB }).eq('id', items[index].id);
+    await db.from('planit_inventory_items').update({ [posField]: posA }).eq('id', items[swapIndex].id);
 
     loadInventurConfig();
 }
