@@ -4711,6 +4711,7 @@ async function loadInventurConfig() {
                 <span id="inventur-config-supplier-toggle-${s.id}" style="color:var(--color-text-light);">▶</span>
             </div>
             <div id="inventur-config-supplier-body-${s.id}" style="display:none;">
+            <div id="inventur-config-groups-${s.id}" style="margin-bottom:0.5rem;"></div>
             <div class="card" style="margin-bottom:0;">
                 <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-bottom:0.75rem;">
                     <button class="btn-small btn-pdf-view btn-icon" style="width:2rem; height:2rem;" onclick="addInventurItem('${s.id}')">
@@ -4731,7 +4732,7 @@ async function loadInventurConfig() {
                             ${i > 0 ? `<button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="moveInventurItem('${s.id}', ${i}, -1, '${window.inventurSortMode}')">
                                 <svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg>
                             </button>` : `<div style="width:1.8rem; height:1.8rem;"></div>`}
-                            <button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="editInventurItem('${item.id}', '${item.name}', '${item.unit}', ${item.target_amount}, ${item.price_per_unit || 0})">
+                            <button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="editInventurItem('${item.id}', '${s.id}', '${item.name}', '${item.unit}', ${item.target_amount}, ${item.price_per_unit || 0}, '${item.group_id || ''}')">
                                 <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                             </button>
                             ${i < items.length - 1 ? `<button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="moveInventurItem('${s.id}', ${i}, 1, '${window.inventurSortMode}')">
@@ -4754,6 +4755,7 @@ async function loadInventurConfig() {
         const toggle = document.getElementById(`inventur-config-supplier-toggle-${id}`);
         if (body) body.style.display = 'block';
         if (toggle) toggle.textContent = '▼';
+        loadGroups(id);
     });
 
     // Aktiven Sort-Tab wiederherstellen
@@ -4775,8 +4777,8 @@ async function addInventurItem(supplierId) {
     openInventurItemModal(supplierId);
 }
 
-async function editInventurItem(id, name, unit, target, price) {
-    openInventurItemModal('', id, name, unit, target, price);
+async function editInventurItem(id, supplierId, name, unit, target, price, groupId) {
+    openInventurItemModal(supplierId, id, name, unit, target, price, groupId);
 }
 
 async function deleteInventurItem(id) {
@@ -4789,17 +4791,11 @@ async function loadInventur() {
     updateInventurDateLabel();
     const date = document.getElementById('inventur-date').value;
 
-    const { data: suppliers } = await db
-        .from('planit_suppliers')
-        .select('*, planit_inventory_items(*)')
-        .eq('user_id', adminSession.user.id)
-        .order('created_at', { ascending: true });
-
-    const { data: entries } = await db
-        .from('planit_inventory_entries')
-        .select('*')
-        .eq('user_id', adminSession.user.id)
-        .eq('entry_date', date);
+    const [{ data: suppliers }, { data: entries }, { data: groups }] = await Promise.all([
+        db.from('planit_suppliers').select('*, planit_inventory_items(*)').eq('user_id', adminSession.user.id).order('created_at', { ascending: true }),
+        db.from('planit_inventory_entries').select('*').eq('user_id', adminSession.user.id).eq('entry_date', date),
+        db.from('planit_inventory_groups').select('*').eq('user_id', adminSession.user.id).order('position', { ascending: true })
+    ]);
 
     const container = document.getElementById('inventur-list');
     if (!suppliers || suppliers.length === 0) {
@@ -4807,9 +4803,66 @@ async function loadInventur() {
         return;
     }
 
-    container.innerHTML = suppliers.map(s => {
-        const items = (s.planit_inventory_items || []).sort((a, b) => a.position - b.position);
+    const groupMap = {};
+    (groups || []).forEach(g => { groupMap[g.id] = g; });
+
+    const renderItemRow = (item, supplierName) => {
+        const entry = (entries || []).find(e => e.item_id === item.id);
+        const actual = entry ? entry.actual_amount : '';
+        const order = actual !== '' ? Math.max(0, item.target_amount - parseFloat(actual)) : '';
+        return `
+        <div style="display:grid; grid-template-columns:1fr 5rem 5rem 5rem; gap:0.5rem; padding:0.5rem 0.75rem; border-bottom:1px solid var(--color-border); align-items:center;">
+            <div>
+                <div style="font-size:0.9rem; font-weight:600;">${item.name}</div>
+                <div style="font-size:0.75rem; color:var(--color-text-light);">${item.unit}</div>
+            </div>
+            <div style="text-align:center; font-size:0.9rem;">${item.target_amount}</div>
+            <input type="number" value="${actual}" min="0" step="0.1"
+                data-item-id="${item.id}"
+                data-target="${item.target_amount}"
+                data-price="${item.price_per_unit || 0}"
+                data-supplier="${supplierName}"
+                onchange="updateOrderValue(this)"
+                style="text-align:center; padding:0.3rem; border-radius:6px; border:1px solid var(--color-border); font-size:0.85rem; width:100%;">
+            <div id="order-${item.id}" style="text-align:center; font-size:0.9rem; font-weight:600; color:${order > 0 ? 'var(--color-red)' : 'var(--color-green)'};">
+                ${order !== '' ? order : '–'}
+            </div>
+        </div>`;
+    };
+
+    const renderGroupSection = (groupKey, groupName, items, supplierName) => {
         if (items.length === 0) return '';
+        return `
+        <div style="margin-bottom:0.25rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding:0.4rem 0.75rem; background:var(--color-beige-light); border-radius:8px; margin-bottom:0.1rem;" onclick="toggleInventurGroup('${groupKey}')">
+                <div style="font-size:0.8rem; font-weight:700; color:var(--color-secondary);">${groupName}</div>
+                <span id="inventur-group-toggle-${groupKey}" style="font-size:0.75rem; color:var(--color-text-light);">▶</span>
+            </div>
+            <div id="inventur-group-body-${groupKey}" style="display:none;">
+                ${items.map(item => renderItemRow(item, supplierName)).join('')}
+            </div>
+        </div>`;
+    };
+
+    container.innerHTML = suppliers.map(s => {
+        const items = (s.planit_inventory_items || []).sort((a, b) => (a.inventory_position ?? 0) - (b.inventory_position ?? 0));
+        if (items.length === 0) return '';
+
+        // Supplier-Gruppen in Reihenfolge ermitteln
+        const supplierGroups = (groups || []).filter(g => g.supplier_id === s.id);
+        const grouped = {};
+        const ungrouped = [];
+        items.forEach(item => {
+            if (item.group_id && groupMap[item.group_id]) {
+                if (!grouped[item.group_id]) grouped[item.group_id] = [];
+                grouped[item.group_id].push(item);
+            } else {
+                ungrouped.push(item);
+            }
+        });
+
+        const hasGroups = supplierGroups.length > 0;
+
         return `
         <div style="margin-bottom:0.75rem;">
             <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding:0.75rem 1rem; background:var(--color-gray); border-radius:12px; margin-bottom:0.25rem;" onclick="toggleInventurSupplier('${s.id}')">
@@ -4824,29 +4877,11 @@ async function loadInventur() {
                     <div style="font-size:0.75rem; font-weight:700; color:var(--color-text-light); text-align:center;">IST</div>
                     <div style="font-size:0.75rem; font-weight:700; color:var(--color-text-light); text-align:center;">BESTELL</div>
                 </div>
-                ${items.map(item => {
-                    const entry = (entries || []).find(e => e.item_id === item.id);
-                    const actual = entry ? entry.actual_amount : '';
-                    const order = actual !== '' ? Math.max(0, item.target_amount - parseFloat(actual)) : '';
-                    return `
-                    <div style="display:grid; grid-template-columns:1fr 5rem 5rem 5rem; gap:0.5rem; padding:0.5rem 0.75rem; border-bottom:1px solid var(--color-border); align-items:center;">
-                        <div>
-                            <div style="font-size:0.9rem; font-weight:600;">${item.name}</div>
-                            <div style="font-size:0.75rem; color:var(--color-text-light);">${item.unit}</div>
-                        </div>
-                        <div style="text-align:center; font-size:0.9rem;">${item.target_amount}</div>
-                        <input type="number" value="${actual}" min="0" step="0.1" 
-                            data-item-id="${item.id}"
-                            data-target="${item.target_amount}"
-                            data-price="${item.price_per_unit || 0}"
-                            data-supplier="${s.name}"
-                            onchange="updateOrderValue(this)"
-                            style="text-align:center; padding:0.3rem; border-radius:6px; border:1px solid var(--color-border); font-size:0.85rem; width:100%;">
-                        <div id="order-${item.id}" style="text-align:center; font-size:0.9rem; font-weight:600; color:${order > 0 ? 'var(--color-red)' : 'var(--color-green)'};">
-                            ${order !== '' ? order : '–'}
-                        </div>
-                    </div>`;
-                }).join('')}
+                ${hasGroups
+                    ? supplierGroups.map(g => renderGroupSection(g.id, g.name, grouped[g.id] || [], s.name)).join('')
+                      + (ungrouped.length > 0 ? renderGroupSection(`${s.id}-allgemein`, 'Allgemein', ungrouped, s.name) : '')
+                    : items.map(item => renderItemRow(item, s.name)).join('')
+                }
             </div>
             </div>
         </div>`;
@@ -4855,7 +4890,6 @@ async function loadInventur() {
     // Lagerwert Container
     container.innerHTML += `<div class="card" id="lagerwert-block" style="margin-top:1rem;"></div>`;
     updateLagerwert();
-
 }
 
 function updateOrderValue(input) {
@@ -5095,7 +5129,7 @@ async function renderBestellansicht() {
     container.innerHTML = html || '<div class="empty-state"><p>Keine Waren gefunden.</p></div>';
 }
 
-function openInventurItemModal(supplierId, itemId = null, name = '', unit = 'Stück', target = 0, price = 0) {
+async function openInventurItemModal(supplierId, itemId = null, name = '', unit = 'Stück', target = 0, price = 0, groupId = '') {
     document.getElementById('inventur-item-id').value = itemId || '';
     document.getElementById('inventur-item-supplier-id').value = supplierId;
     document.getElementById('inventur-item-name').value = name;
@@ -5103,6 +5137,24 @@ function openInventurItemModal(supplierId, itemId = null, name = '', unit = 'St�
     document.getElementById('inventur-item-target').value = target;
     document.getElementById('inventur-item-price').value = price;
     document.getElementById('inventur-item-modal-title').textContent = itemId ? 'Ware bearbeiten' : 'Ware hinzufügen';
+
+    const select = document.getElementById('inventur-item-group');
+    select.innerHTML = '<option value="">— Kein Bereich —</option>';
+    if (supplierId) {
+        const { data: groups } = await db
+            .from('planit_inventory_groups')
+            .select('id, name')
+            .eq('supplier_id', supplierId)
+            .order('position', { ascending: true });
+        (groups || []).forEach(g => {
+            const opt = document.createElement('option');
+            opt.value = g.id;
+            opt.textContent = g.name;
+            if (g.id === groupId) opt.selected = true;
+            select.appendChild(opt);
+        });
+    }
+
     document.getElementById('inventur-item-modal').classList.add('active');
 }
 
@@ -5117,10 +5169,11 @@ async function saveInventurItem() {
     const unit = document.getElementById('inventur-item-unit').value;
     const target = parseFloat(document.getElementById('inventur-item-target').value) || 0;
     const price = parseFloat(document.getElementById('inventur-item-price').value) || 0;
+    const groupId = document.getElementById('inventur-item-group').value || null;
     if (!name) { alert('Bitte Name eingeben.'); return; }
 
     if (id) {
-        await db.from('planit_inventory_items').update({ name, unit, target_amount: target, price_per_unit: price }).eq('id', id);
+        await db.from('planit_inventory_items').update({ name, unit, target_amount: target, price_per_unit: price, group_id: groupId }).eq('id', id);
     } else {
         await db.from('planit_inventory_items').insert({
             user_id: adminSession.user.id,
@@ -5128,7 +5181,8 @@ async function saveInventurItem() {
             name,
             unit,
             target_amount: target,
-            price_per_unit: price
+            price_per_unit: price,
+            group_id: groupId
         });
     }
     closeInventurItemModal();
@@ -5143,6 +5197,14 @@ function openInventurSupplierModal(id = null, name = '') {
 
 function closeInventurSupplierModal() {
     document.getElementById('inventur-supplier-modal').classList.remove('active');
+}
+
+function openInventurInfoModal() {
+    document.getElementById('inventur-info-modal').classList.add('active');
+}
+
+function closeInventurInfoModal() {
+    document.getElementById('inventur-info-modal').classList.remove('active');
 }
 
 async function saveInventurSupplier() {
@@ -5265,12 +5327,127 @@ function toggleInventurSupplier(supplierId) {
     toggle.textContent = isOpen ? '▶' : '▼';
 }
 
+function toggleInventurGroup(groupKey) {
+    const body = document.getElementById(`inventur-group-body-${groupKey}`);
+    const toggle = document.getElementById(`inventur-group-toggle-${groupKey}`);
+    const isOpen = body.style.display === 'block';
+    body.style.display = isOpen ? 'none' : 'block';
+    toggle.textContent = isOpen ? '▶' : '▼';
+}
+
 function toggleInventurConfigSupplier(supplierId) {
     const body = document.getElementById(`inventur-config-supplier-body-${supplierId}`);
     const toggle = document.getElementById(`inventur-config-supplier-toggle-${supplierId}`);
     const isOpen = body.style.display === 'block';
     body.style.display = isOpen ? 'none' : 'block';
     toggle.textContent = isOpen ? '▶' : '▼';
+    if (!isOpen) loadGroups(supplierId);
+}
+
+async function loadGroups(supplierId) {
+    const { data: groups } = await db
+        .from('planit_inventory_groups')
+        .select('*')
+        .eq('supplier_id', supplierId)
+        .eq('user_id', adminSession.user.id)
+        .order('position', { ascending: true });
+
+    renderGroups(supplierId, groups || []);
+}
+
+function renderGroups(supplierId, groups) {
+    const container = document.getElementById(`inventur-config-groups-${supplierId}`);
+    if (!container) return;
+
+    container.innerHTML = `
+        <div class="card" style="margin-bottom:0; padding:0.5rem 0.75rem;">
+            <div style="font-size:0.75rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.05em; margin-bottom:0.5rem;">BEREICHE</div>
+            ${groups.length === 0
+                ? '<div style="font-size:0.8rem; color:var(--color-text-light); margin-bottom:0.5rem;">Keine Bereiche.</div>'
+                : groups.map((g, i) => `
+                    <div style="display:flex; align-items:center; gap:0.3rem; padding:0.3rem 0; border-bottom:1px solid var(--color-border);">
+                        <input id="group-name-${g.id}" type="text" value="${g.name}"
+                            style="flex:1; font-size:0.85rem; border:1px solid transparent; border-radius:6px; padding:0.2rem 0.35rem; background:transparent;"
+                            onfocus="this.style.borderColor='var(--color-border)'"
+                            onblur="this.style.borderColor='transparent'"
+                            onkeydown="if(event.key==='Enter') renameGroup('${g.id}','${supplierId}',this.value)">
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.2rem;">
+                            ${i > 0 ? `<button class="btn-small btn-pdf-view btn-icon" style="width:1.6rem; height:1.6rem;" onclick="moveGroup('${g.id}','${supplierId}',-1)">
+                                <svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg>
+                            </button>` : `<div style="width:1.6rem;"></div>`}
+                            <button class="btn-small btn-pdf-view btn-icon" style="width:1.6rem; height:1.6rem;" onclick="renameGroup('${g.id}','${supplierId}',document.getElementById('group-name-${g.id}').value)">
+                                <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            </button>
+                            ${i < groups.length - 1 ? `<button class="btn-small btn-pdf-view btn-icon" style="width:1.6rem; height:1.6rem;" onclick="moveGroup('${g.id}','${supplierId}',1)">
+                                <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                            </button>` : `<div style="width:1.6rem;"></div>`}
+                            <button class="btn-small btn-pdf-view btn-icon" style="width:1.6rem; height:1.6rem;" onclick="deleteGroup('${g.id}','${supplierId}')">
+                                <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                `).join('')}
+            <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+                <input type="text" id="new-group-input-${supplierId}" placeholder="Neuer Bereich…" style="flex:1; padding:0.3rem 0.5rem; border:1px solid var(--color-border); border-radius:6px; font-size:0.85rem;">
+                <button class="btn-small btn-pdf-view" style="font-size:0.75rem; height:auto; width:auto; padding:0.3rem 0.6rem;" onclick="addGroup('${supplierId}')">+</button>
+            </div>
+        </div>
+    `;
+}
+
+async function addGroup(supplierId) {
+    const input = document.getElementById(`new-group-input-${supplierId}`);
+    const name = input?.value.trim();
+    if (!name) return;
+
+    const { data: existing } = await db
+        .from('planit_inventory_groups')
+        .select('position')
+        .eq('supplier_id', supplierId)
+        .order('position', { ascending: false })
+        .limit(1);
+
+    const nextPos = existing && existing.length > 0 ? (existing[0].position ?? 0) + 1 : 0;
+
+    await db.from('planit_inventory_groups').insert({
+        user_id: adminSession.user.id,
+        supplier_id: supplierId,
+        name,
+        position: nextPos
+    });
+    loadGroups(supplierId);
+}
+
+async function deleteGroup(groupId, supplierId) {
+    if (!confirm('Bereich löschen?')) return;
+    await db.from('planit_inventory_groups').delete().eq('id', groupId);
+    loadGroups(supplierId);
+}
+
+async function renameGroup(groupId, supplierId, newName) {
+    const name = newName?.trim();
+    if (!name) return;
+    await db.from('planit_inventory_groups').update({ name }).eq('id', groupId);
+    loadGroups(supplierId);
+}
+
+async function moveGroup(groupId, supplierId, dir) {
+    const { data: groups } = await db
+        .from('planit_inventory_groups')
+        .select('*')
+        .eq('supplier_id', supplierId)
+        .order('position', { ascending: true });
+
+    if (!groups) return;
+    const idx = groups.findIndex(g => g.id === groupId);
+    const swapIdx = idx + dir;
+    if (swapIdx < 0 || swapIdx >= groups.length) return;
+
+    const posA = groups[idx].position ?? idx;
+    const posB = groups[swapIdx].position ?? swapIdx;
+    await db.from('planit_inventory_groups').update({ position: posB }).eq('id', groups[idx].id);
+    await db.from('planit_inventory_groups').update({ position: posA }).eq('id', groups[swapIdx].id);
+    loadGroups(supplierId);
 }
 
 function setInventurSortMode(mode) {

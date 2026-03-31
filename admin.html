@@ -355,7 +355,9 @@
                 Inventur
             </button>
             <div style="font-size:1.1rem; font-weight:700; color:var(--color-text); text-align:center;">Einstellungen</div>
-            <div></div>
+            <div style="display:flex; justify-content:flex-end;">
+                <button onclick="openInventurInfoModal()" style="background:none; border:2px solid var(--color-text-light); color:var(--color-text-light); border-radius:50%; width:1.6rem; height:1.6rem; font-size:0.75rem; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center;">i</button>
+            </div>
         </div>
 
         <div class="login-tabs" style="margin-bottom:1rem;">
@@ -1058,7 +1060,30 @@
             <label>Preis pro Einheit (€)</label>
             <input type="number" id="inventur-item-price" min="0" step="0.01" placeholder="0.00">
         </div>
+        <div class="form-group">
+            <label>Bereich (optional)</label>
+            <select id="inventur-item-group">
+                <option value="">— Kein Bereich —</option>
+            </select>
+        </div>
         <button class="btn-primary" onclick="saveInventurItem()">Speichern</button>
+    </div>
+</div>
+
+<!-- MODAL: INVENTUR INFO -->
+<div id="inventur-info-modal" class="modal-overlay" onclick="closeInventurInfoModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <div class="modal-title">So baust du die Inventurliste auf</div>
+            <button class="modal-close" onclick="closeInventurInfoModal()">✕</button>
+        </div>
+        <ol style="padding-left:1.25rem; line-height:2; margin:0.5rem 0 1rem;">
+            <li><strong>Lieferanten anlegen</strong><br><span style="font-size:0.85rem; color:var(--color-text-light);">z.B. Metro, Transgourmet</span></li>
+            <li><strong>Pro Lieferant Bereiche anlegen</strong><br><span style="font-size:0.85rem; color:var(--color-text-light);">z.B. Kühlschrank, Keller, Regal</span></li>
+            <li><strong>Waren anlegen</strong><br><span style="font-size:0.85rem; color:var(--color-text-light);">Lieferant und Bereich auswählen</span></li>
+            <li><strong>Reihenfolge anpassen</strong><br><span style="font-size:0.85rem; color:var(--color-text-light);">Inventur- und Bestell-Reihenfolge per ↑↓ Buttons</span></li>
+        </ol>
+        <button class="btn-primary" style="width:100%;" onclick="closeInventurInfoModal()">Verstanden</button>
     </div>
 </div>
 
