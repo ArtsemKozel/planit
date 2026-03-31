@@ -214,7 +214,7 @@
                     <span>›</span>
                 </div>
                 <div class="mehr-item" onclick="switchTab('inventur')">
-                    <span>Inventur</span>
+                    <span>Inventur <span id="inventur-badge" style="background:var(--color-primary); color:white; border-radius:10px; padding:0.1rem 0.5rem; font-size:0.75rem; display:none;"></span></span>
                     <span>›</span>
                 </div>
             </div>
@@ -311,6 +311,9 @@
             <button onclick="changeInventurDate(1)">▶</button>
         </div>
 
+        <!-- Einreichungen -->
+        <div id="submissions-list"></div>
+
         <!-- Sub-Tabs -->
         <div class="login-tabs" style="margin-bottom:1rem;">
             <button id="inventur-sub-tab-inventur" class="login-tab active" onclick="switchInventurSubTab('inventur')">Inventur</button>
@@ -363,6 +366,15 @@
         <div style="font-size:0.85rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.05em; margin-bottom:0.75rem;">LIEFERANTEN</div>
         <div id="suppliers-list"></div>
         <button class="btn-secondary" style="width:100%; margin-bottom:1.5rem;" onclick="addSupplier()">+ Lieferant</button>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding:0.75rem 1rem; background:var(--color-gray); border-radius:12px; margin-bottom:0.25rem;" onclick="toggleDelegationSection()">
+            <div style="font-size:0.85rem; font-weight:700; color:var(--color-primary); letter-spacing:0.05em;">INVENTUR DELEGIEREN</div>
+            <span id="delegation-toggle" style="color:var(--color-text-light);">▶</span>
+        </div>
+        <div id="delegation-body" style="display:none;">
+            <div id="inventur-delegation-list" class="card" style="padding:0.5rem 0.75rem; margin-bottom:0.5rem;"></div>
+            <button class="btn-primary" style="width:100%; margin-bottom:1.5rem;" onclick="saveInventurDelegation()">Speichern</button>
+        </div>
     </div>
 
     <!-- TAB: TRINKGELD -->

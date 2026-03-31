@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadAdminAvailability();
     await loadAdminVacationCalendar();
     await loadRequestsBadge();
+    await loadInventurBadge();
     await loadSickLeaves();
 });
 
@@ -86,8 +87,8 @@ function switchTab(tab) {
     if (tab === 'notes') loadNotes();
     if (tab === 'trinkgeld') loadTrinkgeld();
     if (tab === 'trinkgeld-config') loadTrinkgeldConfig();
-    if (tab === 'inventur') loadInventur();
-    if (tab === 'inventur-config') loadInventurConfig();
+    if (tab === 'inventur') { loadInventur(); loadInventurSubmissions(); }
+    if (tab === 'inventur-config') { loadInventurConfig(); loadInventurDelegation(); }
     localStorage.setItem('planit_admin_tab', tab);
 }
 
@@ -2412,6 +2413,107 @@ async function loadRequestsBadge() {
     } else {
         badge.style.display = 'none';
     }
+}
+
+async function loadInventurBadge() {
+    const { data } = await db
+        .from('planit_inventory_submissions')
+        .select('id')
+        .eq('user_id', adminSession.user.id);
+
+    const badge = document.getElementById('inventur-badge');
+    if (data && data.length > 0) {
+        badge.textContent = data.length;
+        badge.style.display = 'inline';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+async function loadInventurSubmissions() {
+    const { data: submissions } = await db
+        .from('planit_inventory_submissions')
+        .select('*')
+        .eq('user_id', adminSession.user.id)
+        .order('submitted_at', { ascending: false });
+
+    const container = document.getElementById('submissions-list');
+    if (!submissions || submissions.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    const { data: employees } = await db
+        .from('employees_planit')
+        .select('id, name')
+        .eq('user_id', adminSession.user.id);
+
+    const empMap = {};
+    (employees || []).forEach(e => { empMap[e.id] = e.name; });
+
+    container.innerHTML = `
+        <div style="font-size:0.85rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.05em; margin-bottom:0.5rem;">EINGEREICHTE INVENTUREN</div>
+        ${submissions.map(s => {
+            const name = empMap[s.employee_id] || 'Unbekannt';
+            const date = new Date(s.submission_date + 'T12:00:00');
+            const dateStr = date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const time = new Date(s.submitted_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+            return `
+            <div class="card" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; padding:0.6rem 0.75rem;">
+                <div>
+                    <div style="font-size:0.9rem; font-weight:600;">${name}</div>
+                    <div style="font-size:0.75rem; color:var(--color-text-light);">${dateStr} · ${time} Uhr</div>
+                </div>
+                <button class="btn-small btn-pdf-view" style="font-size:0.75rem; padding:0.3rem 0.75rem; height:auto; width:auto;" onclick="markInventurSubmissionSeen('${s.id}')">Gesehen</button>
+            </div>`;
+        }).join('')}
+    `;
+}
+
+async function markInventurSubmissionSeen(id) {
+    await db.from('planit_inventory_submissions').delete().eq('id', id);
+    await loadInventurSubmissions();
+    await loadInventurBadge();
+}
+
+async function loadInventurDelegation() {
+    const { data: employees } = await db
+        .from('employees_planit')
+        .select('id, name, can_do_inventory')
+        .eq('user_id', adminSession.user.id)
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+
+    const container = document.getElementById('inventur-delegation-list');
+    if (!employees || employees.length === 0) {
+        container.innerHTML = '<div style="font-size:0.85rem; color:var(--color-text-light);">Keine Mitarbeiter vorhanden.</div>';
+        return;
+    }
+
+    container.innerHTML = employees.map(e => `
+        <label style="display:flex; align-items:center; gap:0.75rem; padding:0.4rem 0; border-bottom:1px solid var(--color-border); cursor:pointer;">
+            <input type="checkbox" data-emp-id="${e.id}" ${e.can_do_inventory ? 'checked' : ''} style="width:1.1rem; height:1.1rem; accent-color:var(--color-primary); cursor:pointer;">
+            <span style="font-size:0.9rem;">${e.name}</span>
+        </label>
+    `).join('');
+}
+
+function toggleDelegationSection() {
+    const body = document.getElementById('delegation-body');
+    const toggle = document.getElementById('delegation-toggle');
+    const isOpen = body.style.display === 'block';
+    body.style.display = isOpen ? 'none' : 'block';
+    toggle.textContent = isOpen ? '▶' : '▼';
+}
+
+async function saveInventurDelegation() {
+    const checkboxes = document.querySelectorAll('#inventur-delegation-list input[data-emp-id]');
+    for (const cb of checkboxes) {
+        await db.from('employees_planit')
+            .update({ can_do_inventory: cb.checked })
+            .eq('id', cb.dataset.empId);
+    }
+    alert('Gespeichert!');
 }
 
 async function loadRequestsStats() {
