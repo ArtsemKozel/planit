@@ -4377,53 +4377,78 @@ async function loadTrinkgeldHoursEmployees(date) {
 }
 
 let timePickerEmpId = null;
+let timePickerCleanup = [];
+const TP_ITEM_H = 48;
+const TP_H_COUNT = 24;
+const TP_M_COUNT = 60;
 
 function openTimePicker(empId, empName) {
     timePickerEmpId = empId;
     document.getElementById('time-picker-emp-name').textContent = empName;
     const currentH = parseInt(document.getElementById(`tip-hours-h-${empId}`)?.value) || 0;
     const currentM = parseInt(document.getElementById(`tip-hours-m-${empId}`)?.value) || 0;
-    const itemHeight = 48;
 
     const hCol = document.getElementById('time-picker-hours');
     const mCol = document.getElementById('time-picker-minutes');
 
-    const buildItems = (count) => {
-        let html = `<div style="height:48px;"></div>`;
-        for (let i = 0; i < count; i++) {
-            html += `<div class="time-picker-item">${String(i).padStart(2, '0')}</div>`;
+    const buildCircular = (count) => {
+        let html = '';
+        for (let rep = 0; rep < 3; rep++) {
+            for (let i = 0; i < count; i++) {
+                html += `<div class="time-picker-item">${String(i).padStart(2, '0')}</div>`;
+            }
         }
-        html += `<div style="height:48px;"></div>`;
         return html;
     };
 
-    hCol.innerHTML = buildItems(24);
-    mCol.innerHTML = buildItems(60);
+    hCol.innerHTML = buildCircular(TP_H_COUNT);
+    mCol.innerHTML = buildCircular(TP_M_COUNT);
 
     document.getElementById('time-picker-modal').classList.add('active');
     setTimeout(() => {
-        hCol.scrollTop = currentH * itemHeight;
-        mCol.scrollTop = currentM * itemHeight;
+        hCol.scrollTop = (TP_H_COUNT + currentH) * TP_ITEM_H;
+        mCol.scrollTop = (TP_M_COUNT + currentM) * TP_ITEM_H;
     }, 50);
+
+    timePickerCleanup.forEach(fn => fn());
+    timePickerCleanup = [];
+
+    const attachInfinite = (col, count) => {
+        let timer = null;
+        const check = () => {
+            if (col.scrollTop < count * TP_ITEM_H) {
+                col.scrollTop += count * TP_ITEM_H;
+            } else if (col.scrollTop >= count * 2 * TP_ITEM_H) {
+                col.scrollTop -= count * TP_ITEM_H;
+            }
+        };
+        const handler = () => { clearTimeout(timer); timer = setTimeout(check, 100); };
+        col.addEventListener('scroll', handler);
+        timePickerCleanup.push(() => { col.removeEventListener('scroll', handler); clearTimeout(timer); });
+    };
+
+    attachInfinite(hCol, TP_H_COUNT);
+    attachInfinite(mCol, TP_M_COUNT);
 }
 
 function closeTimePicker() {
     document.getElementById('time-picker-modal').classList.remove('active');
+    timePickerCleanup.forEach(fn => fn());
+    timePickerCleanup = [];
     timePickerEmpId = null;
 }
 
 function resetTimePicker() {
-    document.getElementById('time-picker-hours').scrollTop = 0;
-    document.getElementById('time-picker-minutes').scrollTop = 0;
+    document.getElementById('time-picker-hours').scrollTop = TP_H_COUNT * TP_ITEM_H;
+    document.getElementById('time-picker-minutes').scrollTop = TP_M_COUNT * TP_ITEM_H;
 }
 
 function confirmTimePicker() {
     if (!timePickerEmpId) return;
-    const itemHeight = 48;
     const hCol = document.getElementById('time-picker-hours');
     const mCol = document.getElementById('time-picker-minutes');
-    const h = Math.round(hCol.scrollTop / itemHeight);
-    const m = Math.round(mCol.scrollTop / itemHeight);
+    const h = Math.round(hCol.scrollTop / TP_ITEM_H) % TP_H_COUNT;
+    const m = Math.round(mCol.scrollTop / TP_ITEM_H) % TP_M_COUNT;
 
     document.getElementById(`tip-hours-h-${timePickerEmpId}`).value = h;
     document.getElementById(`tip-hours-m-${timePickerEmpId}`).value = m;

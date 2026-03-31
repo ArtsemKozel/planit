@@ -1042,21 +1042,20 @@
             <div class="modal-title" id="time-picker-emp-name"></div>
             <button class="modal-close" onclick="closeTimePicker()">✕</button>
         </div>
-        <div style="position:relative; display:flex; gap:0.5rem; justify-content:center; align-items:flex-end; padding:1rem 0 0.5rem;">
-            <div style="position:absolute; top:50%; left:50%; width:160px; height:48px; transform:translate(-50%, -50%); background:var(--color-gray); border-radius:10px; pointer-events:none; z-index:1;"></div>
-            <div style="display:flex; flex-direction:column; align-items:center; gap:0.25rem;">
-                <div style="font-size:0.7rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.05em;">STUNDEN</div>
-                <div id="time-picker-hours" class="time-picker-col"></div>
-            </div>
-            <div style="font-size:1.6rem; font-weight:700; padding-bottom:0.35rem; z-index:2;">:</div>
-            <div style="display:flex; flex-direction:column; align-items:center; gap:0.25rem;">
-                <div style="font-size:0.7rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.05em;">MINUTEN</div>
-                <div id="time-picker-minutes" class="time-picker-col"></div>
-            </div>
+        <div style="display:flex; gap:1.5rem; justify-content:center; margin:0.25rem 0 0.5rem;">
+            <div style="font-size:0.7rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.05em; text-align:center; width:64px;">STUNDEN</div>
+            <div style="width:16px;"></div>
+            <div style="font-size:0.7rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.05em; text-align:center; width:64px;">MINUTEN</div>
+        </div>
+        <div style="position:relative; display:flex; gap:0.5rem; justify-content:center; align-items:center; padding:0.5rem 0;">
+            <div style="position:absolute; top:50%; left:50%; width:160px; height:48px; transform:translate(-50%,-50%); background:var(--color-gray); border-radius:10px; pointer-events:none; z-index:1;"></div>
+            <div id="time-picker-hours" class="time-picker-col" onclick="event.stopPropagation()"></div>
+            <div style="font-size:1.6rem; font-weight:700; z-index:2;">:</div>
+            <div id="time-picker-minutes" class="time-picker-col" onclick="event.stopPropagation()"></div>
         </div>
         <div style="display:flex; gap:0.75rem; margin-top:0.75rem;">
-            <button onclick="resetTimePicker()" class="btn-secondary">Reset</button>
-            <button onclick="confirmTimePicker()" class="btn-primary">Done</button>
+            <button onclick="resetTimePicker()" class="btn-secondary">Zurücksetzen</button>
+            <button onclick="confirmTimePicker()" class="btn-primary">Übernehmen</button>
         </div>
     </div>
 </div>
