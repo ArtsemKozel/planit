@@ -4902,6 +4902,9 @@ function changeInventurDate(dir) {
     inventurDate.setDate(inventurDate.getDate() + dir);
     updateInventurDateLabel();
     loadInventur();
+    if (document.getElementById('inventur-subtab-bestellung').style.display !== 'none') {
+        renderBestellansicht();
+    }
 }
 
 function updateInventurDateLabel() {
@@ -4914,6 +4917,80 @@ function onInventurDateChange() {
     if (!val) return;
     inventurDate = new Date(val + 'T12:00:00');
     loadInventur();
+    if (document.getElementById('inventur-subtab-bestellung').style.display !== 'none') {
+        renderBestellansicht();
+    }
+}
+
+function switchInventurSubTab(tab) {
+    document.getElementById('inventur-subtab-inventur').style.display = tab === 'inventur' ? 'block' : 'none';
+    document.getElementById('inventur-subtab-bestellung').style.display = tab === 'bestellung' ? 'block' : 'none';
+    document.getElementById('inventur-sub-tab-inventur').classList.toggle('active', tab === 'inventur');
+    document.getElementById('inventur-sub-tab-bestellung').classList.toggle('active', tab === 'bestellung');
+    if (tab === 'bestellung') renderBestellansicht();
+}
+
+async function renderBestellansicht() {
+    const date = inventurDate.toISOString().split('T')[0];
+    const container = document.getElementById('bestellung-list');
+    container.innerHTML = '<div style="text-align:center; color:var(--color-text-light); padding:1rem;">Lädt...</div>';
+
+    const { data: suppliers } = await db
+        .from('planit_suppliers')
+        .select('*, planit_inventory_items(*)')
+        .eq('user_id', adminSession.user.id)
+        .order('created_at', { ascending: true });
+
+    const { data: entries } = await db
+        .from('planit_inventory_entries')
+        .select('*')
+        .eq('user_id', adminSession.user.id)
+        .eq('entry_date', date);
+
+    if (!suppliers || suppliers.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>Keine Waren konfiguriert.</p></div>';
+        return;
+    }
+
+    let html = '';
+    for (const s of suppliers) {
+        const items = (s.planit_inventory_items || [])
+            .sort((a, b) => (a.order_position ?? 0) - (b.order_position ?? 0));
+        if (items.length === 0) continue;
+
+        html += `<div style="margin-bottom:1rem;">
+            <div style="font-size:0.85rem; font-weight:700; color:var(--color-primary); letter-spacing:0.05em; padding:0.5rem 0; border-bottom:2px solid var(--color-border); margin-bottom:0.5rem;">${s.name.toUpperCase()}</div>`;
+
+        for (const item of items) {
+            const entry = (entries || []).find(e => e.item_id === item.id);
+            const hasEntry = !!entry;
+            const actual = hasEntry ? parseFloat(entry.actual_amount) : null;
+            const orderAmt = hasEntry ? Math.max(0, item.target_amount - actual) : null;
+
+            if (hasEntry) {
+                html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0; border-bottom:1px solid var(--color-border);">
+                    <div>
+                        <div style="font-size:0.9rem; font-weight:600;">${item.name}</div>
+                        <div style="font-size:0.75rem; color:var(--color-text-light);">Ist: ${actual} ${item.unit}</div>
+                    </div>
+                    <div style="font-size:1rem; font-weight:700; color:${orderAmt > 0 ? 'var(--color-primary)' : 'var(--color-text-light)'};">
+                        ${orderAmt} ${item.unit}
+                    </div>
+                </div>`;
+            } else {
+                html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0; border-bottom:1px solid var(--color-border); opacity:0.45;">
+                    <div>
+                        <div style="font-size:0.9rem;">${item.name}</div>
+                        <div style="font-size:0.75rem; color:var(--color-text-light);">nicht erfasst</div>
+                    </div>
+                    <div style="font-size:0.75rem; color:var(--color-text-light);">—</div>
+                </div>`;
+            }
+        }
+        html += `</div>`;
+    }
+
+    container.innerHTML = html || '<div class="empty-state"><p>Keine Waren gefunden.</p></div>';
 }
 
 function openInventurItemModal(supplierId, itemId = null, name = '', unit = 'Stück', target = 0, price = 0) {
