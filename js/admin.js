@@ -11,7 +11,7 @@ let openTaskIds = new Set();
 let currentShiftEmployeeId = null;
 let currentShiftDateStr = null;
 let trinkgeldDate = new Date();
-let inventurSortMode = 'inventory';
+window.window.inventurSortMode = 'inventory';
 
 // ── INIT ──────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -4584,14 +4584,22 @@ async function loadInventurConfig() {
     for (const s of suppliers || []) {
         const items = (s.planit_inventory_items || []);
         for (let idx = 0; idx < items.length; idx++) {
+            const updates = {};
             if (items[idx].inventory_position === null || items[idx].inventory_position === undefined) {
-                await db.from('planit_inventory_items').update({ inventory_position: idx }).eq('id', items[idx].id);
+                updates.inventory_position = idx;
                 items[idx].inventory_position = idx;
+            }
+            if (items[idx].order_position === null || items[idx].order_position === undefined) {
+                updates.order_position = idx;
+                items[idx].order_position = idx;
+            }
+            if (Object.keys(updates).length > 0) {
+                await db.from('planit_inventory_items').update(updates).eq('id', items[idx].id);
             }
         }
     }
 
-    const sortField = inventurSortMode === 'order' ? 'order_position' : 'inventory_position';
+    const sortField = window.inventurSortMode === 'order' ? 'order_position' : 'inventory_position';
     container.innerHTML = suppliers.map(s => {
         const items = (s.planit_inventory_items || []).sort((a, b) => (a[sortField] ?? 0) - (b[sortField] ?? 0));
         return `
@@ -4614,17 +4622,17 @@ async function loadInventurConfig() {
                 items.map((item, i) => `
                     <div style="display:flex; align-items:center; gap:0.5rem; padding:0.4rem 0; border-bottom:1px solid var(--color-border);">
                         <div style="flex:1;">
-                            <div style="font-size:0.85rem;">${item.name}</div>
+                            <div style="font-size:0.85rem;"><span style="font-size:0.75rem; color:var(--color-text-light); margin-right:0.35rem;">${i + 1}.</span>${item.name}</div>
                             <div style="font-size:0.75rem; color:var(--color-text-light);">Soll: ${item.target_amount} ${item.unit} · ${(item.price_per_unit || 0).toFixed(2)} €</div>
                         </div>
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.2rem;">
-                            ${i > 0 ? `<button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="moveInventurItem('${s.id}', ${i}, -1, inventurSortMode)">
+                            ${i > 0 ? `<button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="moveInventurItem('${s.id}', ${i}, -1, '${window.inventurSortMode}')">
                                 <svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg>
                             </button>` : `<div style="width:1.8rem; height:1.8rem;"></div>`}
                             <button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="editInventurItem('${item.id}', '${item.name}', '${item.unit}', ${item.target_amount}, ${item.price_per_unit || 0})">
                                 <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                             </button>
-                            ${i < items.length - 1 ? `<button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="moveInventurItem('${s.id}', ${i}, 1, inventurSortMode)">
+                            ${i < items.length - 1 ? `<button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="moveInventurItem('${s.id}', ${i}, 1, '${window.inventurSortMode}')">
                                 <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
                             </button>` : `<div style="width:1.8rem; height:1.8rem;"></div>`}
                             <button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="deleteInventurItem('${item.id}')">
@@ -4647,8 +4655,8 @@ async function loadInventurConfig() {
     });
 
     // Aktiven Sort-Tab wiederherstellen
-    document.getElementById('inventur-sort-tab-inventory')?.classList.toggle('active', inventurSortMode === 'inventory');
-    document.getElementById('inventur-sort-tab-order')?.classList.toggle('active', inventurSortMode === 'order');
+    document.getElementById('inventur-sort-tab-inventory')?.classList.toggle('active', window.inventurSortMode === 'inventory');
+    document.getElementById('inventur-sort-tab-order')?.classList.toggle('active', window.inventurSortMode === 'order');
 }
 
 async function addSupplier() {
@@ -5087,7 +5095,7 @@ function toggleInventurConfigSupplier(supplierId) {
 }
 
 function setInventurSortMode(mode) {
-    inventurSortMode = mode;
+    window.inventurSortMode = mode;
     document.getElementById('inventur-sort-tab-inventory').classList.toggle('active', mode === 'inventory');
     document.getElementById('inventur-sort-tab-order').classList.toggle('active', mode === 'order');
     loadInventurConfig();
@@ -5104,6 +5112,17 @@ async function moveInventurItem(supplierId, index, direction, type) {
     const posField = type === 'order' ? 'order_position' : 'inventory_position';
     const items = (supplier.planit_inventory_items || [])
         .sort((a, b) => (a[posField] ?? 0) - (b[posField] ?? 0));
+    // Wenn alle Positionen gleich sind (z.B. alle null/0), erst mit eindeutigen Werten initialisieren
+    if (type === 'order') {
+        const positions = items.map(i => i[posField] ?? 0);
+        const allSame = positions.every(p => p === positions[0]);
+        if (allSame) {
+            for (let i = 0; i < items.length; i++) {
+                await db.from('planit_inventory_items').update({ [posField]: i }).eq('id', items[i].id);
+                items[i][posField] = i;
+            }
+        }
+    }
 
     const swapIndex = index + direction;
     if (swapIndex < 0 || swapIndex >= items.length) return;
