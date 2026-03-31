@@ -4713,6 +4713,7 @@ async function loadInventurConfig() {
             <div id="inventur-config-supplier-body-${s.id}" style="display:none;">
             <div id="inventur-config-groups-${s.id}" style="margin-bottom:0.5rem;"></div>
             <div class="card" style="margin-bottom:0;">
+                ${window.inventurSortMode === 'inventory' ? `
                 <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-bottom:0.75rem;">
                     <button class="btn-small btn-pdf-view btn-icon" style="width:2rem; height:2rem;" onclick="addInventurItem('${s.id}')">
                         <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -4720,7 +4721,7 @@ async function loadInventurConfig() {
                     <button class="btn-small btn-pdf-view btn-icon" style="width:2rem; height:2rem;" onclick="deleteSupplier('${s.id}')">
                         <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                     </button>
-                </div>
+                </div>` : ''}
                 ${items.length === 0 ? '<div style="font-size:0.85rem; color:var(--color-text-light);">Keine Waren.</div>' :
                 items.map((item, i) => `
                     <div style="display:flex; align-items:center; gap:0.5rem; padding:0.4rem 0; border-bottom:1px solid var(--color-border);">
@@ -4732,15 +4733,17 @@ async function loadInventurConfig() {
                             ${i > 0 ? `<button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="moveInventurItem('${s.id}', ${i}, -1, '${window.inventurSortMode}')">
                                 <svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg>
                             </button>` : `<div style="width:1.8rem; height:1.8rem;"></div>`}
+                            ${window.inventurSortMode === 'inventory' ? `
                             <button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="editInventurItem('${item.id}', '${s.id}', '${item.name}', '${item.unit}', ${item.target_amount}, ${item.price_per_unit || 0}, '${item.group_id || ''}')">
                                 <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                            </button>
+                            </button>` : `<div style="width:1.8rem; height:1.8rem;"></div>`}
                             ${i < items.length - 1 ? `<button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="moveInventurItem('${s.id}', ${i}, 1, '${window.inventurSortMode}')">
                                 <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
                             </button>` : `<div style="width:1.8rem; height:1.8rem;"></div>`}
+                            ${window.inventurSortMode === 'inventory' ? `
                             <button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="deleteInventurItem('${item.id}')">
                                 <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-                            </button>
+                            </button>` : `<div style="width:1.8rem; height:1.8rem;"></div>`}
                         </div>
                     </div>
                 `).join('')}
@@ -4755,7 +4758,7 @@ async function loadInventurConfig() {
         const toggle = document.getElementById(`inventur-config-supplier-toggle-${id}`);
         if (body) body.style.display = 'block';
         if (toggle) toggle.textContent = '▼';
-        loadGroups(id);
+        if (window.inventurSortMode === 'inventory') loadGroups(id);
     });
 
     // Aktiven Sort-Tab wiederherstellen
@@ -5341,7 +5344,7 @@ function toggleInventurConfigSupplier(supplierId) {
     const isOpen = body.style.display === 'block';
     body.style.display = isOpen ? 'none' : 'block';
     toggle.textContent = isOpen ? '▶' : '▼';
-    if (!isOpen) loadGroups(supplierId);
+    if (!isOpen && window.inventurSortMode === 'inventory') loadGroups(supplierId);
 }
 
 async function loadGroups(supplierId) {
