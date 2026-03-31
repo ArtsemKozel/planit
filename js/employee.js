@@ -82,6 +82,12 @@ function switchTab(tab) {
     if (tab === 'stunden') loadMeineStunden();
     if (tab === 'trinkgeld') loadEmpTrinkgeld();
     if (tab === 'inventur-emp') loadEmpInventur();
+    if (tab === 'mehr') {
+        document.getElementById('trinkgeld-menu-item').style.display = 'none';
+        const invItem = document.getElementById('inventur-emp-menu-item');
+        if (invItem) invItem.style.display = 'none';
+        Promise.all([checkTrinkgeldVisibility(), checkInventurVisibility()]);
+    }
     localStorage.setItem('planit_emp_tab', tab);
 }
 
