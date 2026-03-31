@@ -4429,6 +4429,19 @@ function openTimePicker(empId, empName) {
 
     attachInfinite(hCol, TP_H_COUNT);
     attachInfinite(mCol, TP_M_COUNT);
+
+    const blockTouch = (e) => { e.stopPropagation(); e.preventDefault(); };
+    const touchOpts = { passive: false };
+    for (const col of [hCol, mCol]) {
+        col.addEventListener('touchstart', blockTouch, touchOpts);
+        col.addEventListener('touchmove', blockTouch, touchOpts);
+        col.addEventListener('touchend', blockTouch, touchOpts);
+        timePickerCleanup.push(() => {
+            col.removeEventListener('touchstart', blockTouch, touchOpts);
+            col.removeEventListener('touchmove', blockTouch, touchOpts);
+            col.removeEventListener('touchend', blockTouch, touchOpts);
+        });
+    }
 }
 
 function closeTimePicker() {
