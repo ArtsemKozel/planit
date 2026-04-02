@@ -4406,8 +4406,8 @@ function openTimePicker(empId, empName) {
 
     document.getElementById('time-picker-modal').classList.add('active');
     setTimeout(() => {
-        hCol.scrollTop = (TP_H_COUNT + currentH) * TP_ITEM_H;
-        mCol.scrollTop = (TP_M_COUNT + currentM) * TP_ITEM_H;
+        hCol.scrollTop = (TP_H_COUNT + currentH - 1) * TP_ITEM_H;
+        mCol.scrollTop = (TP_M_COUNT + currentM - 1) * TP_ITEM_H;
     }, 50);
 
     timePickerCleanup.forEach(fn => fn());
@@ -4452,16 +4452,16 @@ function closeTimePicker() {
 }
 
 function resetTimePicker() {
-    document.getElementById('time-picker-hours').scrollTop = TP_H_COUNT * TP_ITEM_H;
-    document.getElementById('time-picker-minutes').scrollTop = TP_M_COUNT * TP_ITEM_H;
+    document.getElementById('time-picker-hours').scrollTop = (TP_H_COUNT - 1) * TP_ITEM_H;
+    document.getElementById('time-picker-minutes').scrollTop = (TP_M_COUNT - 1) * TP_ITEM_H;
 }
 
 function confirmTimePicker() {
     if (!timePickerEmpId) return;
     const hCol = document.getElementById('time-picker-hours');
     const mCol = document.getElementById('time-picker-minutes');
-    const h = Math.round(hCol.scrollTop / TP_ITEM_H) % TP_H_COUNT;
-    const m = Math.round(mCol.scrollTop / TP_ITEM_H) % TP_M_COUNT;
+    const h = (Math.round(hCol.scrollTop / TP_ITEM_H) + 1) % TP_H_COUNT;
+    const m = (Math.round(mCol.scrollTop / TP_ITEM_H) + 1) % TP_M_COUNT;
 
     document.getElementById(`tip-hours-h-${timePickerEmpId}`).value = h;
     document.getElementById(`tip-hours-m-${timePickerEmpId}`).value = m;
