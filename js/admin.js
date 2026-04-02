@@ -3835,8 +3835,8 @@ async function loadTrinkgeld() {
         }
     }
     if (toInsert.length > 0) {
-        const { error: tipInsertError } = await db.from('tip_entries').insert(toInsert);
-        if (tipInsertError) console.error('tip_entries insert Fehler:', tipInsertError.message, tipInsertError);
+        const { error: tipInsertError } = await db.from('tip_entries').upsert(toInsert, { onConflict: 'user_id,entry_date' });
+        if (tipInsertError) console.error('tip_entries upsert Fehler:', tipInsertError.message, tipInsertError);
         else toInsert.forEach(e => (entries || []).push(e));
     }
 
