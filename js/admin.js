@@ -607,6 +607,17 @@ async function saveShift(payload, repeat, weeks) {
     }
     closeShiftModal();
     await updateShiftCell(currentShiftEmployeeId, currentShiftDateStr);
+    if (payload.employee_id) {
+        if (!editShiftId && repeat && weeks > 1) {
+            for (let i = 0; i < weeks; i++) {
+                const d = new Date(payload.shift_date + 'T12:00:00');
+                d.setDate(d.getDate() + i * 7);
+                await syncTipHoursForShift(payload.employee_id, d.toISOString().split('T')[0]);
+            }
+        } else {
+            await syncTipHoursForShift(payload.employee_id, payload.shift_date);
+        }
+    }
 }
 
 async function deleteShift() {
@@ -624,6 +635,50 @@ async function deleteShift() {
     }
     closeShiftModal();
     await updateShiftCell(currentShiftEmployeeId, currentShiftDateStr);
+    await syncTipHoursForShift(currentShiftEmployeeId, currentShiftDateStr);
+}
+
+async function syncTipHoursForShift(employeeId, dateStr) {
+    if (!employeeId || !dateStr) return;
+
+    const { data: shift } = await db.from('shifts')
+        .select('start_time,end_time,break_minutes,actual_start_time,actual_end_time,actual_break_minutes')
+        .eq('user_id', adminSession.user.id)
+        .eq('employee_id', employeeId)
+        .eq('shift_date', dateStr)
+        .eq('is_open', false)
+        .maybeSingle();
+
+    if (!shift) {
+        await db.from('tip_hours').delete().eq('user_id', adminSession.user.id).eq('employee_id', employeeId).eq('work_date', dateStr);
+        return;
+    }
+
+    const { data: sick } = await db.from('sick_leaves')
+        .select('id').eq('user_id', adminSession.user.id).eq('employee_id', employeeId)
+        .lte('start_date', dateStr).gte('end_date', dateStr).maybeSingle();
+
+    if (sick) {
+        await db.from('tip_hours').delete().eq('user_id', adminSession.user.id).eq('employee_id', employeeId).eq('work_date', dateStr);
+        return;
+    }
+
+    const startStr = shift.actual_start_time || shift.start_time;
+    const endStr = shift.actual_end_time || shift.end_time;
+    const breakMin = shift.actual_break_minutes ?? shift.break_minutes ?? 0;
+    const [sh, sm] = startStr.split(':').map(Number);
+    const [eh, em] = endStr.split(':').map(Number);
+    const minutes = (eh * 60 + em) - (sh * 60 + sm) - breakMin;
+
+    if (minutes <= 0) {
+        await db.from('tip_hours').delete().eq('user_id', adminSession.user.id).eq('employee_id', employeeId).eq('work_date', dateStr);
+        return;
+    }
+
+    await db.from('tip_hours').upsert(
+        { user_id: adminSession.user.id, employee_id: employeeId, work_date: dateStr, minutes },
+        { onConflict: 'user_id,employee_id,work_date' }
+    );
 }
 
 function toggleRepeat() {
