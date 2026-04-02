@@ -3816,8 +3816,10 @@ async function loadTrinkgeld() {
         if (minutes <= 0) continue;
         tipHoursRows.push({ user_id: adminSession.user.id, employee_id: shift.employee_id, work_date: d, minutes });
     }
+    console.log('Trinkgeld-Sync: Schichten gefunden:', (monthShifts || []).length, '| tip_hours Zeilen:', tipHoursRows.length);
     if (tipHoursRows.length > 0) {
-        await db.from('tip_hours').upsert(tipHoursRows, { onConflict: 'user_id,employee_id,work_date' });
+        const { error: syncError } = await db.from('tip_hours').upsert(tipHoursRows, { onConflict: 'user_id,employee_id,work_date' });
+        if (syncError) console.error('tip_hours upsert Fehler:', syncError.message, syncError);
     }
 
     const { data: tipHours } = await db.from('tip_hours').select('*, employees_planit(name, department)').eq('user_id', adminSession.user.id).gte('work_date', firstDay).lte('work_date', lastDay);
