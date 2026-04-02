@@ -3924,6 +3924,7 @@ async function loadTrinkgeld() {
                 return aDept.localeCompare(bDept);
             });
 
+            if (dateStr === '2026-04-21') console.log('empResults April 21:', Object.keys(d.empResults), '| d.hours:', d.hours.map(h => ({ empId: h.employee_id, minutes: h.minutes, name: h.employees_planit?.name })));
             let lastDept = null;
                 const empRows = empResultsSorted.map(([empId, r]) => {
                 const emp = (tipHours || []).find(h => h.employee_id === empId);
