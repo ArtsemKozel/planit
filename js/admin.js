@@ -626,6 +626,7 @@ async function deleteShift() {
 
     await db.from('open_shift_requests').delete().eq('shift_id', editShiftId);
     await db.from('shift_swaps').delete().eq('shift_id', editShiftId);
+    await db.from('shift_swaps').delete().eq('target_shift_id', editShiftId);
     await db.from('shift_handovers').delete().eq('shift_id', editShiftId);
 
     const { error } = await db.from('shifts').delete().eq('id', editShiftId);
