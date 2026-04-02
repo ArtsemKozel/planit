@@ -97,7 +97,7 @@ input, select, textarea {
     padding: 0.75rem 1rem;
     border: 1px solid #E0E0E0;
     border-radius: 8px;
-    font-size: 1rem;
+    font-size: 16px;
     background: white;
     color: var(--color-text);
     outline: none;
