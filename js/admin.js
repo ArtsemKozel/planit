@@ -435,6 +435,10 @@ async function openShiftModal(employeeId, dateStr, existingShift) {
     document.getElementById('shift-open-note-group').style.display = existingShift?.is_open ? 'block' : 'none';
     document.getElementById('shift-dept-group').style.display = existingShift?.is_open ? 'block' : 'none';
     document.getElementById('shift-department').value = existingShift?.department || 'Service';
+    document.getElementById('shift-actual-group').style.display = existingShift ? 'block' : 'none';
+    document.getElementById('shift-actual-start').value = existingShift?.actual_start_time ? existingShift.actual_start_time.slice(0, 5) : '';
+    document.getElementById('shift-actual-end').value = existingShift?.actual_end_time ? existingShift.actual_end_time.slice(0, 5) : '';
+    document.getElementById('shift-actual-break').value = existingShift?.actual_break_minutes ?? '';
     document.getElementById('shift-repeat').checked = false;
     document.getElementById('shift-repeat-group').style.display = 'none';
     document.getElementById('shift-repeat-weeks').value = 4;
@@ -464,7 +468,12 @@ async function submitShift() {
     }
 
     const isOpen = document.getElementById('shift-is-open').checked;
-    const payload = {
+    const payload = editShiftId ? {
+        actual_start_time: document.getElementById('shift-actual-start').value || null,
+        actual_end_time: document.getElementById('shift-actual-end').value || null,
+        actual_break_minutes: document.getElementById('shift-actual-break').value !== '' ? parseInt(document.getElementById('shift-actual-break').value) : null,
+    } : {};
+    Object.assign(payload, {
         user_id: adminSession.user.id,
         employee_id: isOpen ? null : employeeId,
         shift_date: date,
@@ -475,7 +484,7 @@ async function submitShift() {
         is_open: isOpen,
         open_note: isOpen ? (document.getElementById('shift-open-note').value || null) : null,
         department: isOpen ? document.getElementById('shift-department').value : null
-    };
+    });
 
     const repeat = document.getElementById('shift-repeat').checked;
     const weeks = parseInt(document.getElementById('shift-repeat-weeks').value) || 1;
