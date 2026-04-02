@@ -3789,10 +3789,41 @@ async function loadTrinkgeld() {
     const daysInMonth = new Date(year, month + 1, 0).getDate();
 
     // Alle Daten laden
-    const { data: entries } = await db.from('tip_entries').select('*').eq('user_id', adminSession.user.id).gte('entry_date', firstDay).lte('entry_date', lastDay).order('entry_date', { ascending: false });
+    const [
+        { data: entries },
+        { data: depts },
+        { data: monthShifts },
+        { data: sickLeaves },
+        { data: vacations },
+    ] = await Promise.all([
+        db.from('tip_entries').select('*').eq('user_id', adminSession.user.id).gte('entry_date', firstDay).lte('entry_date', lastDay).order('entry_date', { ascending: false }),
+        db.from('tip_departments').select('*').eq('user_id', adminSession.user.id),
+        db.from('shifts').select('employee_id,shift_date,start_time,end_time,break_minutes,actual_start_time,actual_end_time,actual_break_minutes').eq('user_id', adminSession.user.id).eq('is_open', false).gte('shift_date', firstDay).lte('shift_date', lastDay),
+        db.from('sick_leaves').select('employee_id,start_date,end_date').eq('user_id', adminSession.user.id).lte('start_date', lastDay).gte('end_date', firstDay),
+        db.from('vacation_requests').select('employee_id,start_date,end_date').eq('user_id', adminSession.user.id).eq('status', 'approved').lte('start_date', lastDay).gte('end_date', firstDay),
+    ]);
+
+    // Schichten in tip_hours synchronisieren
+    const tipHoursRows = [];
+    for (const shift of (monthShifts || [])) {
+        if (!shift.employee_id) continue;
+        const d = shift.shift_date;
+        if ((sickLeaves || []).some(s => s.employee_id === shift.employee_id && s.start_date <= d && s.end_date >= d)) continue;
+        if ((vacations || []).some(v => v.employee_id === shift.employee_id && v.start_date <= d && v.end_date >= d)) continue;
+        const startStr = shift.actual_start_time || shift.start_time;
+        const endStr = shift.actual_end_time || shift.end_time;
+        const breakMin = shift.actual_break_minutes ?? shift.break_minutes ?? 0;
+        const [sh, sm] = startStr.split(':').map(Number);
+        const [eh, em] = endStr.split(':').map(Number);
+        const minutes = (eh * 60 + em) - (sh * 60 + sm) - breakMin;
+        if (minutes <= 0) continue;
+        tipHoursRows.push({ user_id: adminSession.user.id, employee_id: shift.employee_id, work_date: d, minutes });
+    }
+    if (tipHoursRows.length > 0) {
+        await db.from('tip_hours').upsert(tipHoursRows, { onConflict: 'user_id,employee_id,work_date' });
+    }
+
     const { data: tipHours } = await db.from('tip_hours').select('*, employees_planit(name, department)').eq('user_id', adminSession.user.id).gte('work_date', firstDay).lte('work_date', lastDay);
-    const { data: depts } = await db.from('tip_departments').select('*').eq('user_id', adminSession.user.id);
-    const { data: config } = await db.from('tip_config').select('*').eq('user_id', adminSession.user.id).maybeSingle();
 
     // Fehlende Tage des Monats in tip_entries anlegen
     const existingDates = new Set((entries || []).map(e => e.entry_date));
