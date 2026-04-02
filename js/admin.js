@@ -3794,11 +3794,25 @@ async function loadTrinkgeld() {
     const { data: depts } = await db.from('tip_departments').select('*').eq('user_id', adminSession.user.id);
     const { data: config } = await db.from('tip_config').select('*').eq('user_id', adminSession.user.id).maybeSingle();
 
-    // Alle Tage mit Daten sammeln
-    const allDates = [...new Set([
-        ...(entries || []).map(e => e.entry_date),
-        ...(tipHours || []).map(h => h.work_date)
-    ])].sort((a, b) => b.localeCompare(a));
+    // Fehlende Tage des Monats in tip_entries anlegen
+    const existingDates = new Set((entries || []).map(e => e.entry_date));
+    const toInsert = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${monthStr}-${String(d).padStart(2, '0')}`;
+        if (!existingDates.has(dateStr)) {
+            toInsert.push({ user_id: adminSession.user.id, entry_date: dateStr, amount_card: 0, amount_cash: 0 });
+        }
+    }
+    if (toInsert.length > 0) {
+        await db.from('tip_entries').insert(toInsert);
+        toInsert.forEach(e => (entries || []).push(e));
+    }
+
+    // Alle Tage des Monats absteigend
+    const allDates = [];
+    for (let d = daysInMonth; d >= 1; d--) {
+        allDates.push(`${monthStr}-${String(d).padStart(2, '0')}`);
+    }
 
     // Pro Tag berechnen
     const empMonthTotals = {};
