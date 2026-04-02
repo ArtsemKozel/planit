@@ -3855,6 +3855,7 @@ async function loadTrinkgeld() {
         const dayEntry = (entries || []).find(e => e.entry_date === dateStr);
         const dayCard = dayEntry ? parseFloat(dayEntry.amount_card) : 0;
         const dayCash = dayEntry ? parseFloat(dayEntry.amount_cash) : 0;
+        if (dateStr === '2026-04-21') console.log('dateStr:', dateStr, '| tipHours gefunden:', (tipHours || []).filter(h => h.work_date === dateStr));
         const dayHours = (tipHours || []).filter(h => h.work_date === dateStr);
         dayResults[dateStr] = { card: dayCard, cash: dayCash, hours: dayHours, empResults: {} };
 
