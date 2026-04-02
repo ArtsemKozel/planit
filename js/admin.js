@@ -3794,15 +3794,11 @@ async function loadTrinkgeld() {
         { data: depts },
         { data: monthShifts },
         { data: sickLeaves },
-        { data: vacations },
-        { data: availabilities },
     ] = await Promise.all([
         db.from('tip_entries').select('*').eq('user_id', adminSession.user.id).gte('entry_date', firstDay).lte('entry_date', lastDay).order('entry_date', { ascending: false }),
         db.from('tip_departments').select('*').eq('user_id', adminSession.user.id),
         db.from('shifts').select('employee_id,shift_date,start_time,end_time,break_minutes,actual_start_time,actual_end_time,actual_break_minutes').eq('user_id', adminSession.user.id).eq('is_open', false).gte('shift_date', firstDay).lte('shift_date', lastDay),
         db.from('sick_leaves').select('employee_id,start_date,end_date').eq('user_id', adminSession.user.id).lte('start_date', lastDay).gte('end_date', firstDay),
-        db.from('vacation_requests').select('employee_id,start_date,end_date').eq('user_id', adminSession.user.id).eq('status', 'approved').lte('start_date', lastDay).gte('end_date', firstDay),
-        db.from('availability').select('employee_id,available_days').eq('user_id', adminSession.user.id).eq('month', firstDay),
     ]);
 
     // Schichten in tip_hours synchronisieren
@@ -3811,10 +3807,6 @@ async function loadTrinkgeld() {
         if (!shift.employee_id) continue;
         const d = shift.shift_date;
         if ((sickLeaves || []).some(s => s.employee_id === shift.employee_id && s.start_date <= d && s.end_date >= d)) continue;
-        if ((vacations || []).some(v => v.employee_id === shift.employee_id && v.start_date <= d && v.end_date >= d)) continue;
-        const avail = (availabilities || []).find(a => a.employee_id === shift.employee_id);
-        const dayNum = parseInt(d.split('-')[2]);
-        if (avail?.available_days?.[dayNum]?.status === 'off') continue;
         const startStr = shift.actual_start_time || shift.start_time;
         const endStr = shift.actual_end_time || shift.end_time;
         const breakMin = shift.actual_break_minutes ?? shift.break_minutes ?? 0;
