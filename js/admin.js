@@ -2026,16 +2026,25 @@ async function loadAdminStunden() {
         const am = approvedMinutes !== null ? String(approvedMinutes % 60).padStart(2, '0') : '';
         const approvedDisplay = approvedMinutes !== null ? `${ah}h ${am}m` : '–';
 
-        // Ist-Stunden (actual)
-        const actualEntry = (actualHours || []).find(a => a.employee_id === emp.id);
-        const actualMinutes = actualEntry ? actualEntry.actual_minutes : null;
-        const actualDisplay = actualMinutes !== null ? `${Math.floor(actualMinutes/60)}h ${String(actualMinutes%60).padStart(2,'0')}m` : '–';
+        // Gearbeitet: aus Schichten berechnen (actual_* wenn vorhanden, sonst geplante Zeiten)
+        let actualMinutes = 0;
+        empShifts.forEach(s => {
+            const startStr = s.actual_start_time || s.start_time;
+            const endStr = s.actual_end_time || s.end_time;
+            const breakMin = (s.actual_break_minutes !== null && s.actual_break_minutes !== undefined)
+                ? s.actual_break_minutes : (s.break_minutes || 0);
+            const [sh, sm] = startStr.split(':').map(Number);
+            const [eh, em] = endStr.split(':').map(Number);
+            actualMinutes += (eh * 60 + em) - (sh * 60 + sm) - breakMin;
+        });
+        const actualDisplay = `${Math.floor(actualMinutes / 60)}h ${String(actualMinutes % 60).padStart(2, '0')}m`;
 
-        // Vormonat-Differenz
+        // Vormonat-Differenz (carry_over bleibt aus actual_hours)
+        const actualEntry = (actualHours || []).find(a => a.employee_id === emp.id);
         const prevDiffMinutes = actualEntry ? (actualEntry.carry_over_minutes || 0) : 0;
 
         // Aktuelle Differenz
-        const diffMinutes = actualMinutes !== null && approvedMinutes !== null
+        const diffMinutes = approvedMinutes !== null
             ? actualMinutes - approvedMinutes + prevDiffMinutes
             : null;
         const diffDisplay = diffMinutes !== null
@@ -2061,12 +2070,7 @@ async function loadAdminStunden() {
                 </div>
                 <div>
                     <div style="font-size:0.75rem; color:var(--color-text-light); margin-bottom:0.3rem;">GEARBEITET</div>
-                    <div style="display:flex; align-items:center; gap:0.5rem;">
-                        <span style="font-weight:600;">${actualDisplay}</span>
-                        <button class="btn-small btn-pdf-view btn-icon" data-empid="${emp.id}" data-name="${emp.name}" data-month="${monthStr}" data-minutes="${actualMinutes !== null ? actualMinutes : 0}" onclick="openActualModal(this)">
-                            <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                        </button>
-                    </div>
+                    <div style="font-weight:600;">${actualDisplay}</div>
                 </div>
                 <div>
                     <div style="font-size:0.75rem; color:var(--color-text-light); margin-bottom:0.3rem;">VORMONAT</div>
