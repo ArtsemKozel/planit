@@ -117,39 +117,6 @@ async function logout() {
 }
 
 // ── PULL TO REFRESH ───────────────────────────────────────
-function initPullToRefresh() {
-    let startY = 0;
-    let pulling = false;
-
-    const indicator = document.createElement('div');
-    indicator.className = 'ptr-indicator';
-    indicator.textContent = '↓ Zum Aktualisieren ziehen';
-    document.body.prepend(indicator);
-
-    document.addEventListener('touchstart', e => {
-        console.log('ptr start', document.querySelector('.modal-overlay.active'));
-        if (window.scrollY === 0 && !document.getElementById('time-picker-modal')?.classList.contains('active')) {
-            startY = e.touches[0].clientY;
-            pulling = true;
-        }
-    }, { passive: true });
-
-    document.addEventListener('touchmove', e => {
-        if (!pulling) return;
-        const diff = e.touches[0].clientY - startY;
-        if (diff > 0) {
-            indicator.style.height = Math.min(diff / 3, 50) + 'px';
-            indicator.textContent = diff > 80 ? '↑ Loslassen zum Aktualisieren' : '↓ Zum Aktualisieren ziehen';
-        }
-    }, { passive: true });
-
-    document.addEventListener('touchend', e => {
-        if (!pulling) return;
-        const diff = e.changedTouches[0].clientY - startY;
-        indicator.style.height = '0';
-        if (diff > 80) location.reload();
-        pulling = false;
-    });
-}
+function initPullToRefresh() {}
 
 document.addEventListener('DOMContentLoaded', initPullToRefresh);
