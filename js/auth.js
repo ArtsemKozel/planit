@@ -127,7 +127,7 @@ function initPullToRefresh() {
     document.body.prepend(indicator);
 
     document.addEventListener('touchstart', e => {
-        if (window.scrollY === 0 && !e.target.closest('#time-picker-modal')) {
+        if (window.scrollY === 0 && !document.getElementById('time-picker-modal')?.classList.contains('active')) {
             startY = e.touches[0].clientY;
             pulling = true;
         }
