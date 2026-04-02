@@ -4430,16 +4430,15 @@ function openTimePicker(empId, empName) {
     attachInfinite(hCol, TP_H_COUNT);
     attachInfinite(mCol, TP_M_COUNT);
 
-    const blockTouch = (e) => { e.stopPropagation(); e.preventDefault(); };
-    const touchOpts = { passive: false };
+    const stopProp = (e) => { e.stopPropagation(); };
     for (const col of [hCol, mCol]) {
-        col.addEventListener('touchstart', blockTouch, touchOpts);
-        col.addEventListener('touchmove', blockTouch, touchOpts);
-        col.addEventListener('touchend', blockTouch, touchOpts);
+        col.addEventListener('touchstart', stopProp);
+        col.addEventListener('touchmove', stopProp);
+        col.addEventListener('touchend', stopProp);
         timePickerCleanup.push(() => {
-            col.removeEventListener('touchstart', blockTouch, touchOpts);
-            col.removeEventListener('touchmove', blockTouch, touchOpts);
-            col.removeEventListener('touchend', blockTouch, touchOpts);
+            col.removeEventListener('touchstart', stopProp);
+            col.removeEventListener('touchmove', stopProp);
+            col.removeEventListener('touchend', stopProp);
         });
     }
 }
