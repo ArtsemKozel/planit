@@ -3872,15 +3872,11 @@ async function loadTrinkgeld() {
         if (minutes <= 0) continue;
         tipHoursRows.push({ user_id: adminSession.user.id, employee_id: shift.employee_id, work_date: d, minutes });
     }
-    console.log('Trinkgeld-Sync: Schichten gefunden:', (monthShifts || []).length, '| tip_hours Zeilen:', tipHoursRows.length);
     if (tipHoursRows.length > 0) {
-        const { error: syncError } = await db.from('tip_hours').upsert(tipHoursRows, { onConflict: 'user_id,employee_id,work_date' });
-        if (syncError) console.error('tip_hours upsert Fehler:', syncError.message, syncError);
+        await db.from('tip_hours').upsert(tipHoursRows, { onConflict: 'user_id,employee_id,work_date' });
     }
 
     const { data: tipHours } = await db.from('tip_hours').select('*, employees_planit(name, department)').eq('user_id', adminSession.user.id).gte('work_date', firstDay).lte('work_date', lastDay);
-    console.log('tip_hours 2026-04-21:', (tipHours || []).filter(h => h.work_date === '2026-04-21'));
-
     // Fehlende Tage des Monats in tip_entries anlegen
     const existingDates = new Set((entries || []).map(e => e.entry_date));
     const toInsert = [];
@@ -3891,9 +3887,8 @@ async function loadTrinkgeld() {
         }
     }
     if (toInsert.length > 0) {
-        const { error: tipInsertError } = await db.from('tip_entries').upsert(toInsert, { onConflict: 'user_id,entry_date' });
-        if (tipInsertError) console.error('tip_entries upsert Fehler:', tipInsertError.message, tipInsertError);
-        else toInsert.forEach(e => (entries || []).push(e));
+        await db.from('tip_entries').upsert(toInsert, { onConflict: 'user_id,entry_date' });
+        toInsert.forEach(e => (entries || []).push(e));
     }
 
     // Alle Tage des Monats aufsteigend
@@ -3911,7 +3906,6 @@ async function loadTrinkgeld() {
         const dayEntry = (entries || []).find(e => e.entry_date === dateStr);
         const dayCard = dayEntry ? parseFloat(dayEntry.amount_card) : 0;
         const dayCash = dayEntry ? parseFloat(dayEntry.amount_cash) : 0;
-        if (dateStr === '2026-04-21') console.log('dateStr:', dateStr, '| tipHours gefunden:', (tipHours || []).filter(h => h.work_date === dateStr));
         const dayHours = (tipHours || []).filter(h => h.work_date === dateStr);
         dayResults[dateStr] = { card: dayCard, cash: dayCash, hours: dayHours, empResults: {} };
 
@@ -3980,7 +3974,6 @@ async function loadTrinkgeld() {
                 return aDept.localeCompare(bDept);
             });
 
-            if (dateStr === '2026-04-21') console.log('empResults April 21:', Object.keys(d.empResults), '| d.hours:', d.hours.map(h => ({ empId: h.employee_id, minutes: h.minutes, name: h.employees_planit?.name })));
             let lastDept = null;
                 const empRows = empResultsSorted.map(([empId, r]) => {
                 const emp = (tipHours || []).find(h => h.employee_id === empId);
@@ -4695,7 +4688,6 @@ async function deleteTrinkgeldEntryDirect(id) {
 }
 
 async function saveTrinkgeldResults() {
-    console.log('saveTrinkgeldResults called');
     const year = trinkgeldDate.getFullYear();
     const month = trinkgeldDate.getMonth();
     const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
