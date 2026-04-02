@@ -3823,6 +3823,7 @@ async function loadTrinkgeld() {
     }
 
     const { data: tipHours } = await db.from('tip_hours').select('*, employees_planit(name, department)').eq('user_id', adminSession.user.id).gte('work_date', firstDay).lte('work_date', lastDay);
+    console.log('tip_hours 2026-04-21:', (tipHours || []).filter(h => h.work_date === '2026-04-21'));
 
     // Fehlende Tage des Monats in tip_entries anlegen
     const existingDates = new Set((entries || []).map(e => e.entry_date));
