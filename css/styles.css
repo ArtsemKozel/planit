@@ -169,7 +169,7 @@ label {
     transform: translateY(-50%);
     background: none;
     border: none;
-    color: var(--color-primary);
+    color: var(--color-text-light);
     cursor: pointer;
     padding: 0.4rem;
     border-radius: 8px;
