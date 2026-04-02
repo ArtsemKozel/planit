@@ -4405,6 +4405,7 @@ function openTimePicker(empId, empName) {
     mCol.innerHTML = buildCircular(TP_M_COUNT);
 
     document.getElementById('time-picker-modal').classList.add('active');
+    document.body.style.overflow = 'hidden';
     setTimeout(() => {
         hCol.scrollTop = (TP_H_COUNT + currentH - 1) * TP_ITEM_H;
         mCol.scrollTop = (TP_M_COUNT + currentM - 1) * TP_ITEM_H;
@@ -4445,6 +4446,7 @@ function openTimePicker(empId, empName) {
 
 function closeTimePicker() {
     document.getElementById('time-picker-modal').classList.remove('active');
+    document.body.style.overflow = '';
     timePickerCleanup.forEach(fn => fn());
     timePickerCleanup = [];
     timePickerEmpId = null;
