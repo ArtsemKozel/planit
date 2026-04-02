@@ -3808,9 +3808,9 @@ async function loadTrinkgeld() {
         toInsert.forEach(e => (entries || []).push(e));
     }
 
-    // Alle Tage des Monats absteigend
+    // Alle Tage des Monats aufsteigend
     const allDates = [];
-    for (let d = daysInMonth; d >= 1; d--) {
+    for (let d = 1; d <= daysInMonth; d++) {
         allDates.push(`${monthStr}-${String(d).padStart(2, '0')}`);
     }
 
