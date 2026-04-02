@@ -3859,7 +3859,7 @@ async function loadTrinkgeld() {
         const dayHours = (tipHours || []).filter(h => h.work_date === dateStr);
         dayResults[dateStr] = { card: dayCard, cash: dayCash, hours: dayHours, empResults: {} };
 
-        if (dayCard === 0 && dayCash === 0) continue;
+        if (dayCard === 0 && dayCash === 0 && dayHours.length === 0) continue;
         if (!depts || depts.length === 0) continue;
 
         for (const dept of depts) {
