@@ -3835,8 +3835,9 @@ async function loadTrinkgeld() {
         }
     }
     if (toInsert.length > 0) {
-        await db.from('tip_entries').insert(toInsert);
-        toInsert.forEach(e => (entries || []).push(e));
+        const { error: tipInsertError } = await db.from('tip_entries').insert(toInsert);
+        if (tipInsertError) console.error('tip_entries insert Fehler:', tipInsertError.message, tipInsertError);
+        else toInsert.forEach(e => (entries || []).push(e));
     }
 
     // Alle Tage des Monats aufsteigend
