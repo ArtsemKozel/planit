@@ -127,6 +127,7 @@ function initPullToRefresh() {
     document.body.prepend(indicator);
 
     document.addEventListener('touchstart', e => {
+        console.log('ptr start', document.querySelector('.modal-overlay.active'));
         if (window.scrollY === 0 && !document.getElementById('time-picker-modal')?.classList.contains('active')) {
             startY = e.touches[0].clientY;
             pulling = true;
