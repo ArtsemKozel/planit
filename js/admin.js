@@ -306,8 +306,18 @@ async function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
                 const shift = shifts.find(s => s.employee_id === emp.id && s.shift_date === dateStr);
                 const cell = document.createElement('div');
                 cell.className = 'week-cell' + (shift ? ' has-shift' : '');
-                cell.textContent = shift ? `${shift.start_time.slice(0,5)}\n${shift.end_time.slice(0,5)}` : '+';
                 cell.style.whiteSpace = 'pre';
+                cell.style.position = 'relative';
+                if (shift) {
+                    cell.textContent = `${shift.start_time.slice(0,5)}\n${shift.end_time.slice(0,5)}`;
+                    if (shift.actual_start_time) {
+                        const dot = document.createElement('div');
+                        dot.style.cssText = 'position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:var(--color-primary);';
+                        cell.appendChild(dot);
+                    }
+                } else {
+                    cell.textContent = '+';
+                }
 
                 if (planningMode && !shift) {
                     const empAvail = availCache[emp.id] || {};
@@ -3852,11 +3862,22 @@ async function updateShiftCell(employeeId, dateStr) {
 
         const shift = (shifts || []).find(s => s.employee_id === employeeId && !s.is_open);
         cell.className = 'week-cell' + (shift ? ' has-shift' : '');
-        cell.textContent = shift ? `${shift.start_time.slice(0,5)}\n${shift.end_time.slice(0,5)}` : '+';
         cell.style.whiteSpace = 'pre';
+        cell.style.position = 'relative';
         cell.style.background = '';
         cell.style.color = '';
         cell.style.fontSize = '';
+        cell.innerHTML = '';
+        if (shift) {
+            cell.textContent = `${shift.start_time.slice(0,5)}\n${shift.end_time.slice(0,5)}`;
+            if (shift.actual_start_time) {
+                const dot = document.createElement('div');
+                dot.style.cssText = 'position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:var(--color-primary);';
+                cell.appendChild(dot);
+            }
+        } else {
+            cell.textContent = '+';
+        }
         cell.onclick = () => openShiftModal(employeeId, dateStr, shift || null);
     } else {
         // Offene Schicht
