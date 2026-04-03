@@ -2132,13 +2132,13 @@ async function loadAdminStunden() {
 
         return `
         <div class="card" style="margin-bottom:0.75rem;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; cursor:pointer;" onclick="toggleStundenEmp('${emp.id}')">
+            <button style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:1rem; background:none; border:none; padding:0; cursor:pointer; touch-action:manipulation; text-align:left;" onclick="toggleStundenEmp('${emp.id}')">
                 <div style="font-weight:600;">${emp.name}</div>
                 <div style="display:flex; align-items:center; gap:0.75rem;">
                     <div style="font-size:0.8rem; color:var(--color-text-light);">${emp.department}</div>
                     <span id="stunden-toggle-${emp.id}" style="color:var(--color-text-light);">▶</span>
                 </div>
-            </div>
+            </button>
             <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:1rem;">
                 <div>
                     <div style="font-size:0.75rem; color:var(--color-text-light); margin-bottom:0.3rem;">ABGERECHNET</div>
