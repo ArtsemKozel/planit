@@ -2108,11 +2108,36 @@ async function loadAdminStunden() {
             : '–';
         const diffColor = diffMinutes === null ? 'var(--color-text-light)' : diffMinutes > 0 ? '#2d7a2d' : diffMinutes < 0 ? 'var(--color-red)' : 'var(--color-text-light)';
 
+        const shiftRows = empShifts
+            .slice().sort((a, b) => a.shift_date.localeCompare(b.shift_date))
+            .map(s => {
+                const dateLabel = new Date(s.shift_date + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
+                const startStr = s.actual_start_time || s.start_time;
+                const endStr = s.actual_end_time || s.end_time;
+                const breakMin = (s.actual_break_minutes !== null && s.actual_break_minutes !== undefined) ? s.actual_break_minutes : (s.break_minutes || 0);
+                const [sh, sm] = startStr.split(':').map(Number);
+                const [eh, em] = endStr.split(':').map(Number);
+                const mins = (eh * 60 + em) - (sh * 60 + sm) - breakMin;
+                const durStr = `${Math.floor(mins/60)}h ${String(mins%60).padStart(2,'0')}m`;
+                const plannedStr = `${s.start_time.slice(0,5)}–${s.end_time.slice(0,5)}`;
+                const hasActual = s.actual_start_time || s.actual_end_time;
+                const actualStr = hasActual ? `<span style="color:var(--color-primary);">${(s.actual_start_time||s.start_time).slice(0,5)}–${(s.actual_end_time||s.end_time).slice(0,5)}${s.actual_break_minutes != null ? ` (${s.actual_break_minutes}m)` : ''}</span>` : '';
+                return `<div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; padding:0.25rem 0; border-bottom:1px solid var(--color-border);">
+                    <span style="min-width:6rem;">${dateLabel}</span>
+                    <span style="color:var(--color-text-light);">${plannedStr}</span>
+                    ${actualStr}
+                    <span style="font-weight:600; min-width:4rem; text-align:right;">${durStr}</span>
+                </div>`;
+            }).join('');
+
         return `
         <div class="card" style="margin-bottom:0.75rem;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; cursor:pointer;" onclick="toggleStundenEmp('${emp.id}')">
                 <div style="font-weight:600;">${emp.name}</div>
-                <div style="font-size:0.8rem; color:var(--color-text-light);">${emp.department}</div>
+                <div style="display:flex; align-items:center; gap:0.75rem;">
+                    <div style="font-size:0.8rem; color:var(--color-text-light);">${emp.department}</div>
+                    <span id="stunden-toggle-${emp.id}" style="color:var(--color-text-light);">▶</span>
+                </div>
             </div>
             <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:1rem;">
                 <div>
@@ -2142,10 +2167,21 @@ async function loadAdminStunden() {
                 <div style="font-size:0.75rem; color:var(--color-text-light); margin-bottom:0.2rem;">SALDO</div>
                 <div style="font-weight:700; font-size:1.1rem; color:${diffColor};">${diffDisplay}</div>
             </div>
+            <div id="stunden-shifts-${emp.id}" style="display:none; margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid var(--color-border);">
+                ${shiftRows || '<div style="font-size:0.8rem; color:var(--color-text-light);">Keine Schichten.</div>'}
+            </div>
         </div>`;
     }).join('');
 
     document.getElementById('admin-stunden-list').innerHTML = html;
+}
+
+function toggleStundenEmp(empId) {
+    const body = document.getElementById(`stunden-shifts-${empId}`);
+    const toggle = document.getElementById(`stunden-toggle-${empId}`);
+    const open = body.style.display === 'none';
+    body.style.display = open ? 'block' : 'none';
+    toggle.textContent = open ? '▼' : '▶';
 }
 
 function openActualModal(btn) {
