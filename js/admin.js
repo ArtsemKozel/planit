@@ -356,39 +356,72 @@ async function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
         deptStundenDiv.style.padding = '0.5rem 0.75rem';
         deptStundenDiv.style.marginTop = '0.25rem';
         deptStundenDiv.style.marginBottom = '0.5rem';
+        deptStundenDiv.dataset.stundenDept = dept;
 
         const deptEmps = employees.filter(e => (e.department || 'Allgemein') === dept);
-        deptStundenDiv.innerHTML = deptEmps.map(emp => {
-            const empWeekShifts = shifts.filter(s => s.employee_id === emp.id && !s.is_open);
-            let weekMinutes = 0;
-            empWeekShifts.forEach(s => {
-                const start = s.start_time.slice(0,5).split(':').map(Number);
-                const end = s.end_time.slice(0,5).split(':').map(Number);
-                weekMinutes += (end[0]*60+end[1]) - (start[0]*60+start[1]) - (s.break_minutes || 0);
-            });
-            const empMonthShifts = (monthShifts || []).filter(s => s.employee_id === emp.id);
-            let monthMinutes = 0;
-            empMonthShifts.forEach(s => {
-                const start = s.start_time.slice(0,5).split(':').map(Number);
-                const end = s.end_time.slice(0,5).split(':').map(Number);
-                monthMinutes += (end[0]*60+end[1]) - (start[0]*60+start[1]) - (s.break_minutes || 0);
-            });
-            const weekH = (weekMinutes / 60).toFixed(1);
-            const monthH = (monthMinutes / 60).toFixed(1);
-            const weekColor = weekMinutes === 0 ? 'var(--color-text-light)' :
-                weekMinutes > 600 ? '#c05050' :
-                weekMinutes < 240 ? '#b8a020' : '#6aaa6a';
-            const parts = emp.name.trim().split(' ');
-            const displayName = parts.length > 1 ? `${parts[0]} ${parts[1][0]}.` : parts[0];
-            return `<div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0; border-bottom:1px solid var(--color-border);">
-                <span style="font-size:0.9rem; font-weight:600;">${displayName}</span>
-                <div style="font-size:0.85rem;">
-                    <span style="color:${weekColor}; font-weight:600;">${weekH}h KW${kwNumber}</span>
-                    <span style="color:var(--color-text-light); margin-left:0.5rem;">/ ${monthH}h ${monthNames[month-1]}</span>
-                </div>
-            </div>`;
-        }).join('');
+        deptStundenDiv.innerHTML = buildStundenDivHtml(deptEmps, shifts, monthShifts, kwNumber, month, monthNames);
         grid.appendChild(deptStundenDiv);
+    });
+}
+
+function buildStundenDivHtml(deptEmps, weekShifts, monthShifts, kwNumber, month, monthNames) {
+    return deptEmps.map(emp => {
+        const empWeekShifts = weekShifts.filter(s => s.employee_id === emp.id && !s.is_open);
+        let weekMinutes = 0;
+        empWeekShifts.forEach(s => {
+            const start = s.start_time.slice(0,5).split(':').map(Number);
+            const end = s.end_time.slice(0,5).split(':').map(Number);
+            weekMinutes += (end[0]*60+end[1]) - (start[0]*60+start[1]) - (s.break_minutes || 0);
+        });
+        const empMonthShifts = (monthShifts || []).filter(s => s.employee_id === emp.id);
+        let monthMinutes = 0;
+        empMonthShifts.forEach(s => {
+            const start = s.start_time.slice(0,5).split(':').map(Number);
+            const end = s.end_time.slice(0,5).split(':').map(Number);
+            monthMinutes += (end[0]*60+end[1]) - (start[0]*60+start[1]) - (s.break_minutes || 0);
+        });
+        const weekH = (weekMinutes / 60).toFixed(1);
+        const monthH = (monthMinutes / 60).toFixed(1);
+        const weekColor = weekMinutes === 0 ? 'var(--color-text-light)' :
+            weekMinutes > 600 ? '#c05050' :
+            weekMinutes < 240 ? '#b8a020' : '#6aaa6a';
+        const parts = emp.name.trim().split(' ');
+        const displayName = parts.length > 1 ? `${parts[0]} ${parts[1][0]}.` : parts[0];
+        return `<div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0; border-bottom:1px solid var(--color-border);">
+            <span style="font-size:0.9rem; font-weight:600;">${displayName}</span>
+            <div style="font-size:0.85rem;">
+                <span style="color:${weekColor}; font-weight:600;">${weekH}h KW${kwNumber}</span>
+                <span style="color:var(--color-text-light); margin-left:0.5rem;">/ ${monthH}h ${monthNames[month-1]}</span>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+async function refreshHoursOverview() {
+    const divs = document.querySelectorAll('[data-stunden-dept]');
+    if (!divs.length) return;
+
+    const monday = getMonday(weekDate);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const year = monday.getFullYear();
+    const month = monday.getMonth() + 1;
+    const monthStart = `${year}-${String(month).padStart(2,'0')}-01`;
+    const monthEnd = `${year}-${String(month).padStart(2,'0')}-${new Date(year, month, 0).getDate()}`;
+    const weekStart = monday.toISOString().split('T')[0];
+    const weekEnd = sunday.toISOString().split('T')[0];
+    const kwNumber = Math.ceil(((monday - new Date(year, 0, 1)) / 86400000 + new Date(year, 0, 1).getDay() + 1) / 7);
+    const monthNames = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+
+    const [{ data: weekShifts }, { data: monthShifts }] = await Promise.all([
+        db.from('shifts').select('employee_id,start_time,end_time,break_minutes').eq('user_id', adminSession.user.id).eq('is_open', false).gte('shift_date', weekStart).lte('shift_date', weekEnd),
+        db.from('shifts').select('employee_id,start_time,end_time,break_minutes').eq('user_id', adminSession.user.id).eq('is_open', false).gte('shift_date', monthStart).lte('shift_date', monthEnd),
+    ]);
+
+    divs.forEach(div => {
+        const dept = div.dataset.stundenDept;
+        const deptEmps = employees.filter(e => (e.department || 'Allgemein') === dept);
+        div.innerHTML = buildStundenDivHtml(deptEmps, weekShifts || [], monthShifts || [], kwNumber, month, monthNames);
     });
 }
 
@@ -615,6 +648,7 @@ async function saveShift(payload, repeat, weeks) {
     }
     closeShiftModal();
     await updateShiftCell(currentShiftEmployeeId, currentShiftDateStr);
+    await refreshHoursOverview();
     if (payload.employee_id) {
         if (!editShiftId && repeat && weeks > 1) {
             for (let i = 0; i < weeks; i++) {
@@ -644,6 +678,7 @@ async function deleteShift() {
     }
     closeShiftModal();
     await updateShiftCell(currentShiftEmployeeId, currentShiftDateStr);
+    await refreshHoursOverview();
     await syncTipHoursForShift(currentShiftEmployeeId, currentShiftDateStr);
 }
 
