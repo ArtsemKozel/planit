@@ -497,6 +497,12 @@ input[type="time"] {
     font-size: 1rem;
 }
 
+.month-selector button.btn-pdf-view {
+    background: var(--color-primary);
+    color: white;
+    padding: 0;
+}
+
 .month-selector span {
     font-weight: 700;
     font-size: 1rem;
