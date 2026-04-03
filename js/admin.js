@@ -312,9 +312,6 @@ async function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
                     cell.textContent = `${shift.start_time.slice(0,5)}\n${shift.end_time.slice(0,5)}`;
                     if (shift.actual_start_time) {
                         cell.style.background = '#E8D4A0';
-                        const dot = document.createElement('div');
-                        dot.style.cssText = 'position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:var(--color-primary);';
-                        cell.appendChild(dot);
                     }
                 } else {
                     cell.textContent = '+';
