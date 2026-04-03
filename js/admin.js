@@ -2227,6 +2227,167 @@ function toggleStundenEmp(empId) {
     toggle.textContent = open ? '▼' : '▶';
 }
 
+async function downloadStundenPdf() {
+    const year = adminStundenDate.getFullYear();
+    const month = adminStundenDate.getMonth();
+    const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+    const monthLabel = adminStundenDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+    const firstDay = `${monthStr}-01`;
+    const lastDay = new Date(year, month + 1, 0).toISOString().split('T')[0];
+
+    const [{ data: emps }, { data: shifts }, { data: approved }, { data: actualHours }] = await Promise.all([
+        db.from('employees_planit').select('*').eq('is_active', true).order('name'),
+        db.from('shifts').select('*').eq('user_id', adminSession.user.id).eq('is_open', false).gte('shift_date', firstDay).lte('shift_date', lastDay),
+        db.from('approved_hours').select('*').eq('user_id', adminSession.user.id).eq('month', monthStr),
+        db.from('actual_hours').select('*').eq('user_id', adminSession.user.id).eq('month', monthStr),
+    ]);
+
+    if (!emps || emps.length === 0) { alert('Keine Mitarbeiter vorhanden.'); return; }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const pageW = 210;
+    const marginL = 15;
+    const marginR = 15;
+    const contentW = pageW - marginL - marginR;
+
+    emps.forEach((emp, empIdx) => {
+        if (empIdx > 0) doc.addPage();
+
+        const empShifts = (shifts || [])
+            .filter(s => s.employee_id === emp.id)
+            .sort((a, b) => a.shift_date.localeCompare(b.shift_date));
+
+        // Kopfzeile
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text(emp.name, marginL, 22);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(120);
+        doc.text(emp.department || '', marginL, 29);
+        doc.text(monthLabel, pageW - marginR, 22, { align: 'right' });
+        doc.setTextColor(0);
+
+        // Trennlinie
+        doc.setDrawColor(200);
+        doc.line(marginL, 33, pageW - marginR, 33);
+
+        // Schicht-Tabelle Header
+        let y = 42;
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.setFillColor(245, 245, 245);
+        doc.rect(marginL, y - 5, contentW, 7, 'F');
+        doc.text('Datum', marginL + 1, y);
+        doc.text('Geplant', marginL + 38, y);
+        doc.text('Tatsächlich', marginL + 75, y);
+        doc.text('Pause', marginL + 120, y);
+        doc.text('Stunden', pageW - marginR, y, { align: 'right' });
+        y += 6;
+
+        doc.setFont('helvetica', 'normal');
+        let totalActualMin = 0;
+
+        if (empShifts.length === 0) {
+            doc.setTextColor(150);
+            doc.text('Keine Schichten in diesem Monat.', marginL + 1, y + 3);
+            doc.setTextColor(0);
+            y += 10;
+        } else {
+            empShifts.forEach((s, i) => {
+                if (y > 250) { doc.addPage(); y = 20; }
+                const dateLabel = new Date(s.shift_date + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+                const planned = `${s.start_time.slice(0,5)}–${s.end_time.slice(0,5)}`;
+                const startStr = s.actual_start_time || s.start_time;
+                const endStr = s.actual_end_time || s.end_time;
+                const breakMin = (s.actual_break_minutes !== null && s.actual_break_minutes !== undefined) ? s.actual_break_minutes : (s.break_minutes || 0);
+                const hasActual = s.actual_start_time || s.actual_end_time;
+                const actual = hasActual ? `${startStr.slice(0,5)}–${endStr.slice(0,5)}` : '–';
+                const [sh, sm] = startStr.split(':').map(Number);
+                const [eh, em] = endStr.split(':').map(Number);
+                const mins = (eh * 60 + em) - (sh * 60 + sm) - breakMin;
+                totalActualMin += mins;
+                const durStr = `${Math.floor(mins/60)}:${String(mins%60).padStart(2,'0')}`;
+
+                if (i % 2 === 0) {
+                    doc.setFillColor(250, 250, 250);
+                    doc.rect(marginL, y - 4, contentW, 6, 'F');
+                }
+                doc.text(dateLabel, marginL + 1, y);
+                doc.text(planned, marginL + 38, y);
+                if (hasActual) { doc.setTextColor(180, 140, 50); }
+                doc.text(actual, marginL + 75, y);
+                doc.setTextColor(0);
+                doc.text(`${breakMin} Min`, marginL + 120, y);
+                doc.text(durStr, pageW - marginR, y, { align: 'right' });
+                y += 6;
+            });
+        }
+
+        // Trennlinie vor Summen
+        y += 2;
+        doc.setDrawColor(200);
+        doc.line(marginL, y, pageW - marginR, y);
+        y += 7;
+
+        // Summen
+        const approvedEntry = (approved || []).find(a => a.employee_id === emp.id);
+        const approvedMin = approvedEntry ? approvedEntry.approved_minutes : null;
+        const actualEntry = (actualHours || []).find(a => a.employee_id === emp.id);
+        const carryMin = actualEntry ? (actualEntry.carry_over_minutes || 0) : 0;
+        const diffMin = approvedMin !== null ? totalActualMin - approvedMin + carryMin : null;
+
+        const fmtMin = (m) => `${Math.floor(Math.abs(m)/60)}:${String(Math.abs(m)%60).padStart(2,'0')}`;
+
+        doc.setFontSize(9);
+        const col1 = marginL + 1;
+        const col2 = marginL + 60;
+        const col3 = marginL + 110;
+
+        doc.setFont('helvetica', 'bold');
+        doc.text('Gearbeitet:', col1, y);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`${Math.floor(totalActualMin/60)}:${String(totalActualMin%60).padStart(2,'0')} h`, col1 + 28, y);
+
+        doc.setFont('helvetica', 'bold');
+        doc.text('Abgerechnet:', col2, y);
+        doc.setFont('helvetica', 'normal');
+        doc.text(approvedMin !== null ? `${fmtMin(approvedMin)} h` : '–', col2 + 32, y);
+
+        doc.setFont('helvetica', 'bold');
+        doc.text('Vormonat:', col3, y);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`${carryMin >= 0 ? '+' : '-'}${fmtMin(carryMin)} h`, col3 + 24, y);
+        y += 7;
+
+        doc.setFont('helvetica', 'bold');
+        doc.text('Saldo:', col1, y);
+        if (diffMin !== null) {
+            doc.setTextColor(diffMin > 0 ? 45 : diffMin < 0 ? 180 : 0, diffMin > 0 ? 122 : diffMin < 0 ? 50 : 0, 0);
+            doc.text(`${diffMin >= 0 ? '+' : '-'}${fmtMin(diffMin)} h`, col1 + 28, y);
+            doc.setTextColor(0);
+        } else {
+            doc.setFont('helvetica', 'normal');
+            doc.text('–', col1 + 28, y);
+        }
+
+        // Unterschrift-Feld
+        y = Math.max(y + 20, 240);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setDrawColor(150);
+        doc.line(marginL, y, marginL + 70, y);
+        doc.line(pageW - marginR - 70, y, pageW - marginR, y);
+        doc.setTextColor(130);
+        doc.text('Datum, Unterschrift Mitarbeiter', marginL, y + 5);
+        doc.text('Datum, Unterschrift Vorgesetzter', pageW - marginR - 70, y + 5);
+        doc.setTextColor(0);
+    });
+
+    doc.save(`Stundenkonto_${monthStr}.pdf`);
+}
+
 function openActualModal(btn) {
     const empId = btn.dataset.empid;
     const name = btn.dataset.name;
