@@ -420,7 +420,7 @@ async function loadVacationAccount() {
 
     const [{ data: emp }, { data: phases }, { data: requests }] = await Promise.all([
         db.from('employees_planit')
-            .select('vacation_days_per_year, start_date, hours_per_vacation_day')
+            .select('vacation_days_per_year, start_date, hours_per_vacation_day, carry_over_days, carry_over_hours')
             .eq('id', currentEmployee.id)
             .maybeSingle(),
         db.from('employment_phases')
@@ -428,7 +428,7 @@ async function loadVacationAccount() {
             .eq('employee_id', currentEmployee.id)
             .order('start_date'),
         db.from('vacation_requests')
-            .select('deducted_days, start_date')
+            .select('deducted_days, deducted_hours, start_date')
             .eq('employee_id', currentEmployee.id)
             .eq('status', 'approved')
             .gte('start_date', `${_vacYear}-01-01`)
@@ -512,25 +512,37 @@ function renderVacationAccount(cutoffDate) {
         entitlementH = entitlement * hoursPerDay;
     }
 
-    // Genommene Tage bis cutoff
-    const usedDays = _vacRequests
-        .filter(r => r.start_date <= yearEnd)
-        .reduce((sum, r) => sum + (r.deducted_days || 0), 0);
-    const usedH = usedDays * hoursPerDay;
-    const remaining = entitlement - usedDays;
-    const remainingH = entitlementH - usedH;
+    // Übertrag Vorjahr (direkt, keine Umrechnung)
+    const carryover = _vacEmp?.carry_over_days || 0;
+    const carryoverH = _vacEmp?.carry_over_hours || 0;
+
+    // Genommene Tage bis cutoff — phasengenau, deducted_hours direkt
+    const usedEntries = _vacRequests.filter(r => r.start_date <= yearEnd);
+    const usedDays = usedEntries.reduce((sum, r) => sum + (r.deducted_days || 0), 0);
+    const usedH = usedEntries.reduce((sum, r) => {
+        if (r.deducted_hours != null) return sum + r.deducted_hours;
+        const phase = _vacPhases.find(p => p.start_date <= r.start_date && (!p.end_date || p.end_date >= r.start_date));
+        const hpd = phase ? (phase.hours_per_vacation_day || 0) : hoursPerDay;
+        return sum + (r.deducted_days || 0) * hpd;
+    }, 0);
+
+    const remaining = entitlement + carryover - usedDays;
+    const remainingH = entitlementH + carryoverH - usedH;
+
+    const fmt2 = v => v.toFixed(2);
+    const sub = v => `<span style="font-size:0.75rem; color:var(--color-text-light);">${v}</span>`;
 
     document.getElementById('vacation-account').style.color =
         remaining <= 3 ? '#E57373' : remaining <= 7 ? '#C9A24D' : 'var(--color-primary)';
 
     document.getElementById('vac-entitlement').innerHTML =
-        `${entitlement.toFixed(2)} Tage<br><span style="font-size:0.75rem; color:var(--color-text-light);">${entitlementH.toFixed(2)} Std</span>`;
+        `${fmt2(entitlement)} Tage<br>${sub(fmt2(entitlementH) + ' Std')}`;
     document.getElementById('vac-carryover').innerHTML =
-        `0.00 Tage<br><span style="font-size:0.75rem; color:var(--color-text-light);">0.00 Std</span>`;
+        `${fmt2(carryover)} Tage<br>${sub(fmt2(carryoverH) + ' Std')}`;
     document.getElementById('vac-used-detail').innerHTML =
-        `${usedDays.toFixed(2)} Tage<br><span style="font-size:0.75rem; color:var(--color-text-light);">${usedH.toFixed(2)} Std</span>`;
+        `${fmt2(usedDays)} Tage<br>${sub(fmt2(usedH) + ' Std')}`;
     document.getElementById('vac-remaining-detail').innerHTML =
-        `${remaining.toFixed(2)} Tage<br><span style="font-size:0.75rem; color:var(--color-text-light);">${remainingH.toFixed(2)} Std</span>`;
+        `${fmt2(remaining)} Tage<br>${sub(fmt2(remainingH) + ' Std')}`;
 
     // Phasen-Info
     const phasesInfo = document.getElementById('vac-phases-info');
