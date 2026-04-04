@@ -1068,6 +1068,7 @@ function editVacationAndApprove(vac) {
     document.getElementById('edit-vacation-start').value = vac.start_date;
     document.getElementById('edit-vacation-end').value = vac.end_date;
     document.getElementById('edit-vacation-days').value = vac.deducted_days || 0;
+    document.getElementById('edit-vacation-hours').value = vac.deducted_hours ?? '';
     document.getElementById('edit-vacation-modal').classList.add('active');
 }
 
@@ -1126,6 +1127,7 @@ function editVacation(id, startDate, endDate, deductedDays, type) {
     document.getElementById('edit-vacation-start').value = startDate;
     document.getElementById('edit-vacation-end').value = endDate;
     document.getElementById('edit-vacation-days').value = deductedDays;
+    document.getElementById('edit-vacation-hours').value = '';
     document.getElementById('edit-vacation-payout-month').value = '';
     document.getElementById('edit-vacation-modal').classList.add('active');
 }
@@ -1151,10 +1153,13 @@ async function submitEditVacation() {
     const days = isPayout ? rawValue / hoursPerDay : rawValue;
 
     const payoutMonth = document.getElementById('edit-vacation-payout-month').value.trim() || null;
+    const hoursRaw = document.getElementById('edit-vacation-hours').value;
+    const deductedHours = hoursRaw !== '' ? parseFloat(hoursRaw) : null;
     const updateData = {
         start_date: start,
         end_date: end,
         deducted_days: days,
+        deducted_hours: deductedHours,
         ...(isPayout && payoutMonth ? { payout_month: payoutMonth } : {})
     };
 
