@@ -904,7 +904,7 @@ async function loadAdminVacations() {
                 <h4>${v.employees_planit?.name || 'Unbekannt'}</h4>
                 <p>${v.type === 'payout' ? `Erstellt am ${formatDate(v.start_date)}` : `${formatDate(v.start_date)} – ${formatDate(v.end_date)}`}</p>
 ${v.reason ? `<p style="font-size:0.8rem;">${v.reason}</p>` : ''}
-${v.status === 'approved' ? `<p style="font-size:0.8rem; color:var(--color-primary);">🏖 ${v.deducted_days || 0} ${v.type === 'payout' ? 'Urlaubstage ausgezahlt' : 'Urlaubstage abgezogen'}${v.payout_month ? ` · ${v.payout_month}` : ''}</p>` : ''}
+${v.status === 'approved' ? `<p style="font-size:0.8rem; color:var(--color-primary);">${v.type === 'payout' ? '💰' : '🏖'} ${(Math.round((v.deducted_days || 0) * 100) / 100).toFixed(2)} ${v.type === 'payout' ? 'Urlaubstage ausgezahlt' : 'Urlaubstage abgezogen'}${v.payout_month ? ` · ${v.payout_month}` : ''}</p>` : ''}
             </div>
             <div style="display:flex; flex-direction:column; gap:0.5rem; align-items:flex-end;">
                 <span class="badge badge-${v.status}">
@@ -3219,7 +3219,7 @@ async function loadUrlaubsverwaltung() {
                                     ${v.reason ? `<div style="font-size:0.75rem; color:var(--color-text-light);">${v.reason}</div>` : ''}
                                 </div>
                                 <span style="font-weight:600; white-space:nowrap; text-align:right;">
-                                    ${(v.deducted_days || 0).toFixed(2)} Tage
+                                    ${(Math.round((v.deducted_days || 0) * 100) / 100).toFixed(2)} Tage
                                     ${(() => {
                                         if (v.deducted_hours != null) return `<div style="font-size:0.75rem; color:var(--color-text-light); font-weight:400;">${v.deducted_hours} Std</div>`;
                                         if (v.type === 'payout') return `<div style="font-size:0.75rem; color:var(--color-text-light); font-weight:400;">${((v.deducted_days || 0) * (emp.hours_per_vacation_day || 8)).toFixed(1)} Std</div>`;
