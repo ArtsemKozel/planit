@@ -1890,15 +1890,9 @@ function renderEmploymentPhases() {
                     <input type="date" value="${p.end_date || ''}" onchange="updatePhase(${i}, 'end_date', this.value)" style="padding:0.4rem; font-size:0.8rem;">
                 </div>
             </div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:0.5rem;">
-                <div>
-                    <label style="font-size:0.75rem;">Urlaubstage/Jahr</label>
-                    <input type="number" value="${p.vacation_days_per_year ?? 20}" min="0" max="365" onchange="updatePhase(${i}, 'vacation_days_per_year', parseFloat(this.value) || 0)" style="padding:0.4rem; font-size:0.8rem;">
-                </div>
-                <div>
-                    <label style="font-size:0.75rem;">Std/Urlaubstag</label>
-                    <input type="number" value="${p.hours_per_vacation_day ?? 8}" min="0" max="24" step="0.5" onchange="updatePhase(${i}, 'hours_per_vacation_day', parseFloat(this.value) || 0)" style="padding:0.4rem; font-size:0.8rem;">
-                </div>
+            <div style="margin-bottom:0.5rem;">
+                <label style="font-size:0.75rem;">Std/Urlaubstag</label>
+                <input type="number" value="${p.hours_per_vacation_day ?? 8}" min="0" max="24" step="0.5" onchange="updatePhase(${i}, 'hours_per_vacation_day', parseFloat(this.value) || 0)" style="padding:0.4rem; font-size:0.8rem; width:100%;">
             </div>
             <div>
                 <label style="font-size:0.75rem;">Kommentar (optional)</label>
@@ -1912,7 +1906,6 @@ function addEmploymentPhase() {
     currentPhases.push({
         start_date: '',
         end_date: '',
-        vacation_days_per_year: 20,
         hours_per_vacation_day: 8.0
     });
     renderEmploymentPhases();
@@ -3493,8 +3486,8 @@ function calculateVacationAccount(emp, year, vacations, _prevVacations, phases =
                 months = startFraction + (endMonth - startMonth - 1) + endFraction;
             }
 
-            const phaseDays = phase.hours_per_vacation_day === 0 ? 0 : Math.round((months / 12) * (phase.vacation_days_per_year || 20) * 100) / 100;
-            const phaseHours = phaseDays * (phase.hours_per_vacation_day || 0);
+            const totalDaysPerYear = emp.vacation_days_per_year ?? 20;
+            const phaseDays = phase.hours_per_vacation_day === 0 ? 0 : Math.round((months / 12) * totalDaysPerYear * 100) / 100;
             entitlement = Math.round((entitlement + phaseDays) * 100) / 100;
             entitlementH = Math.round((entitlementH + phaseDays * (phase.hours_per_vacation_day || 0)) * 100) / 100;
         }
