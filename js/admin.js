@@ -3368,9 +3368,12 @@ async function saveAllCarryOvers() {
         // Werte direkt aus den Inputs lesen und als neue Werte setzen (SET, kein ADD)
         const days = Number(document.getElementById(`co-days-${empId}`)?.value ?? 0) || 0;
         const hours = Number(document.getElementById(`co-hours-${empId}`)?.value ?? 0) || 0;
-        const { error } = await db.from('employees_planit')
+        console.log(`[saveAllCarryOvers] empId=${empId} → carry_over_days=${days}, carry_over_hours=${hours}`);
+        const { data: updated, error } = await db.from('employees_planit')
             .update({ carry_over_days: days, carry_over_hours: hours, carry_over_set_at: now })
-            .eq('id', empId);
+            .eq('id', empId)
+            .select('id, carry_over_days, carry_over_hours');
+        console.log(`[saveAllCarryOvers] DB-Antwort:`, updated, error);
         if (error) { alert('Fehler bei ' + empId + ': ' + error.message); return; }
         await db.from('planit_audit_log').insert({
             user_id: adminSession.user.id,
@@ -3518,6 +3521,7 @@ function calculateVacationAccount(emp, year, vacations, _prevVacations, phases =
 
     const hoursPerDay = emp.hours_per_vacation_day || 8.0;
     const carryoverH = carryover * hoursPerDay + carryoverExtraH;
+    console.log(`[calculateVacationAccount] ${emp.name} | carry_over_days=${emp.carry_over_days}, carry_over_hours=${emp.carry_over_hours} → carryover=${carryover}, carryoverExtraH=${carryoverExtraH}, carryoverH=${carryoverH}`);
     const remaining = entitlement + carryover - used;
     const remainingH = entitlementH + carryoverH - used * hoursPerDay;
     return {
