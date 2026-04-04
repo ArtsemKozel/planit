@@ -3517,24 +3517,30 @@ function calculateVacationAccount(emp, year, vacations, _prevVacations, phases =
         entitlementH = entitlement * hoursPerDay;
     }
 
-    // Genommene Tage dieses Jahr
-    const used = vacations
-        .filter(v => v.employee_id === emp.id)
-        .reduce((sum, v) => sum + (v.deducted_days || 0), 0);
+    // Genommene Tage und Stunden dieses Jahr
+    const empVacations = vacations.filter(v => v.employee_id === emp.id);
+    const used = empVacations.reduce((sum, v) => sum + (v.deducted_days || 0), 0);
+    const usedH = empVacations.reduce((sum, v) => {
+        if (v.deducted_hours != null) return sum + v.deducted_hours;
+        // hoursPerDay anhand der Beschäftigungsphase zum Zeitpunkt des Eintrags
+        const date = v.start_date;
+        const phase = phases.find(p => p.start_date <= date && (!p.end_date || p.end_date >= date));
+        const hpd = phase ? (phase.hours_per_vacation_day || 0) : (emp.hours_per_vacation_day || 8.0);
+        return sum + (v.deducted_days || 0) * hpd;
+    }, 0);
 
     // Übertrag Vorjahr aus Mitarbeiter-Stammdaten (direkt, keine Umrechnung)
     const carryover = emp.carry_over_days || 0;
     const carryoverH = emp.carry_over_hours || 0;
 
-    const hoursPerDay = emp.hours_per_vacation_day || 8.0;
     console.log(`[calculateVacationAccount] ${emp.name} | carry_over_days=${emp.carry_over_days}, carry_over_hours=${emp.carry_over_hours} → carryover=${carryover}, carryoverH=${carryoverH}`);
     const remaining = entitlement + carryover - used;
-    const remainingH = entitlementH + carryoverH - used * hoursPerDay;
+    const remainingH = entitlementH + carryoverH - usedH;
     return {
         entitlement, carryover, used, remaining,
         entitlementH,
         carryoverH,
-        usedH: used * hoursPerDay,
+        usedH,
         remainingH
     };
 }
