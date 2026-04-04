@@ -486,29 +486,32 @@ function renderVacationAccount(cutoffDate) {
             entitlementH += phaseDays * (phase.hours_per_vacation_day || 0);
         }
     } else {
+        const cutoffEnd = new Date(yearEnd + 'T12:00:00');
         if (_vacEmp?.start_date) {
             const start = new Date(_vacEmp.start_date + 'T12:00:00');
             if (start.getFullYear() > year) {
                 entitlement = 0;
-            } else if (start.getFullYear() === year) {
-                for (let m = start.getMonth(); m <= new Date(yearEnd + 'T12:00:00').getMonth(); m++) {
-                    const daysInMonth = new Date(year, m + 1, 0).getDate();
-                    const firstDay = m === start.getMonth() ? start.getDate() : 1;
-                    const lastDay = m === new Date(yearEnd + 'T12:00:00').getMonth()
-                        ? new Date(yearEnd + 'T12:00:00').getDate() : daysInMonth;
-                    entitlement += monthlyDays * ((lastDay - firstDay + 1) / daysInMonth);
-                }
             } else {
-                // Vollständiges Jahr bis cutoff
-                for (let m = 0; m <= new Date(yearEnd + 'T12:00:00').getMonth(); m++) {
+                const fromMonth = start.getFullYear() === year ? start.getMonth() : 0;
+                const fromDay   = start.getFullYear() === year ? start.getDate()  : 1;
+                const toMonth   = cutoffEnd.getMonth();
+                const toDay     = cutoffEnd.getDate();
+                for (let m = fromMonth; m <= toMonth; m++) {
                     const daysInMonth = new Date(year, m + 1, 0).getDate();
-                    const lastDay = m === new Date(yearEnd + 'T12:00:00').getMonth()
-                        ? new Date(yearEnd + 'T12:00:00').getDate() : daysInMonth;
-                    entitlement += monthlyDays * (lastDay / daysInMonth);
+                    const firstDay = m === fromMonth ? fromDay : 1;
+                    const lastDay  = m === toMonth   ? toDay   : daysInMonth;
+                    entitlement += monthlyDays * ((lastDay - firstDay + 1) / daysInMonth);
                 }
             }
         } else {
-            entitlement = totalDays;
+            // Kein Eintrittsdatum — ab Januar bis cutoff
+            const toMonth = cutoffEnd.getMonth();
+            const toDay   = cutoffEnd.getDate();
+            for (let m = 0; m <= toMonth; m++) {
+                const daysInMonth = new Date(year, m + 1, 0).getDate();
+                const lastDay = m === toMonth ? toDay : daysInMonth;
+                entitlement += monthlyDays * (lastDay / daysInMonth);
+            }
         }
         entitlementH = entitlement * hoursPerDay;
     }
