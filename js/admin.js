@@ -3127,15 +3127,6 @@ async function loadUrlaubsverwaltung() {
         .gte('start_date', `${year}-01-01`)
         .lte('end_date', `${year}-12-31`);
 
-    // Vorjahr laden für Übertrag
-    const { data: prevVacations } = await db
-        .from('vacation_requests')
-        .select('employee_id, deducted_days')
-        .eq('user_id', adminSession.user.id)
-        .eq('status', 'approved')
-        .gte('start_date', `${year-1}-01-01`)
-        .lte('end_date', `${year-1}-12-31`);
-
     container.innerHTML = '';
 
     employees.forEach(emp => {
@@ -3144,7 +3135,7 @@ async function loadUrlaubsverwaltung() {
 
         // Urlaubskonto berechnen
         const empPhases = (allPhases || []).filter(p => p.employee_id === emp.id);
-        const account = calculateVacationAccount(emp, year, vacations || [], prevVacations || [], empPhases);
+        const account = calculateVacationAccount(emp, year, vacations || [], [], empPhases);
 
         const header = document.createElement('div');
         header.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:1rem 1.25rem; cursor:pointer;';
@@ -3178,8 +3169,13 @@ async function loadUrlaubsverwaltung() {
                     <div style="font-size:0.75rem; color:var(--color-text-light);">${account.entitlementH.toFixed(2)} Std</div>
                 </div>
                 <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem;">
-                    <div style="font-size:0.75rem; color:var(--color-text-light);">Übertrag Vorjahr</div>
-                    <div style="font-weight:700;">${account.carryover.toFixed(2)} Tage</div>
+                    <div style="font-size:0.75rem; color:var(--color-text-light); margin-bottom:0.25rem;">Übertrag Vorjahr</div>
+                    <div style="display:flex; align-items:center; gap:0.4rem;">
+                        <input type="number" step="0.5" min="0" value="${(emp.carry_over_days || 0).toFixed(2)}"
+                            style="width:70px; padding:0.2rem 0.4rem; border:1px solid var(--color-border); border-radius:6px; font-size:0.9rem; font-weight:700;"
+                            onchange="saveCarryOverDays('${emp.id}', this.value)">
+                        <span style="font-size:0.8rem; color:var(--color-text-light);">Tage</span>
+                    </div>
                     <div style="font-size:0.75rem; color:var(--color-text-light);">${account.carryoverH.toFixed(2)} Std</div>
                 </div>
                 <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem;">
@@ -3308,8 +3304,19 @@ function changeUrlaubYear(dir) {
     loadUrlaubsverwaltung();
 }
 
-function calculateVacationAccount(emp, year, vacations, prevVacations, phases = []) {
-    const today = new Date();
+async function saveCarryOverDays(empId, value) {
+    const days = parseFloat(value) || 0;
+    await db.from('employees_planit').update({ carry_over_days: days }).eq('id', empId);
+    await db.from('planit_audit_log').insert({
+        user_id: adminSession.user.id,
+        action: 'update_carry_over_days',
+        target_type: 'employee',
+        target_id: empId,
+        details: { carry_over_days: days }
+    });
+}
+
+function calculateVacationAccount(emp, year, vacations, _prevVacations, phases = []) {
 
     // Jahre vor 2026 → alles 0
     if (year < 2026) {
@@ -3384,21 +3391,8 @@ function calculateVacationAccount(emp, year, vacations, prevVacations, phases = 
         .filter(v => v.employee_id === emp.id)
         .reduce((sum, v) => sum + (v.deducted_days || 0), 0);
 
-    // Übertrag vom Vorjahr — nur ab 2027
-    let carryover = 0;
-    if (year >= 2027) {
-        const prevUsed = prevVacations
-            .filter(v => v.employee_id === emp.id)
-            .reduce((sum, v) => sum + (v.deducted_days || 0), 0);
-        const prevEntitlement = emp.vacation_days_per_year ?? 20;
-        const prevRemaining = prevEntitlement - prevUsed;
-        if (prevRemaining > 0) {
-            const expiry = new Date(year, 2, 31);
-            if (today <= expiry) {
-                carryover = prevRemaining;
-            }
-        }
-    }
+    // Übertrag Vorjahr aus Mitarbeiter-Stammdaten (carry_over_days)
+    const carryover = emp.carry_over_days || 0;
 
     const hoursPerDay = emp.hours_per_vacation_day || 8.0;
     const remaining = entitlement + carryover - used;
