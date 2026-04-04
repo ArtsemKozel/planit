@@ -409,116 +409,135 @@ async function loadVacations() {
     `).join('');
 }
 
+let _vacEmp = null;
+let _vacPhases = null;
+let _vacRequests = null;
+let _vacYear = new Date().getFullYear();
+
 async function loadVacationAccount() {
-    const year = new Date().getFullYear();
-    document.getElementById('vacation-year-label').textContent = year;
+    _vacYear = new Date().getFullYear();
+    document.getElementById('vacation-year-label').textContent = _vacYear;
 
-    // Mitarbeiter-Daten laden
-    const { data: emp } = await db
-        .from('employees_planit')
-        .select('vacation_days_per_year, start_date, hours_per_vacation_day')
-        .eq('id', currentEmployee.id)
-        .maybeSingle();
+    const [{ data: emp }, { data: phases }, { data: requests }] = await Promise.all([
+        db.from('employees_planit')
+            .select('vacation_days_per_year, start_date, hours_per_vacation_day')
+            .eq('id', currentEmployee.id)
+            .maybeSingle(),
+        db.from('employment_phases')
+            .select('*')
+            .eq('employee_id', currentEmployee.id)
+            .order('start_date'),
+        db.from('vacation_requests')
+            .select('deducted_days, start_date')
+            .eq('employee_id', currentEmployee.id)
+            .eq('status', 'approved')
+            .gte('start_date', `${_vacYear}-01-01`)
+            .lte('start_date', `${_vacYear}-12-31`)
+    ]);
 
-    // Phasen laden
-    const { data: phases, error: phasesError } = await db
-        .from('employment_phases')
-        .select('*')
-        .eq('employee_id', currentEmployee.id)
-        .order('start_date');
+    _vacEmp = emp;
+    _vacPhases = phases || [];
+    _vacRequests = requests || [];
 
-    const totalDays = emp?.vacation_days_per_year ?? 20;
-    const hoursPerDay = emp?.hours_per_vacation_day || 8.0;
+    const cutoffEl = document.getElementById('vac-cutoff');
+    cutoffEl.value = `${_vacYear}-12-31`;
+
+    renderVacationAccount(`${_vacYear}-12-31`);
+}
+
+function renderVacationAccount(cutoffDate) {
+    if (!_vacEmp && !_vacPhases) return;
+    const year = _vacYear;
     const yearStart = `${year}-01-01`;
-    const yearEnd = `${year}-12-31`;
+    const yearEnd = cutoffDate || `${year}-12-31`;
 
-    // Anspruch berechnen
+    const totalDays = _vacEmp?.vacation_days_per_year ?? 20;
+    const hoursPerDay = _vacEmp?.hours_per_vacation_day || 8.0;
+    const monthlyDays = totalDays / 12;
+
+    // Anspruch berechnen — monatsweise
     let entitlement = 0;
     let entitlementH = 0;
-    const activePhases = (phases || []).filter(p =>
+    const activePhases = _vacPhases.filter(p =>
         p.start_date <= yearEnd && (!p.end_date || p.end_date >= yearStart)
     );
 
     if (activePhases.length > 0) {
         for (const phase of activePhases) {
-            const phaseStartRaw = new Date(phase.start_date + 'T12:00:00');
-            const yearStartDate = new Date(yearStart + 'T12:00:00');
-            const phaseStart = phaseStartRaw > yearStartDate ? phaseStartRaw : yearStartDate;
-            const phaseEndRaw = phase.end_date ? new Date(phase.end_date + 'T12:00:00') : new Date(yearEnd + 'T12:00:00');
-            const yearEndDate = new Date(yearEnd + 'T12:00:00');
-            const phaseEnd = phaseEndRaw < yearEndDate ? phaseEndRaw : yearEndDate;
-
-            const startMonth = phaseStart.getMonth();
-            const endMonth = phaseEnd.getMonth();
-            const startDay = phaseStart.getDate();
-            const endDay = phaseEnd.getDate();
-            const daysInEndMonth = new Date(year, endMonth + 1, 0).getDate();
-            const startFraction = startDay === 1 ? 1 : startDay <= 15 ? 1 : 0.5;
-            const endFraction = endDay >= daysInEndMonth ? 1 : endDay >= 15 ? 1 : 0.5;
-
-            let months = 0;
-            if (startMonth === endMonth) {
-                months = endFraction;
-            } else {
-                months = startFraction + (endMonth - startMonth - 1) + endFraction;
+            const phaseStart = new Date(Math.max(
+                new Date(phase.start_date + 'T12:00:00'),
+                new Date(yearStart + 'T12:00:00')
+            ));
+            const phaseEnd = new Date(Math.min(
+                phase.end_date ? new Date(phase.end_date + 'T12:00:00') : new Date(yearEnd + 'T12:00:00'),
+                new Date(yearEnd + 'T12:00:00')
+            ));
+            const phaseMonthlyDays = totalDays / 12;
+            let phaseDays = 0;
+            for (let m = phaseStart.getMonth(); m <= phaseEnd.getMonth(); m++) {
+                const daysInMonth = new Date(year, m + 1, 0).getDate();
+                const firstDay = m === phaseStart.getMonth() ? phaseStart.getDate() : 1;
+                const lastDay  = m === phaseEnd.getMonth()   ? phaseEnd.getDate()   : daysInMonth;
+                phaseDays += phaseMonthlyDays * ((lastDay - firstDay + 1) / daysInMonth);
             }
-
-            const phaseDays = phase.hours_per_vacation_day === 0 ? 0 : Math.round((months / 12) * (phase.vacation_days_per_year || 20) * 100) / 100;
-            entitlement = Math.round((entitlement + phaseDays) * 100) / 100;
-            entitlementH = Math.round((entitlementH + phaseDays * (phase.hours_per_vacation_day || 0)) * 100) / 100;
+            if (phase.hours_per_vacation_day === 0) phaseDays = 0;
+            entitlement += phaseDays;
+            entitlementH += phaseDays * (phase.hours_per_vacation_day || 0);
         }
     } else {
-        entitlement = totalDays;
-        if (emp?.start_date) {
-            const start = new Date(emp.start_date + 'T12:00:00');
-            if (start.getFullYear() === year) {
-                const dayOfMonth = start.getDate();
-                const fractionOfMonth = dayOfMonth === 1 ? 1 : dayOfMonth <= 15 ? 1 : 0.5;
-                const monthsWorked = (12 - start.getMonth() - 1) + fractionOfMonth;
-                entitlement = Math.round((monthsWorked / 12) * totalDays * 100) / 100;
-            } else if (start.getFullYear() > year) {
+        if (_vacEmp?.start_date) {
+            const start = new Date(_vacEmp.start_date + 'T12:00:00');
+            if (start.getFullYear() > year) {
                 entitlement = 0;
+            } else if (start.getFullYear() === year) {
+                for (let m = start.getMonth(); m <= new Date(yearEnd + 'T12:00:00').getMonth(); m++) {
+                    const daysInMonth = new Date(year, m + 1, 0).getDate();
+                    const firstDay = m === start.getMonth() ? start.getDate() : 1;
+                    const lastDay = m === new Date(yearEnd + 'T12:00:00').getMonth()
+                        ? new Date(yearEnd + 'T12:00:00').getDate() : daysInMonth;
+                    entitlement += monthlyDays * ((lastDay - firstDay + 1) / daysInMonth);
+                }
+            } else {
+                // Vollständiges Jahr bis cutoff
+                for (let m = 0; m <= new Date(yearEnd + 'T12:00:00').getMonth(); m++) {
+                    const daysInMonth = new Date(year, m + 1, 0).getDate();
+                    const lastDay = m === new Date(yearEnd + 'T12:00:00').getMonth()
+                        ? new Date(yearEnd + 'T12:00:00').getDate() : daysInMonth;
+                    entitlement += monthlyDays * (lastDay / daysInMonth);
+                }
             }
+        } else {
+            entitlement = totalDays;
         }
         entitlementH = entitlement * hoursPerDay;
     }
 
-    // Genehmigte Urlaubsanträge dieses Jahr laden
-    const { data: requests } = await db
-        .from('vacation_requests')
-        .select('deducted_days')
-        .eq('employee_id', currentEmployee.id)
-        .eq('status', 'approved')
-        .gte('start_date', `${year}-01-01`)
-        .lte('end_date', `${year}-12-31`);
-
-    const usedDays = (requests || []).reduce((sum, r) => sum + (r.deducted_days || 0), 0);
+    // Genommene Tage bis cutoff
+    const usedDays = _vacRequests
+        .filter(r => r.start_date <= yearEnd)
+        .reduce((sum, r) => sum + (r.deducted_days || 0), 0);
     const usedH = usedDays * hoursPerDay;
     const remaining = entitlement - usedDays;
     const remainingH = entitlementH - usedH;
 
-    // vacation-account wird im Detail-Block angezeigt, nicht im Header
-    // vacation-used und vacation-total werden nicht mehr im Header gebraucht
+    document.getElementById('vacation-account').style.color =
+        remaining <= 3 ? '#E57373' : remaining <= 7 ? '#C9A24D' : 'var(--color-primary)';
 
-    const accountEl = document.getElementById('vacation-account');
-    accountEl.style.color = remaining <= 3 ? '#E57373' :
-        remaining <= 7 ? '#C9A24D' : 'var(--color-primary)';
-
-    // Details füllen
-    document.getElementById('vac-entitlement').innerHTML = `${entitlement.toFixed(2)} Tage<br><span style="font-size:0.75rem; color:var(--color-text-light);">${entitlementH.toFixed(2)} Std</span>`;
-    document.getElementById('vac-carryover').innerHTML = `0.00 Tage<br><span style="font-size:0.75rem; color:var(--color-text-light);">0.00 Std</span>`;
-    document.getElementById('vac-used-detail').innerHTML = `${usedDays.toFixed(2)} Tage<br><span style="font-size:0.75rem; color:var(--color-text-light);">${usedH.toFixed(2)} Std</span>`;
-    document.getElementById('vac-remaining-detail').innerHTML = `${remaining.toFixed(2)} Tage<br><span style="font-size:0.75rem; color:var(--color-text-light);">${remainingH.toFixed(2)} Std</span>`;
+    document.getElementById('vac-entitlement').innerHTML =
+        `${entitlement.toFixed(2)} Tage<br><span style="font-size:0.75rem; color:var(--color-text-light);">${entitlementH.toFixed(2)} Std</span>`;
+    document.getElementById('vac-carryover').innerHTML =
+        `0.00 Tage<br><span style="font-size:0.75rem; color:var(--color-text-light);">0.00 Std</span>`;
+    document.getElementById('vac-used-detail').innerHTML =
+        `${usedDays.toFixed(2)} Tage<br><span style="font-size:0.75rem; color:var(--color-text-light);">${usedH.toFixed(2)} Std</span>`;
+    document.getElementById('vac-remaining-detail').innerHTML =
+        `${remaining.toFixed(2)} Tage<br><span style="font-size:0.75rem; color:var(--color-text-light);">${remainingH.toFixed(2)} Std</span>`;
 
     // Phasen-Info
     const phasesInfo = document.getElementById('vac-phases-info');
     if (activePhases.length > 0) {
-        const formatShort = d => {
-            const parts = d.split('-');
-            return `${parts[2]}.${parts[1]}.${parts[0].slice(2)}`;
-        };
+        const fmt = d => { const p = d.split('-'); return `${p[2]}.${p[1]}.${p[0].slice(2)}`; };
         phasesInfo.innerHTML = activePhases.map(p =>
-            `Std. pro UT: ${p.hours_per_vacation_day}h (${formatShort(p.start_date)} – ${p.end_date ? formatShort(p.end_date) : 'offen'})${p.notes ? ` · ${p.notes}` : ''}`
+            `Std. pro UT: ${p.hours_per_vacation_day}h (${fmt(p.start_date)} – ${p.end_date ? fmt(p.end_date) : 'offen'})${p.notes ? ` · ${p.notes}` : ''}`
         ).join('<br>');
     } else {
         phasesInfo.innerHTML = `Std. pro UT: ${hoursPerDay}h`;
