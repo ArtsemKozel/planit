@@ -1399,12 +1399,14 @@ async function loadOverview() {
     } else {
         const makeRow = (s, highlighted) => {
             const d = new Date(s.shift_date + 'T12:00:00');
+            const isPast = s.shift_date < today;
             const isToday = s.shift_date === today;
+            const bg = isPast ? '#FDF3DC' : (isToday ? '#FFF8E7' : 'var(--color-gray)');
             const row = document.createElement('div');
-            row.style.cssText = `display:flex; align-items:center; gap:1rem; padding:0.75rem; border-radius:12px; margin-bottom:0.5rem; background:${isToday ? '#FFF8E7' : 'var(--color-gray)'}; ${highlighted ? 'box-shadow:0 0 0 2px var(--color-primary);' : ''}`;
+            row.style.cssText = `display:flex; align-items:center; gap:1rem; padding:0.75rem; border-radius:12px; margin-bottom:0.5rem; background:${bg}; ${highlighted ? 'box-shadow:0 0 0 2px var(--color-primary);' : ''}`;
             row.innerHTML = `
                 <div style="min-width:2.5rem; text-align:center;">
-                    <div style="font-size:1.3rem; font-weight:700; line-height:1; color:${highlighted || isToday ? 'var(--color-primary)' : 'inherit'};">${d.getDate()}</div>
+                    <div style="font-size:1.3rem; font-weight:700; line-height:1; color:${highlighted || isToday ? 'var(--color-primary)' : isPast ? '#C9A24D' : 'inherit'};">${d.getDate()}</div>
                     <div style="font-size:0.7rem; color:var(--color-text-light);">${dayNames[d.getDay()]}</div>
                 </div>
                 <div style="flex:1; background:white; border-radius:10px; padding:0.6rem 0.75rem;">
