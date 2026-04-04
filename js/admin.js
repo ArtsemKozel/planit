@@ -3308,9 +3308,11 @@ let carryOverSectionOpen = false;
 function toggleCarryOverSection() {
     const body = document.getElementById('carry-over-body');
     const icon = document.getElementById('carry-over-toggle-icon');
+    const btn = document.querySelector('#carry-over-body').previousElementSibling;
     carryOverSectionOpen = !carryOverSectionOpen;
     body.style.display = carryOverSectionOpen ? 'block' : 'none';
     icon.textContent = carryOverSectionOpen ? '▼' : '▶';
+    btn.style.color = carryOverSectionOpen ? 'inherit' : '#C9A24D';
     if (carryOverSectionOpen) loadCarryOverSection();
 }
 
