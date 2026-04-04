@@ -3218,7 +3218,10 @@ async function loadUrlaubsverwaltung() {
                                     <span>${v.type === 'manual' ? formatDate(v.start_date) : formatDate(v.start_date) + ' – ' + formatDate(v.end_date)}</span>
                                     ${v.reason ? `<div style="font-size:0.75rem; color:var(--color-text-light);">${v.reason}</div>` : ''}
                                 </div>
-                                <span style="font-weight:600; white-space:nowrap;">${(v.deducted_days || 0).toFixed(2)} Tage</span>
+                                <span style="font-weight:600; white-space:nowrap; text-align:right;">
+                                    ${(v.deducted_days || 0).toFixed(2)} Tage
+                                    ${v.deducted_hours != null ? `<div style="font-size:0.75rem; color:var(--color-text-light); font-weight:400;">${v.deducted_hours} Std</div>` : ''}
+                                </span>
                             </div>`).join('')
                 }
             </div>
