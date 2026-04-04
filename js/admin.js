@@ -3165,11 +3165,9 @@ async function loadUrlaubsverwaltung() {
 
         // Konto-Übersicht
         body.innerHTML = `
-            <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.75rem;">
-                <label style="font-size:0.8rem; color:var(--color-text-light); white-space:nowrap;">Anspruch bis</label>
-                <input type="date" id="cutoff-${emp.id}" value="${year}-12-31"
-                    style="padding:0.25rem 0.5rem; border:1px solid var(--color-border); border-radius:6px; font-size:0.85rem;"
-                    onchange="updateEmpAccount('${emp.id}')">
+            <div class="form-group">
+                <label>Anspruch bis</label>
+                <input type="date" id="cutoff-${emp.id}" value="${year}-12-31" onchange="updateEmpAccount('${emp.id}')">
             </div>
             <div id="account-boxes-${emp.id}">${buildAccountBoxesHtml(emp.id, account)}</div>
             ${empPhases.length > 0
