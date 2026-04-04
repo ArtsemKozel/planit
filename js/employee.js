@@ -1392,11 +1392,10 @@ async function loadOverview() {
         listEl.appendChild(row);
     });
 
-    // Nur aktuelle und zukünftige Schichten
-    const upcomingShifts = (shifts || []).filter(s => s.shift_date >= today);
+    const allShifts = shifts || [];
 
-    if (upcomingShifts.length === 0) {
-        listEl.innerHTML = '<div style="color:var(--color-text-light); font-size:0.9rem;">Keine kommenden Schichten diesen Monat</div>';
+    if (allShifts.length === 0) {
+        listEl.innerHTML = '<div style="color:var(--color-text-light); font-size:0.9rem;">Keine Schichten diesen Monat</div>';
     } else {
         const makeRow = (s, highlighted) => {
             const d = new Date(s.shift_date + 'T12:00:00');
@@ -1416,32 +1415,49 @@ async function loadOverview() {
             return row;
         };
 
-        // Nächste Schicht ist Index 0 — zeige sie in der Mitte: 1 davor + sie + 1 danach = 3
-        const nextIdx = 0;
-        const visibleStart = Math.max(0, nextIdx - 1);
-        const visible = upcomingShifts.slice(visibleStart, visibleStart + 3);
-        const hidden  = upcomingShifts.slice(visibleStart + 3);
+        // Nächste/aktuelle Schicht finden — erste mit Datum >= heute
+        const nextIdx = allShifts.findIndex(s => s.shift_date >= today);
+        // Mitte: 1 vergangene davor + nächste + 1 zukünftige danach
+        const centerIdx = nextIdx >= 0 ? nextIdx : allShifts.length - 1;
+        const visibleStart = Math.max(0, centerIdx - 1);
+        const visibleEnd   = Math.min(allShifts.length, visibleStart + 3);
+        const visible = allShifts.slice(visibleStart, visibleEnd);
+        const hidden  = [...allShifts.slice(0, visibleStart), ...allShifts.slice(visibleEnd)];
 
         visible.forEach((s, i) => {
-            const highlighted = (i === (nextIdx - visibleStart));
-            listEl.appendChild(makeRow(s, highlighted));
+            listEl.appendChild(makeRow(s, visibleStart + i === centerIdx));
         });
 
         if (hidden.length > 0) {
             const moreContainer = document.createElement('div');
             moreContainer.id = 'overview-shifts-more';
             moreContainer.style.display = 'none';
-            hidden.forEach(s => moreContainer.appendChild(makeRow(s, false)));
+            // Vergangene oben einfügen, restliche unten
+            const pastHidden  = allShifts.slice(0, visibleStart);
+            const futureHidden = allShifts.slice(visibleEnd);
+            pastHidden.forEach(s => {
+                const row = makeRow(s, false);
+                listEl.insertBefore(row, listEl.firstChild);
+            });
+            futureHidden.forEach(s => moreContainer.appendChild(makeRow(s, false)));
             listEl.appendChild(moreContainer);
 
             const btn = document.createElement('button');
             btn.className = 'btn-secondary';
-            btn.style.cssText = 'width:100%; margin-top:0.25rem; font-size:0.85rem;';
-            btn.textContent = `Alle anzeigen (${hidden.length} weitere)`;
+            btn.style.cssText = 'width:100%; margin-top:0.25rem; font-size:1rem; padding:0.4rem;';
+            btn.textContent = '▼';
+            let expanded = false;
             btn.onclick = () => {
-                moreContainer.style.display = 'block';
-                btn.style.display = 'none';
+                expanded = !expanded;
+                moreContainer.style.display = expanded ? 'block' : 'none';
+                // Vergangene Zeilen oben ein-/ausblenden
+                const pastRows = listEl.querySelectorAll('[data-past]');
+                pastRows.forEach(r => r.style.display = expanded ? 'flex' : 'none');
+                btn.textContent = expanded ? '▲' : '▼';
             };
+            // Vergangene Zeilen markieren und initial verstecken
+            const addedPastRows = Array.from(listEl.children).slice(0, pastHidden.length);
+            addedPastRows.forEach(r => { r.dataset.past = '1'; r.style.display = 'none'; });
             listEl.appendChild(btn);
         }
     }
