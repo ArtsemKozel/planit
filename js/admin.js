@@ -3220,7 +3220,11 @@ async function loadUrlaubsverwaltung() {
                                 </div>
                                 <span style="font-weight:600; white-space:nowrap; text-align:right;">
                                     ${(v.deducted_days || 0).toFixed(2)} Tage
-                                    ${v.deducted_hours != null ? `<div style="font-size:0.75rem; color:var(--color-text-light); font-weight:400;">${v.deducted_hours} Std</div>` : ''}
+                                    ${(() => {
+                                        if (v.deducted_hours != null) return `<div style="font-size:0.75rem; color:var(--color-text-light); font-weight:400;">${v.deducted_hours} Std</div>`;
+                                        if (v.type === 'payout') return `<div style="font-size:0.75rem; color:var(--color-text-light); font-weight:400;">${((v.deducted_days || 0) * (emp.hours_per_vacation_day || 8)).toFixed(1)} Std</div>`;
+                                        return '';
+                                    })()}
                                 </span>
                             </div>`).join('')
                 }
