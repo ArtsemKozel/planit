@@ -1401,7 +1401,7 @@ async function loadOverview() {
             const d = new Date(s.shift_date + 'T12:00:00');
             const isPast = s.shift_date < today;
             const isToday = s.shift_date === today;
-            const bg = isToday ? '#FFF8E7' : 'var(--color-gray)';
+            const bg = highlighted ? 'white' : 'var(--color-gray)';
             const innerBg = isPast ? '#C9A24D' : 'white';
             const row = document.createElement('div');
             row.style.cssText = `display:flex; align-items:center; gap:1rem; padding:0.75rem; border-radius:12px; margin-bottom:0.5rem; background:${bg}; ${highlighted ? 'box-shadow:0 0 0 2px var(--color-primary);' : ''}`;
