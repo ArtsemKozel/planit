@@ -3668,18 +3668,25 @@ function calculateVacationAccount(emp, year, vacations, _prevVacations, phases =
         return sum + (v.deducted_days || 0) * hpd;
     }, 0);
 
+    // Alle Zwischenwerte auf 2 Dezimalstellen runden
+    const r2 = v => Math.round(v * 100) / 100;
+    const entitlementR  = r2(entitlement);
+    const entitlementHR = r2(entitlementH);
+    const usedR  = r2(used);
+    const usedHR = r2(usedH);
+
     // Übertrag Vorjahr aus Mitarbeiter-Stammdaten (direkt, keine Umrechnung)
-    const carryover = emp.carry_over_days || 0;
-    const carryoverH = emp.carry_over_hours || 0;
+    const carryover  = r2(emp.carry_over_days  || 0);
+    const carryoverH = r2(emp.carry_over_hours || 0);
 
     console.log(`[calculateVacationAccount] ${emp.name} | carryover=${carryover}, carryoverH=${carryoverH}`);
-    const remaining = Math.round((entitlement + carryover - used) * 100) / 100;
-    const remainingH = Math.round((entitlementH + carryoverH - usedH) * 100) / 100;
+    const remaining  = r2(entitlementR  + carryover  - usedR);
+    const remainingH = r2(entitlementHR + carryoverH - usedHR);
     return {
-        entitlement, carryover, used, remaining,
-        entitlementH,
+        entitlement: entitlementR, carryover, used: usedR, remaining,
+        entitlementH: entitlementHR,
         carryoverH,
-        usedH,
+        usedH: usedHR,
         remainingH
     };
 }
