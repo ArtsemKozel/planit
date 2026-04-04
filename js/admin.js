@@ -477,6 +477,8 @@ async function openShiftModal(employeeId, dateStr, existingShift) {
     document.getElementById('shift-dept-group').style.display = existingShift?.is_open ? 'block' : 'none';
     document.getElementById('shift-department').value = existingShift?.department || 'Service';
     document.getElementById('shift-actual-group').style.display = existingShift ? 'block' : 'none';
+    document.getElementById('shift-actual-body').style.display = 'none';
+    document.getElementById('shift-actual-toggle').textContent = '▶';
     document.getElementById('shift-actual-start').value = existingShift?.actual_start_time ? existingShift.actual_start_time.slice(0, 5) : (existingShift?.start_time ? existingShift.start_time.slice(0, 5) : '');
     document.getElementById('shift-actual-end').value = existingShift?.actual_end_time ? existingShift.actual_end_time.slice(0, 5) : (existingShift?.end_time ? existingShift.end_time.slice(0, 5) : '');
     document.getElementById('shift-actual-break').value = existingShift?.actual_break_minutes ?? '';
@@ -2217,6 +2219,14 @@ async function loadAdminStunden() {
     }).join('');
 
     document.getElementById('admin-stunden-list').innerHTML = html;
+}
+
+function toggleShiftActual() {
+    const body = document.getElementById('shift-actual-body');
+    const toggle = document.getElementById('shift-actual-toggle');
+    const open = body.style.display === 'none';
+    body.style.display = open ? 'block' : 'none';
+    toggle.textContent = open ? '▼' : '▶';
 }
 
 function toggleStundenEmp(empId) {

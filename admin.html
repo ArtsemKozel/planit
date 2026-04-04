@@ -574,18 +574,24 @@
             <textarea id="shift-notes" rows="2"></textarea>
         </div>
         <!-- Tatsächliche Zeiten (nur bei bestehender Schicht) -->
-        <div id="shift-actual-group" style="display:none;">
-            <div class="form-group">
-                <label>Tatsächliche Startzeit</label>
-                <input type="time" id="shift-actual-start" style="height:48px; font-size:16px;">
-            </div>
-            <div class="form-group">
-                <label>Tatsächliche Endzeit</label>
-                <input type="time" id="shift-actual-end" style="height:48px; font-size:16px;">
-            </div>
-            <div class="form-group">
-                <label>Tatsächliche Pause (Min)</label>
-                <input type="number" id="shift-actual-break" placeholder="z.B. 30" min="0">
+        <div id="shift-actual-group" style="display:none; margin-bottom:1rem;">
+            <button type="button" onclick="toggleShiftActual()" style="display:flex; justify-content:space-between; align-items:center; width:100%; background:var(--color-gray); border:none; border-radius:8px; padding:0.6rem 0.75rem; cursor:pointer; font-size:0.9rem; font-weight:600; color:var(--color-text);">
+                <span>Tatsächliche Zeiten</span>
+                <span id="shift-actual-toggle">▶</span>
+            </button>
+            <div id="shift-actual-body" style="display:none; padding-top:0.75rem;">
+                <div class="form-group">
+                    <label>Tatsächliche Startzeit</label>
+                    <input type="time" id="shift-actual-start" style="height:48px; font-size:16px;">
+                </div>
+                <div class="form-group">
+                    <label>Tatsächliche Endzeit</label>
+                    <input type="time" id="shift-actual-end" style="height:48px; font-size:16px;">
+                </div>
+                <div class="form-group">
+                    <label>Tatsächliche Pause (Min)</label>
+                    <input type="number" id="shift-actual-break" placeholder="z.B. 30" min="0">
+                </div>
             </div>
         </div>
         <!-- Wiederholung -->
