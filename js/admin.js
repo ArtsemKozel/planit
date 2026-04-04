@@ -1554,16 +1554,7 @@ async function loadTeam() {
         return;
     }
 
-    // Urlaubsanträge dieses Jahr laden
-    const year = new Date().getFullYear();
-    const { data: vacations } = await db
-        .from('vacation_requests')
-        .select('employee_id, start_date, end_date, deducted_days')
-        .eq('user_id', adminSession.user.id)
-        .eq('status', 'approved')
-        .gte('start_date', `${year}-01-01`)
-        .lte('end_date', `${year}-12-31`);
-
+    const fmtDate = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
     const departments = [...new Set(employees.map(e => e.department || 'Allgemein'))].sort();
 
     container.innerHTML = departments.map(dept => {
@@ -1571,31 +1562,44 @@ async function loadTeam() {
         return `
             <div style="font-size:0.85rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.05em; margin:1rem 0 0.5rem;">${dept.toUpperCase()}</div>
             ${deptEmployees.map(e => {
-        // Urlaubstage berechnen
-        const empVacations = (vacations || []).filter(v => v.employee_id === e.id);
-        let usedDays = 0;
-        empVacations.forEach(v => {
-            usedDays += v.deducted_days || 0;
-        });
-        const totalDays = e.vacation_days_per_year ?? 20;
-        const remaining = totalDays - usedDays;
-        const color = remaining <= 3 ? '#E57373' : remaining <= 7 ? '#C9A24D' : 'var(--color-primary)';
+                const beschaeftigung = e.is_apprentice ? 'Ausbildung' : 'Anstellung';
+                return `
+                <div style="border-radius:14px; margin-bottom:0.5rem; overflow:hidden; background:var(--color-gray);">
+                    <div onclick="toggleTeamEmployee('${e.id}')" style="display:flex; justify-content:space-between; align-items:center; padding:0.75rem 1rem; cursor:pointer;">
+                        <div style="display:flex; align-items:center; gap:0.6rem;">
+                            <span style="font-weight:700;">${e.name}</span>
+                            ${e.is_apprentice ? '<span style="background:#E8D0FF; color:#9B59B6; font-size:0.7rem; padding:2px 6px; border-radius:8px; font-weight:600;">Azubi</span>' : ''}
+                        </div>
+                        <div style="display:flex; gap:0.5rem; align-items:center;">
+                            <button class="btn-small btn-pdf-view btn-icon" onclick="event.stopPropagation(); openEditEmployeeModal('${e.id}')"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                            <button class="btn-small btn-delete btn-icon" onclick="event.stopPropagation(); deleteEmployee('${e.id}', '${e.name}')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
+                            <span id="toggle-team-${e.id}" style="color:var(--color-text-light); font-size:0.85rem; margin-left:0.25rem;">▶</span>
+                        </div>
+                    </div>
+                    <div id="teambody-${e.id}" style="display:none; padding:0.75rem 1rem; border-top:1px solid var(--color-border); background:white;">
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem 1rem; font-size:0.85rem;">
+                            <div><span style="color:var(--color-text-light);">Kürzel</span><br><strong>${e.login_code}</strong></div>
+                            <div><span style="color:var(--color-text-light);">PIN</span><br><strong>${e.password_hash || '—'}</strong></div>
+                            <div><span style="color:var(--color-text-light);">Abteilung</span><br><strong>${e.department || 'Allgemein'}</strong></div>
+                            <div><span style="color:var(--color-text-light);">Beschäftigungsart</span><br><strong>${beschaeftigung}</strong></div>
+                            <div><span style="color:var(--color-text-light);">Eintrittsdatum</span><br><strong>${fmtDate(e.start_date)}</strong></div>
+                            <div><span style="color:var(--color-text-light);">Geburtstag</span><br><strong>${fmtDate(e.birthdate)}</strong></div>
+                            <div><span style="color:var(--color-text-light);">Urlaubstage / Jahr</span><br><strong>${e.vacation_days_per_year ?? 20}</strong></div>
+                            <div><span style="color:var(--color-text-light);">Stunden / Urlaubstag</span><br><strong>${e.hours_per_vacation_day || 8.0}</strong></div>
+                        </div>
+                    </div>
+                </div>`;
+        }).join('')}`;
+    }).join('');
+}
 
-        return `
-        <div class="list-item">
-            <div class="list-item-info">
-                <h4>${e.name}${e.is_apprentice ? ' <span style="background:#E8D0FF; color:#9B59B6; font-size:0.7rem; padding:2px 6px; border-radius:8px; font-weight:600;">Azubi</span>' : ''}</h4>
-                <p>${e.login_code} · PIN: ${e.password_hash || '—'} · ${e.department || 'Allgemein'}${e.birthdate ? ' · 🎂 ' + new Date(e.birthdate + 'T00:00:00').toLocaleDateString('de-DE', {day:'numeric', month:'long'}) : ''}</p>
-                <p style="font-size:0.8rem; color:${color}; margin-top:0.2rem;">🏖 ${remaining} von ${totalDays} Urlaubstagen übrig</p>
-            </div>
-            <div style="display:flex; gap:0.5rem; align-items:center;">
-                <button class="btn-small btn-pdf-view btn-icon" onclick="openEditEmployeeModal('${e.id}')"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-                <button class="btn-small btn-delete btn-icon" onclick="deleteEmployee('${e.id}', '${e.name}')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
-            </div>
-        </div>`;
-
-    }).join('')}`;
-}).join('');
+function toggleTeamEmployee(id) {
+    const body = document.getElementById(`teambody-${id}`);
+    const arrow = document.getElementById(`toggle-team-${id}`);
+    if (!body) return;
+    const open = body.style.display !== 'none';
+    body.style.display = open ? 'none' : 'block';
+    if (arrow) arrow.textContent = open ? '▶' : '▼';
 }
 
 function openNewEmployeeModal() {
