@@ -1400,17 +1400,16 @@ async function loadOverview() {
         const makeRow = (s, highlighted) => {
             const d = new Date(s.shift_date + 'T12:00:00');
             const isPast = s.shift_date < today;
-            const isToday = s.shift_date === today;
-            const bg = highlighted ? 'white' : 'var(--color-gray)';
             const innerBg = isPast ? '#C9A24D' : 'white';
+            const innerBorder = highlighted ? `box-shadow:0 0 0 2px var(--color-primary);` : '';
             const row = document.createElement('div');
-            row.style.cssText = `display:flex; align-items:center; gap:1rem; padding:0.75rem; border-radius:12px; margin-bottom:0.5rem; background:${bg}; ${highlighted ? 'box-shadow:0 0 0 2px var(--color-primary);' : ''}`;
+            row.style.cssText = `display:flex; align-items:center; gap:1rem; padding:0.75rem; border-radius:12px; margin-bottom:0.5rem; background:var(--color-gray);`;
             row.innerHTML = `
                 <div style="min-width:2.5rem; text-align:center;">
                     <div style="font-size:1.3rem; font-weight:700; line-height:1; color:#2C3E50;">${d.getDate()}</div>
                     <div style="font-size:0.7rem; color:var(--color-text-light);">${dayNames[d.getDay()]}</div>
                 </div>
-                <div style="flex:1; background:${innerBg}; border-radius:10px; padding:0.6rem 0.75rem;">
+                <div style="flex:1; background:${innerBg}; border-radius:10px; padding:0.6rem 0.75rem; ${innerBorder}">
                     <div style="font-weight:${highlighted ? '800' : '700'}; font-size:0.95rem; color:#2C3E50;">${s.start_time.slice(0,5)} – ${s.end_time.slice(0,5)}</div>
                     ${s.notes ? `<div style="font-size:0.8rem; color:var(--color-text-light);">${s.notes}</div>` : ''}
                 </div>
