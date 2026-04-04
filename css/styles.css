@@ -86,10 +86,9 @@ body {
 
 /* CLICKABLE INFO BOXES */
 .info-box-clickable {
-    background: #F5F5F5;
+    background: #FFFFFF;
     border-radius: 8px;
     padding: 0.5rem 0.75rem;
-    cursor: pointer;
     transition: background 0.15s;
 }
 .info-box-clickable:hover {
