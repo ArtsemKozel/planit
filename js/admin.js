@@ -3488,6 +3488,7 @@ function calculateVacationAccount(emp, year, vacations, _prevVacations, phases =
 
             const totalDaysPerYear = emp.vacation_days_per_year ?? 20;
             const phaseDays = phase.hours_per_vacation_day === 0 ? 0 : Math.round((months / 12) * totalDaysPerYear * 100) / 100;
+            console.log(`[calculateVacationAccount] ${emp.name} | Phase ${phase.start_date}–${phase.end_date || 'offen'} | Quelle: emp.vacation_days_per_year=${emp.vacation_days_per_year} → totalDaysPerYear=${totalDaysPerYear} | months=${months.toFixed(2)} | phaseDays=${phaseDays}`);
             entitlement = Math.round((entitlement + phaseDays) * 100) / 100;
             entitlementH = Math.round((entitlementH + phaseDays * (phase.hours_per_vacation_day || 0)) * 100) / 100;
         }
@@ -3495,6 +3496,7 @@ function calculateVacationAccount(emp, year, vacations, _prevVacations, phases =
         // Ohne Phasen — Standardberechnung
         const totalDays = emp.vacation_days_per_year ?? 20;
         const hoursPerDay = emp.hours_per_vacation_day || 8.0;
+        console.log(`[calculateVacationAccount] ${emp.name} | Keine Phasen | Quelle: emp.vacation_days_per_year=${emp.vacation_days_per_year} → totalDays=${totalDays}`);
         entitlement = totalDays;
         if (emp.start_date) {
             const start = new Date(emp.start_date + 'T12:00:00');
