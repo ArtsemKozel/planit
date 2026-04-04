@@ -1554,7 +1554,14 @@ async function loadTeam() {
         return;
     }
 
+    const { data: allPhases } = await db
+        .from('employment_phases')
+        .select('*')
+        .eq('user_id', adminSession.user.id)
+        .order('start_date');
+
     const fmtDate = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+    const fmtShort = d => { if (!d) return 'offen'; const p = d.split('-'); return `${p[2]}.${p[1]}.${p[0]}`; };
     const departments = [...new Set(employees.map(e => e.department || 'Allgemein'))].sort();
 
     container.innerHTML = departments.map(dept => {
@@ -1562,7 +1569,15 @@ async function loadTeam() {
         return `
             <div style="font-size:0.85rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.05em; margin:1rem 0 0.5rem;">${dept.toUpperCase()}</div>
             ${deptEmployees.map(e => {
-                const beschaeftigung = e.is_apprentice ? 'Ausbildung' : 'Anstellung';
+                const empPhases = (allPhases || []).filter(p => p.employee_id === e.id).sort((a, b) => a.start_date.localeCompare(b.start_date));
+                const phasesHtml = empPhases.length > 0
+                    ? empPhases.map(p => `
+                        <div style="display:flex; gap:0.5rem; align-items:baseline; font-size:0.82rem; padding:0.2rem 0; border-bottom:1px solid var(--color-border);">
+                            <span style="min-width:7rem; color:var(--color-text-light);">${fmtShort(p.start_date)} – ${fmtShort(p.end_date)}</span>
+                            <span>${p.hours_per_vacation_day}h/UT${p.notes ? ' · ' + p.notes : ''}</span>
+                        </div>`).join('')
+                    : `<div style="font-size:0.82rem; color:var(--color-text-light);">Keine Phasen eingetragen</div>`;
+
                 return `
                 <div style="border-radius:14px; margin-bottom:0.5rem; overflow:hidden; background:var(--color-gray);">
                     <div onclick="toggleTeamEmployee('${e.id}')" style="display:flex; justify-content:space-between; align-items:center; padding:0.75rem 1rem; cursor:pointer;">
@@ -1577,16 +1592,16 @@ async function loadTeam() {
                         </div>
                     </div>
                     <div id="teambody-${e.id}" style="display:none; padding:0.75rem 1rem; border-top:1px solid var(--color-border); background:white;">
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem 1rem; font-size:0.85rem;">
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem 1rem; font-size:0.85rem; margin-bottom:0.75rem;">
                             <div><span style="color:var(--color-text-light);">Kürzel</span><br><strong>${e.login_code}</strong></div>
                             <div><span style="color:var(--color-text-light);">PIN</span><br><strong>${e.password_hash || '—'}</strong></div>
                             <div><span style="color:var(--color-text-light);">Abteilung</span><br><strong>${e.department || 'Allgemein'}</strong></div>
-                            <div><span style="color:var(--color-text-light);">Beschäftigungsart</span><br><strong>${beschaeftigung}</strong></div>
                             <div><span style="color:var(--color-text-light);">Eintrittsdatum</span><br><strong>${fmtDate(e.start_date)}</strong></div>
                             <div><span style="color:var(--color-text-light);">Geburtstag</span><br><strong>${fmtDate(e.birthdate)}</strong></div>
                             <div><span style="color:var(--color-text-light);">Urlaubstage / Jahr</span><br><strong>${e.vacation_days_per_year ?? 20}</strong></div>
-                            <div><span style="color:var(--color-text-light);">Stunden / Urlaubstag</span><br><strong>${e.hours_per_vacation_day || 8.0}</strong></div>
                         </div>
+                        <div style="font-size:0.8rem; font-weight:600; color:var(--color-text-light); margin-bottom:0.4rem;">BESCHÄFTIGUNGSPHASEN</div>
+                        ${phasesHtml}
                     </div>
                 </div>`;
         }).join('')}`;
