@@ -3332,6 +3332,7 @@ async function loadCarryOverSection() {
         return;
     }
 
+    list.dataset.empIds = emps.map(e => e.id).join(',');
     list.innerHTML = emps.map(emp => {
         const setAt = emp.carry_over_set_at
             ? `<div style="font-size:0.72rem; color:var(--color-text-light); margin-top:0.2rem;">Eingetragen am ${formatDate(emp.carry_over_set_at.split('T')[0])}</div>`
@@ -3350,32 +3351,33 @@ async function loadCarryOverSection() {
                 <input type="number" min="0" id="co-hours-${emp.id}" value="${emp.carry_over_hours || 0}"
                     style="width:60px; padding:0.3rem 0.4rem; border:1px solid var(--color-border); border-radius:6px; font-size:0.9rem; font-weight:700; text-align:center;">
                 <span style="font-size:0.75rem; color:var(--color-text-light);">Std</span>
-                <button onclick="saveCarryOverForEmp('${emp.id}')"
-                    style="padding:0.3rem 0.6rem; background:var(--color-primary); color:white; border:none; border-radius:6px; font-size:0.8rem; cursor:pointer; touch-action:manipulation;">
-                    Speichern
-                </button>
             </div>
         </div>`;
     }).join('');
 }
 
-async function saveCarryOverForEmp(empId) {
-    const days = parseFloat(document.getElementById(`co-days-${empId}`).value) || 0;
-    const hours = parseFloat(document.getElementById(`co-hours-${empId}`).value) || 0;
+async function saveAllCarryOvers() {
+    const list = document.getElementById('carry-over-list');
+    const empIds = (list.dataset.empIds || '').split(',').filter(Boolean);
+    if (!empIds.length) return;
     const now = new Date().toISOString();
-    const { error } = await db.from('employees_planit').update({
-        carry_over_days: days,
-        carry_over_hours: hours,
-        carry_over_set_at: now
-    }).eq('id', empId);
-    if (error) { alert('Fehler: ' + error.message); return; }
-    await db.from('planit_audit_log').insert({
-        user_id: adminSession.user.id,
-        action: 'update_carry_over',
-        target_type: 'employee',
-        target_id: empId,
-        details: { carry_over_days: days, carry_over_hours: hours }
-    });
+    for (const empId of empIds) {
+        const days = parseFloat(document.getElementById(`co-days-${empId}`)?.value) || 0;
+        const hours = parseFloat(document.getElementById(`co-hours-${empId}`)?.value) || 0;
+        const { error } = await db.from('employees_planit').update({
+            carry_over_days: days,
+            carry_over_hours: hours,
+            carry_over_set_at: now
+        }).eq('id', empId);
+        if (error) { alert('Fehler bei ' + empId + ': ' + error.message); return; }
+        await db.from('planit_audit_log').insert({
+            user_id: adminSession.user.id,
+            action: 'update_carry_over',
+            target_type: 'employee',
+            target_id: empId,
+            details: { carry_over_days: days, carry_over_hours: hours }
+        });
+    }
     await loadCarryOverSection();
     loadUrlaubsverwaltung();
 }

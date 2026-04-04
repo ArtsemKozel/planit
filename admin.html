@@ -955,7 +955,10 @@
             </button>
             <div id="carry-over-body" style="display:none;">
                 <div id="carry-over-list" style="padding:0 1.25rem;"></div>
-                <div style="padding:0.75rem 1.25rem 1rem;">
+                <div style="padding:0.75rem 1.25rem 1rem; display:flex; flex-direction:column; gap:0.5rem;">
+                    <button onclick="saveAllCarryOvers()" style="width:100%; padding:0.7rem; background:var(--color-primary); color:white; border:none; border-radius:8px; font-size:0.85rem; font-weight:600; cursor:pointer; touch-action:manipulation;">
+                        Speichern
+                    </button>
                     <button onclick="applyYearEndCarryOver()" style="width:100%; padding:0.7rem; background:#F5F0E8; color:var(--color-primary); border:1px solid var(--color-primary); border-radius:8px; font-size:0.85rem; font-weight:600; cursor:pointer; touch-action:manipulation;">
                         Saldo <span id="carry-over-from-year"></span> als Übertrag <span id="carry-over-to-year"></span> für alle übernehmen
                     </button>
