@@ -3365,13 +3365,12 @@ async function saveAllCarryOvers() {
     if (!empIds.length) return;
     const now = new Date().toISOString();
     for (const empId of empIds) {
-        const days = parseFloat(document.getElementById(`co-days-${empId}`)?.value) || 0;
-        const hours = parseFloat(document.getElementById(`co-hours-${empId}`)?.value) || 0;
-        const { error } = await db.from('employees_planit').update({
-            carry_over_days: days,
-            carry_over_hours: hours,
-            carry_over_set_at: now
-        }).eq('id', empId);
+        // Werte direkt aus den Inputs lesen und als neue Werte setzen (SET, kein ADD)
+        const days = Number(document.getElementById(`co-days-${empId}`)?.value ?? 0) || 0;
+        const hours = Number(document.getElementById(`co-hours-${empId}`)?.value ?? 0) || 0;
+        const { error } = await db.from('employees_planit')
+            .update({ carry_over_days: days, carry_over_hours: hours, carry_over_set_at: now })
+            .eq('id', empId);
         if (error) { alert('Fehler bei ' + empId + ': ' + error.message); return; }
         await db.from('planit_audit_log').insert({
             user_id: adminSession.user.id,
@@ -3422,9 +3421,12 @@ async function applyYearEndCarryOver() {
 }
 
 async function saveCarryOver(empId, daysVal, hoursVal) {
+    // Immer beide Felder explizit setzen (SET, kein ADD)
+    const days = daysVal !== null ? (Number(daysVal) || 0) : undefined;
+    const hours = hoursVal !== null ? (Number(hoursVal) || 0) : undefined;
     const update = {};
-    if (daysVal !== null) update.carry_over_days = parseFloat(daysVal) || 0;
-    if (hoursVal !== null) update.carry_over_hours = parseFloat(hoursVal) || 0;
+    if (days !== undefined) update.carry_over_days = days;
+    if (hours !== undefined) update.carry_over_hours = hours;
     await db.from('employees_planit').update(update).eq('id', empId);
     await db.from('planit_audit_log').insert({
         user_id: adminSession.user.id,
