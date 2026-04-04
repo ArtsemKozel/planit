@@ -1064,7 +1064,8 @@ function editVacationAndApprove(vac) {
     editVacationApproveAfter = true;
     const isPayout = vac.type === 'payout';
     document.getElementById('edit-vacation-date-fields').style.display = isPayout ? 'none' : 'block';
-    document.getElementById('edit-vacation-days-label').textContent = isPayout ? 'Urlaubsstunden' : 'Abzuziehende Urlaubstage';
+    document.getElementById('edit-vacation-days-field').style.display = isPayout ? 'none' : 'block';
+    document.getElementById('edit-vacation-payout-month-field').style.display = isPayout ? 'block' : 'none';
     document.getElementById('edit-vacation-start').value = vac.start_date;
     document.getElementById('edit-vacation-end').value = vac.end_date;
     document.getElementById('edit-vacation-days').value = vac.deducted_days || 0;
@@ -1122,7 +1123,7 @@ function editVacation(id, startDate, endDate, deductedDays, type) {
     editVacationId = id;
     const isPayout = type === 'payout';
     document.getElementById('edit-vacation-date-fields').style.display = isPayout ? 'none' : 'block';
-    document.getElementById('edit-vacation-days-label').textContent = isPayout ? 'Urlaubsstunden' : 'Abzuziehende Urlaubstage';
+    document.getElementById('edit-vacation-days-field').style.display = isPayout ? 'none' : 'block';
     document.getElementById('edit-vacation-payout-month-field').style.display = isPayout ? 'block' : 'none';
     document.getElementById('edit-vacation-start').value = startDate;
     document.getElementById('edit-vacation-end').value = endDate;
@@ -1150,11 +1151,10 @@ async function submitEditVacation() {
 
     const isPayout = vac?.type === 'payout';
     const hoursPerDay = vac?.employees_planit?.hours_per_vacation_day || 8.0;
-    const days = isPayout ? rawValue / hoursPerDay : rawValue;
-
     const payoutMonth = document.getElementById('edit-vacation-payout-month').value.trim() || null;
     const hoursRaw = document.getElementById('edit-vacation-hours').value;
     const deductedHours = hoursRaw !== '' ? parseFloat(hoursRaw) : null;
+    const days = isPayout ? (deductedHours != null ? deductedHours / hoursPerDay : rawValue) : rawValue;
     const updateData = {
         start_date: start,
         end_date: end,
