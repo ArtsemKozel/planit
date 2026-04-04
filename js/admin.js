@@ -3169,18 +3169,9 @@ async function loadUrlaubsverwaltung() {
                     <div style="font-size:0.75rem; color:var(--color-text-light);">${account.entitlementH.toFixed(2)} Std</div>
                 </div>
                 <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem;">
-                    <div style="font-size:0.75rem; color:var(--color-text-light); margin-bottom:0.25rem;">Übertrag Vorjahr</div>
-                    <div style="display:flex; align-items:center; gap:0.4rem; margin-bottom:0.25rem;">
-                        <input type="number" min="0" value="${emp.carry_over_days || 0}"
-                            style="width:55px; padding:0.2rem 0.4rem; border:1px solid var(--color-border); border-radius:6px; font-size:0.9rem; font-weight:700;"
-                            onchange="saveCarryOver('${emp.id}', this.value, null)">
-                        <span style="font-size:0.8rem; color:var(--color-text-light);">T</span>
-                        <input type="number" min="0" value="${emp.carry_over_hours || 0}"
-                            style="width:55px; padding:0.2rem 0.4rem; border:1px solid var(--color-border); border-radius:6px; font-size:0.9rem; font-weight:700;"
-                            onchange="saveCarryOver('${emp.id}', null, this.value)">
-                        <span style="font-size:0.8rem; color:var(--color-text-light);">Std</span>
-                    </div>
-                    <div style="font-size:0.75rem; color:var(--color-text-light);">${account.carryoverH.toFixed(2)} Std gesamt</div>
+                    <div style="font-size:0.75rem; color:var(--color-text-light);">Übertrag Vorjahr</div>
+                    <div style="font-weight:700;">${account.carryover.toFixed(2)} Tage</div>
+                    <div style="font-size:0.75rem; color:var(--color-text-light);">${account.carryoverH.toFixed(2)} Std</div>
                 </div>
                 <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem;">
                     <div style="font-size:0.75rem; color:var(--color-text-light);">Genommen</div>
