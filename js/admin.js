@@ -7,6 +7,13 @@ let planningMode = false;
 let availabilityCache = {};
 let urlaubYear = new Date().getFullYear();
 let vacationExplainData = {};
+
+function _cutoffChangeHandler(e) {
+    const input = e.target;
+    if (input.dataset && input.dataset.empid) {
+        updateEmpAccount(input.dataset.empid);
+    }
+}
 let editVacationApproveAfter = false;
 let openTaskIds = new Set();
 let currentShiftEmployeeId = null;
@@ -3129,6 +3136,8 @@ async function loadUrlaubsverwaltung() {
     ]);
 
     container.innerHTML = '';
+    container.removeEventListener('change', _cutoffChangeHandler);
+    container.addEventListener('change', _cutoffChangeHandler);
 
     (freshEmps || []).forEach(emp => {
         const block = document.createElement('div');
@@ -3167,7 +3176,7 @@ async function loadUrlaubsverwaltung() {
         body.innerHTML = `
             <div class="form-group">
                 <label>Anspruch bis</label>
-                <input type="date" id="cutoff-${emp.id}" value="${year}-12-31" onchange="updateEmpAccount('${emp.id}')">
+                <input type="date" id="cutoff-${emp.id}" value="${year}-12-31" data-empid="${emp.id}">
             </div>
             <div id="account-boxes-${emp.id}">${buildAccountBoxesHtml(emp.id, account)}</div>
             ${empPhases.length > 0
