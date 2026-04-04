@@ -3526,7 +3526,6 @@ async function saveCarryOver(empId, daysVal, hoursVal) {
 }
 
 function calculateVacationAccount(emp, year, vacations, _prevVacations, phases = []) {
-    const r5 = v => Math.round(v * 2) / 2; // auf 0.5 runden
 
     // Jahre vor 2026 → alles 0
     if (year < 2026) {
@@ -3544,52 +3543,68 @@ function calculateVacationAccount(emp, year, vacations, _prevVacations, phases =
     let entitlementH = 0;
 
     if (activePhases.length > 0) {
-        // Mit Phasen berechnen
-        const daysInYear = ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0) ? 366 : 365;
+        // Mit Phasen — monatsweise berechnen
         for (const phase of activePhases) {
-            const phaseStartRaw = new Date(phase.start_date + 'T12:00:00');
-            const yearStartDate = new Date(yearStart + 'T12:00:00');
-            const phaseStart = phaseStartRaw > yearStartDate ? phaseStartRaw : yearStartDate;
-
-            const phaseEndRaw = phase.end_date ? new Date(phase.end_date + 'T12:00:00') : new Date(yearEnd + 'T12:00:00');
-            const yearEndDate = new Date(yearEnd + 'T12:00:00');
-            const phaseEnd = phaseEndRaw < yearEndDate ? phaseEndRaw : yearEndDate;
-
-            // Tage dieser Phase im Jahr (inkl. Start- und Endtag)
-            const daysInPhase = Math.round((phaseEnd - phaseStart) / 86400000) + 1;
+            const phaseStart = new Date(Math.max(
+                new Date(phase.start_date + 'T12:00:00'),
+                new Date(yearStart + 'T12:00:00')
+            ));
+            const phaseEnd = new Date(Math.min(
+                phase.end_date ? new Date(phase.end_date + 'T12:00:00') : new Date(yearEnd + 'T12:00:00'),
+                new Date(yearEnd + 'T12:00:00')
+            ));
 
             const totalDaysPerYear = emp.vacation_days_per_year ?? 20;
-            const phaseDays = phase.hours_per_vacation_day === 0 ? 0 : r5((daysInPhase / daysInYear) * totalDaysPerYear);
-            console.log(`[calculateVacationAccount] ${emp.name} | Phase ${phase.start_date}–${phase.end_date || 'offen'} | daysInPhase=${daysInPhase}/${daysInYear} | totalDaysPerYear=${totalDaysPerYear} | phaseDays=${phaseDays}`);
-            entitlement = r5(entitlement + phaseDays);
-            entitlementH = Math.round((entitlementH + phaseDays * (phase.hours_per_vacation_day || 0)) * 100) / 100;
+            const monthlyDays = totalDaysPerYear / 12;
+            let phaseDays = 0;
+
+            const startMonth = phaseStart.getMonth();
+            const endMonth = phaseEnd.getMonth();
+
+            for (let m = startMonth; m <= endMonth; m++) {
+                const daysInMonth = new Date(year, m + 1, 0).getDate();
+                const firstDay = m === startMonth ? phaseStart.getDate() : 1;
+                const lastDay  = m === endMonth   ? phaseEnd.getDate()   : daysInMonth;
+                phaseDays += monthlyDays * ((lastDay - firstDay + 1) / daysInMonth);
+            }
+
+            if (phase.hours_per_vacation_day === 0) phaseDays = 0;
+            console.log(`[calculateVacationAccount] ${emp.name} | Phase ${phase.start_date}–${phase.end_date || 'offen'} | phaseDays=${phaseDays.toFixed(4)}`);
+            entitlement += phaseDays;
+            entitlementH += phaseDays * (phase.hours_per_vacation_day || 0);
         }
     } else {
-        // Ohne Phasen — Standardberechnung
+        // Ohne Phasen — monatsweise ab Eintrittsdatum
         const totalDays = emp.vacation_days_per_year ?? 20;
         const hoursPerDay = emp.hours_per_vacation_day || 8.0;
-        console.log(`[calculateVacationAccount] ${emp.name} | Keine Phasen | Quelle: emp.vacation_days_per_year=${emp.vacation_days_per_year} → totalDays=${totalDays}`);
-        entitlement = totalDays;
+        const monthlyDays = totalDays / 12;
+        console.log(`[calculateVacationAccount] ${emp.name} | Keine Phasen | vacation_days_per_year=${totalDays}`);
+
         if (emp.start_date) {
             const start = new Date(emp.start_date + 'T12:00:00');
-            if (start.getFullYear() === year) {
-                const dayOfMonth = start.getDate();
-                const fractionOfMonth = dayOfMonth === 1 ? 1 : dayOfMonth <= 15 ? 1 : 0.5;
-                const monthsWorked = (12 - start.getMonth() - 1) + fractionOfMonth;
-                entitlement = r5((monthsWorked / 12) * totalDays);
-            } else if (start.getFullYear() > year) {
+            if (start.getFullYear() > year) {
                 entitlement = 0;
+            } else if (start.getFullYear() === year) {
+                // Anteilig ab Eintrittsdatum
+                for (let m = start.getMonth(); m <= 11; m++) {
+                    const daysInMonth = new Date(year, m + 1, 0).getDate();
+                    const firstDay = m === start.getMonth() ? start.getDate() : 1;
+                    entitlement += monthlyDays * ((daysInMonth - firstDay + 1) / daysInMonth);
+                }
+            } else {
+                entitlement = totalDays;
             }
+        } else {
+            entitlement = totalDays;
         }
         entitlementH = entitlement * hoursPerDay;
     }
 
     // Genommene Tage und Stunden dieses Jahr
     const empVacations = vacations.filter(v => v.employee_id === emp.id);
-    const used = r5(empVacations.reduce((sum, v) => sum + (v.deducted_days || 0), 0));
+    const used = empVacations.reduce((sum, v) => sum + (v.deducted_days || 0), 0);
     const usedH = empVacations.reduce((sum, v) => {
         if (v.deducted_hours != null) return sum + v.deducted_hours;
-        // hoursPerDay anhand der Beschäftigungsphase zum Zeitpunkt des Eintrags
         const date = v.start_date;
         const phase = phases.find(p => p.start_date <= date && (!p.end_date || p.end_date >= date));
         const hpd = phase ? (phase.hours_per_vacation_day || 0) : (emp.hours_per_vacation_day || 8.0);
@@ -3600,8 +3615,8 @@ function calculateVacationAccount(emp, year, vacations, _prevVacations, phases =
     const carryover = emp.carry_over_days || 0;
     const carryoverH = emp.carry_over_hours || 0;
 
-    console.log(`[calculateVacationAccount] ${emp.name} | carry_over_days=${emp.carry_over_days}, carry_over_hours=${emp.carry_over_hours} → carryover=${carryover}, carryoverH=${carryoverH}`);
-    const remaining = r5(entitlement + carryover - used);
+    console.log(`[calculateVacationAccount] ${emp.name} | carryover=${carryover}, carryoverH=${carryoverH}`);
+    const remaining = entitlement + carryover - used;
     const remainingH = entitlementH + carryoverH - usedH;
     return {
         entitlement, carryover, used, remaining,
