@@ -3107,6 +3107,10 @@ async function deleteSickLeave(id) {
 
 async function loadUrlaubsverwaltung() {
     document.getElementById('urlaubsverwaltung-year-label').textContent = urlaubYear;
+    const fromYearEl = document.getElementById('carry-over-from-year');
+    const toYearEl = document.getElementById('carry-over-to-year');
+    if (fromYearEl) fromYearEl.textContent = urlaubYear;
+    if (toYearEl) toYearEl.textContent = urlaubYear + 1;
     const year = urlaubYear;
     const container = document.getElementById('urlaubsverwaltung-list');
     container.innerHTML = '<div style="color:var(--color-text-light);">Wird geladen...</div>';
@@ -3296,6 +3300,116 @@ async function saveEintrag(empId) {
 
 function changeUrlaubYear(dir) {
     urlaubYear += dir;
+    loadUrlaubsverwaltung();
+}
+
+let carryOverSectionOpen = false;
+
+function toggleCarryOverSection() {
+    const body = document.getElementById('carry-over-body');
+    const icon = document.getElementById('carry-over-toggle-icon');
+    carryOverSectionOpen = !carryOverSectionOpen;
+    body.style.display = carryOverSectionOpen ? 'block' : 'none';
+    icon.textContent = carryOverSectionOpen ? '▼' : '▶';
+    if (carryOverSectionOpen) loadCarryOverSection();
+}
+
+async function loadCarryOverSection() {
+    const list = document.getElementById('carry-over-list');
+    list.innerHTML = '<div style="color:var(--color-text-light); font-size:0.85rem; padding:0.5rem 0;">Wird geladen...</div>';
+    const { data: emps } = await db
+        .from('employees_planit')
+        .select('id, name, department, carry_over_days, carry_over_hours, carry_over_set_at')
+        .eq('user_id', adminSession.user.id)
+        .eq('is_active', true)
+        .order('name');
+
+    if (!emps || emps.length === 0) {
+        list.innerHTML = '<div style="color:var(--color-text-light); font-size:0.85rem;">Keine Mitarbeiter</div>';
+        return;
+    }
+
+    list.innerHTML = emps.map(emp => {
+        const setAt = emp.carry_over_set_at
+            ? `<div style="font-size:0.72rem; color:var(--color-text-light); margin-top:0.2rem;">Eingetragen am ${formatDate(emp.carry_over_set_at.split('T')[0])}</div>`
+            : '';
+        return `
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:0.6rem 0; border-bottom:1px solid var(--color-border); gap:0.75rem;">
+            <div style="min-width:0; flex:1;">
+                <div style="font-weight:600; font-size:0.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${emp.name}</div>
+                <div style="font-size:0.75rem; color:var(--color-text-light);">${emp.department || 'Allgemein'}</div>
+                ${setAt}
+            </div>
+            <div style="display:flex; align-items:center; gap:0.35rem; flex-shrink:0;">
+                <input type="number" min="0" id="co-days-${emp.id}" value="${emp.carry_over_days || 0}"
+                    style="width:60px; padding:0.3rem 0.4rem; border:1px solid var(--color-border); border-radius:6px; font-size:0.9rem; font-weight:700; text-align:center;">
+                <span style="font-size:0.75rem; color:var(--color-text-light);">T</span>
+                <input type="number" min="0" id="co-hours-${emp.id}" value="${emp.carry_over_hours || 0}"
+                    style="width:60px; padding:0.3rem 0.4rem; border:1px solid var(--color-border); border-radius:6px; font-size:0.9rem; font-weight:700; text-align:center;">
+                <span style="font-size:0.75rem; color:var(--color-text-light);">Std</span>
+                <button onclick="saveCarryOverForEmp('${emp.id}')"
+                    style="padding:0.3rem 0.6rem; background:var(--color-primary); color:white; border:none; border-radius:6px; font-size:0.8rem; cursor:pointer; touch-action:manipulation;">
+                    Speichern
+                </button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+async function saveCarryOverForEmp(empId) {
+    const days = parseFloat(document.getElementById(`co-days-${empId}`).value) || 0;
+    const hours = parseFloat(document.getElementById(`co-hours-${empId}`).value) || 0;
+    const now = new Date().toISOString();
+    const { error } = await db.from('employees_planit').update({
+        carry_over_days: days,
+        carry_over_hours: hours,
+        carry_over_set_at: now
+    }).eq('id', empId);
+    if (error) { alert('Fehler: ' + error.message); return; }
+    await db.from('planit_audit_log').insert({
+        user_id: adminSession.user.id,
+        action: 'update_carry_over',
+        target_type: 'employee',
+        target_id: empId,
+        details: { carry_over_days: days, carry_over_hours: hours }
+    });
+    await loadCarryOverSection();
+    loadUrlaubsverwaltung();
+}
+
+async function applyYearEndCarryOver() {
+    if (!confirm(`Saldo ${urlaubYear} für alle Mitarbeiter als Übertrag ${urlaubYear + 1} speichern?\n\nDies überschreibt bestehende Übertrag-Werte.`)) return;
+
+    const { data: allPhases } = await db
+        .from('employment_phases')
+        .select('*')
+        .eq('user_id', adminSession.user.id);
+    const { data: vacations } = await db
+        .from('vacation_requests')
+        .select('*')
+        .eq('user_id', adminSession.user.id)
+        .eq('status', 'approved')
+        .gte('start_date', `${urlaubYear}-01-01`)
+        .lte('end_date', `${urlaubYear}-12-31`);
+    const { data: emps } = await db
+        .from('employees_planit')
+        .select('*')
+        .eq('user_id', adminSession.user.id)
+        .eq('is_active', true);
+
+    const now = new Date().toISOString();
+    for (const emp of (emps || [])) {
+        const empPhases = (allPhases || []).filter(p => p.employee_id === emp.id);
+        const account = calculateVacationAccount(emp, urlaubYear, vacations || [], [], empPhases);
+        const remainingDays = Math.max(0, account.remaining);
+        await db.from('employees_planit').update({
+            carry_over_days: Math.round(remainingDays * 100) / 100,
+            carry_over_hours: 0,
+            carry_over_set_at: now
+        }).eq('id', emp.id);
+    }
+    alert(`Übertrag ${urlaubYear + 1} für alle Mitarbeiter gespeichert.`);
+    await loadCarryOverSection();
     loadUrlaubsverwaltung();
 }
 
