@@ -3115,25 +3115,28 @@ async function loadUrlaubsverwaltung() {
     const container = document.getElementById('urlaubsverwaltung-list');
     container.innerHTML = '<div style="color:var(--color-text-light);">Wird geladen...</div>';
 
-    // Beschäftigungsphasen laden
-    const { data: allPhases } = await db
-        .from('employment_phases')
-        .select('*')
-        .eq('user_id', adminSession.user.id)
-        .order('start_date');
-
-    // Alle genehmigten Urlaubsanträge des Jahres laden
-    const { data: vacations } = await db
-        .from('vacation_requests')
-        .select('*, employees_planit(name)')
-        .eq('user_id', adminSession.user.id)
-        .eq('status', 'approved')
-        .gte('start_date', `${year}-01-01`)
-        .lte('end_date', `${year}-12-31`);
+    // Frische Mitarbeiterdaten laden (inkl. carry_over_days/hours)
+    const [{ data: freshEmps }, { data: allPhases }, { data: vacations }] = await Promise.all([
+        db.from('employees_planit')
+            .select('*')
+            .eq('user_id', adminSession.user.id)
+            .eq('is_active', true)
+            .order('name'),
+        db.from('employment_phases')
+            .select('*')
+            .eq('user_id', adminSession.user.id)
+            .order('start_date'),
+        db.from('vacation_requests')
+            .select('*, employees_planit(name)')
+            .eq('user_id', adminSession.user.id)
+            .eq('status', 'approved')
+            .gte('start_date', `${year}-01-01`)
+            .lte('end_date', `${year}-12-31`)
+    ]);
 
     container.innerHTML = '';
 
-    employees.forEach(emp => {
+    (freshEmps || []).forEach(emp => {
         const block = document.createElement('div');
         block.style.cssText = 'border-radius:14px; margin-bottom:1rem; overflow:hidden; background:var(--color-gray);';
 
