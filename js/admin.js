@@ -3673,8 +3673,8 @@ function calculateVacationAccount(emp, year, vacations, _prevVacations, phases =
     const carryoverH = emp.carry_over_hours || 0;
 
     console.log(`[calculateVacationAccount] ${emp.name} | carryover=${carryover}, carryoverH=${carryoverH}`);
-    const remaining = entitlement + carryover - used;
-    const remainingH = entitlementH + carryoverH - usedH;
+    const remaining = Math.round((entitlement + carryover - used) * 100) / 100;
+    const remainingH = Math.round((entitlementH + carryoverH - usedH) * 100) / 100;
     return {
         entitlement, carryover, used, remaining,
         entitlementH,
