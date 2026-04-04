@@ -3312,7 +3312,8 @@ function toggleCarryOverSection() {
     carryOverSectionOpen = !carryOverSectionOpen;
     body.style.display = carryOverSectionOpen ? 'block' : 'none';
     icon.textContent = carryOverSectionOpen ? '▼' : '▶';
-    btn.style.color = carryOverSectionOpen ? 'inherit' : '#C9A24D';
+    btn.style.background = carryOverSectionOpen ? 'none' : '#C9A24D';
+    btn.style.color = carryOverSectionOpen ? 'inherit' : 'white';
     if (carryOverSectionOpen) loadCarryOverSection();
 }
 
