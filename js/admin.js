@@ -3295,22 +3295,22 @@ function changeUrlaubYear(dir) {
 function buildAccountBoxesHtml(empId, account) {
     const remColor = account.remaining <= 3 ? '#E57373' : 'var(--color-primary)';
     return `<div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:1rem;">
-        <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem; cursor:pointer;" onclick="showVacationExplain('${empId}', 'jahresanspruch')">
+        <div class="info-box-clickable" onclick="showVacationExplain('${empId}', 'jahresanspruch')">
             <div style="font-size:0.75rem; color:var(--color-text-light);">Jahresanspruch ⓘ</div>
             <div style="font-weight:700;">${account.entitlement.toFixed(2)} Tage</div>
             <div style="font-size:0.75rem; color:var(--color-text-light);">${account.entitlementH.toFixed(2)} Std</div>
         </div>
-        <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem; cursor:pointer;" onclick="showVacationExplain('${empId}', 'carryover')">
+        <div class="info-box-clickable" onclick="showVacationExplain('${empId}', 'carryover')">
             <div style="font-size:0.75rem; color:var(--color-text-light);">Übertrag Vorjahr ⓘ</div>
             <div style="font-weight:700;">${account.carryover.toFixed(2)} Tage</div>
             <div style="font-size:0.75rem; color:var(--color-text-light);">${account.carryoverH.toFixed(2)} Std</div>
         </div>
-        <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem; cursor:pointer;" onclick="showVacationExplain('${empId}', 'genommen')">
+        <div class="info-box-clickable" onclick="showVacationExplain('${empId}', 'genommen')">
             <div style="font-size:0.75rem; color:var(--color-text-light);">Genommen ⓘ</div>
             <div style="font-weight:700;">${account.used.toFixed(2)} Tage</div>
             <div style="font-size:0.75rem; color:var(--color-text-light);">${account.usedH.toFixed(2)} Std</div>
         </div>
-        <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem; cursor:pointer;" onclick="showVacationExplain('${empId}', 'uebrig')">
+        <div class="info-box-clickable" onclick="showVacationExplain('${empId}', 'uebrig')">
             <div style="font-size:0.75rem; color:var(--color-text-light);">Übrig ⓘ</div>
             <div style="font-weight:700; color:${remColor};">${account.remaining.toFixed(2)} Tage</div>
             <div style="font-size:0.75rem; color:var(--color-text-light);">${account.remainingH.toFixed(2)} Std</div>
