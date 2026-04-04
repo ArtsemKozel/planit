@@ -3165,28 +3165,13 @@ async function loadUrlaubsverwaltung() {
 
         // Konto-Übersicht
         body.innerHTML = `
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:1rem;">
-                <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem; cursor:pointer;" onclick="showVacationExplain('${emp.id}', 'jahresanspruch')">
-                    <div style="font-size:0.75rem; color:var(--color-text-light);">Jahresanspruch ⓘ</div>
-                    <div style="font-weight:700;">${account.entitlement.toFixed(2)} Tage</div>
-                    <div style="font-size:0.75rem; color:var(--color-text-light);">${account.entitlementH.toFixed(2)} Std</div>
-                </div>
-                <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem; cursor:pointer;" onclick="showVacationExplain('${emp.id}', 'carryover')">
-                    <div style="font-size:0.75rem; color:var(--color-text-light);">Übertrag Vorjahr ⓘ</div>
-                    <div style="font-weight:700;">${account.carryover.toFixed(2)} Tage</div>
-                    <div style="font-size:0.75rem; color:var(--color-text-light);">${account.carryoverH.toFixed(2)} Std</div>
-                </div>
-                <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem; cursor:pointer;" onclick="showVacationExplain('${emp.id}', 'genommen')">
-                    <div style="font-size:0.75rem; color:var(--color-text-light);">Genommen ⓘ</div>
-                    <div style="font-weight:700;">${account.used.toFixed(2)} Tage</div>
-                    <div style="font-size:0.75rem; color:var(--color-text-light);">${account.usedH.toFixed(2)} Std</div>
-                </div>
-                <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem; cursor:pointer;" onclick="showVacationExplain('${emp.id}', 'uebrig')">
-                    <div style="font-size:0.75rem; color:var(--color-text-light);">Übrig ⓘ</div>
-                    <div style="font-weight:700; color:${account.remaining <= 3 ? '#E57373' : 'var(--color-primary)'};">${account.remaining.toFixed(2)} Tage</div>
-                    <div style="font-size:0.75rem; color:var(--color-text-light);">${account.remainingH.toFixed(2)} Std</div>
-                </div>
+            <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.75rem;">
+                <label style="font-size:0.8rem; color:var(--color-text-light); white-space:nowrap;">Anspruch bis</label>
+                <input type="date" id="cutoff-${emp.id}" value="${year}-12-31"
+                    style="padding:0.25rem 0.5rem; border:1px solid var(--color-border); border-radius:6px; font-size:0.85rem;"
+                    onchange="updateEmpAccount('${emp.id}')">
             </div>
+            <div id="account-boxes-${emp.id}">${buildAccountBoxesHtml(emp.id, account)}</div>
             ${empPhases.length > 0
                 ? empPhases.map(p => {
                     const formatShort = d => {
@@ -3307,6 +3292,41 @@ async function saveEintrag(empId) {
 function changeUrlaubYear(dir) {
     urlaubYear += dir;
     loadUrlaubsverwaltung();
+}
+
+function buildAccountBoxesHtml(empId, account) {
+    const remColor = account.remaining <= 3 ? '#E57373' : 'var(--color-primary)';
+    return `<div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:1rem;">
+        <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem; cursor:pointer;" onclick="showVacationExplain('${empId}', 'jahresanspruch')">
+            <div style="font-size:0.75rem; color:var(--color-text-light);">Jahresanspruch ⓘ</div>
+            <div style="font-weight:700;">${account.entitlement.toFixed(2)} Tage</div>
+            <div style="font-size:0.75rem; color:var(--color-text-light);">${account.entitlementH.toFixed(2)} Std</div>
+        </div>
+        <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem; cursor:pointer;" onclick="showVacationExplain('${empId}', 'carryover')">
+            <div style="font-size:0.75rem; color:var(--color-text-light);">Übertrag Vorjahr ⓘ</div>
+            <div style="font-weight:700;">${account.carryover.toFixed(2)} Tage</div>
+            <div style="font-size:0.75rem; color:var(--color-text-light);">${account.carryoverH.toFixed(2)} Std</div>
+        </div>
+        <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem; cursor:pointer;" onclick="showVacationExplain('${empId}', 'genommen')">
+            <div style="font-size:0.75rem; color:var(--color-text-light);">Genommen ⓘ</div>
+            <div style="font-weight:700;">${account.used.toFixed(2)} Tage</div>
+            <div style="font-size:0.75rem; color:var(--color-text-light);">${account.usedH.toFixed(2)} Std</div>
+        </div>
+        <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem; cursor:pointer;" onclick="showVacationExplain('${empId}', 'uebrig')">
+            <div style="font-size:0.75rem; color:var(--color-text-light);">Übrig ⓘ</div>
+            <div style="font-weight:700; color:${remColor};">${account.remaining.toFixed(2)} Tage</div>
+            <div style="font-size:0.75rem; color:var(--color-text-light);">${account.remainingH.toFixed(2)} Std</div>
+        </div>
+    </div>`;
+}
+
+function updateEmpAccount(empId) {
+    const d = vacationExplainData[empId];
+    if (!d) return;
+    const cutoff = document.getElementById(`cutoff-${empId}`)?.value || `${d.year}-12-31`;
+    const account = calculateVacationAccount(d.emp, d.year, d.vacations, [], d.phases, cutoff);
+    vacationExplainData[empId].account = account;
+    document.getElementById(`account-boxes-${empId}`).innerHTML = buildAccountBoxesHtml(empId, account);
 }
 
 function showVacationExplain(empId, type) {
@@ -3525,7 +3545,7 @@ async function saveCarryOver(empId, daysVal, hoursVal) {
     });
 }
 
-function calculateVacationAccount(emp, year, vacations, _prevVacations, phases = []) {
+function calculateVacationAccount(emp, year, vacations, _prevVacations, phases = [], cutoffDate = null) {
 
     // Jahre vor 2026 → alles 0
     if (year < 2026) {
@@ -3534,7 +3554,7 @@ function calculateVacationAccount(emp, year, vacations, _prevVacations, phases =
 
     // Phasen für dieses Jahr filtern
     const yearStart = `${year}-01-01`;
-    const yearEnd = `${year}-12-31`;
+    const yearEnd = cutoffDate || `${year}-12-31`;
     const activePhases = phases.filter(p =>
         p.start_date <= yearEnd && (!p.end_date || p.end_date >= yearStart)
     );
@@ -3600,8 +3620,8 @@ function calculateVacationAccount(emp, year, vacations, _prevVacations, phases =
         entitlementH = entitlement * hoursPerDay;
     }
 
-    // Genommene Tage und Stunden dieses Jahr
-    const empVacations = vacations.filter(v => v.employee_id === emp.id);
+    // Genommene Tage und Stunden dieses Jahr (bis cutoff)
+    const empVacations = vacations.filter(v => v.employee_id === emp.id && v.start_date <= yearEnd);
     const used = empVacations.reduce((sum, v) => sum + (v.deducted_days || 0), 0);
     const usedH = empVacations.reduce((sum, v) => {
         if (v.deducted_hours != null) return sum + v.deducted_hours;
