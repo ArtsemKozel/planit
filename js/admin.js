@@ -3170,13 +3170,17 @@ async function loadUrlaubsverwaltung() {
                 </div>
                 <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem;">
                     <div style="font-size:0.75rem; color:var(--color-text-light); margin-bottom:0.25rem;">Übertrag Vorjahr</div>
-                    <div style="display:flex; align-items:center; gap:0.4rem;">
-                        <input type="number" step="0.5" min="0" value="${(emp.carry_over_days || 0).toFixed(2)}"
-                            style="width:70px; padding:0.2rem 0.4rem; border:1px solid var(--color-border); border-radius:6px; font-size:0.9rem; font-weight:700;"
-                            onchange="saveCarryOverDays('${emp.id}', this.value)">
-                        <span style="font-size:0.8rem; color:var(--color-text-light);">Tage</span>
+                    <div style="display:flex; align-items:center; gap:0.4rem; margin-bottom:0.25rem;">
+                        <input type="number" min="0" value="${emp.carry_over_days || 0}"
+                            style="width:55px; padding:0.2rem 0.4rem; border:1px solid var(--color-border); border-radius:6px; font-size:0.9rem; font-weight:700;"
+                            onchange="saveCarryOver('${emp.id}', this.value, null)">
+                        <span style="font-size:0.8rem; color:var(--color-text-light);">T</span>
+                        <input type="number" min="0" value="${emp.carry_over_hours || 0}"
+                            style="width:55px; padding:0.2rem 0.4rem; border:1px solid var(--color-border); border-radius:6px; font-size:0.9rem; font-weight:700;"
+                            onchange="saveCarryOver('${emp.id}', null, this.value)">
+                        <span style="font-size:0.8rem; color:var(--color-text-light);">Std</span>
                     </div>
-                    <div style="font-size:0.75rem; color:var(--color-text-light);">${account.carryoverH.toFixed(2)} Std</div>
+                    <div style="font-size:0.75rem; color:var(--color-text-light);">${account.carryoverH.toFixed(2)} Std gesamt</div>
                 </div>
                 <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem;">
                     <div style="font-size:0.75rem; color:var(--color-text-light);">Genommen</div>
@@ -3304,15 +3308,17 @@ function changeUrlaubYear(dir) {
     loadUrlaubsverwaltung();
 }
 
-async function saveCarryOverDays(empId, value) {
-    const days = parseFloat(value) || 0;
-    await db.from('employees_planit').update({ carry_over_days: days }).eq('id', empId);
+async function saveCarryOver(empId, daysVal, hoursVal) {
+    const update = {};
+    if (daysVal !== null) update.carry_over_days = parseFloat(daysVal) || 0;
+    if (hoursVal !== null) update.carry_over_hours = parseFloat(hoursVal) || 0;
+    await db.from('employees_planit').update(update).eq('id', empId);
     await db.from('planit_audit_log').insert({
         user_id: adminSession.user.id,
-        action: 'update_carry_over_days',
+        action: 'update_carry_over',
         target_type: 'employee',
         target_id: empId,
-        details: { carry_over_days: days }
+        details: update
     });
 }
 
@@ -3391,16 +3397,18 @@ function calculateVacationAccount(emp, year, vacations, _prevVacations, phases =
         .filter(v => v.employee_id === emp.id)
         .reduce((sum, v) => sum + (v.deducted_days || 0), 0);
 
-    // Übertrag Vorjahr aus Mitarbeiter-Stammdaten (carry_over_days)
+    // Übertrag Vorjahr aus Mitarbeiter-Stammdaten
     const carryover = emp.carry_over_days || 0;
+    const carryoverExtraH = emp.carry_over_hours || 0;
 
     const hoursPerDay = emp.hours_per_vacation_day || 8.0;
+    const carryoverH = carryover * hoursPerDay + carryoverExtraH;
     const remaining = entitlement + carryover - used;
-    const remainingH = entitlementH + (carryover * hoursPerDay) - used * hoursPerDay;
+    const remainingH = entitlementH + carryoverH - used * hoursPerDay;
     return {
         entitlement, carryover, used, remaining,
         entitlementH,
-        carryoverH: carryover * hoursPerDay,
+        carryoverH,
         usedH: used * hoursPerDay,
         remainingH
     };
