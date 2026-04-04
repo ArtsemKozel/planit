@@ -6,6 +6,7 @@ let editShiftId = null;
 let planningMode = false;
 let availabilityCache = {};
 let urlaubYear = new Date().getFullYear();
+let vacationExplainData = {};
 let editVacationApproveAfter = false;
 let openTaskIds = new Set();
 let currentShiftEmployeeId = null;
@@ -3136,6 +3137,8 @@ async function loadUrlaubsverwaltung() {
         // Urlaubskonto berechnen
         const empPhases = (allPhases || []).filter(p => p.employee_id === emp.id);
         const account = calculateVacationAccount(emp, year, vacations || [], [], empPhases);
+        const empVacations = (vacations || []).filter(v => v.employee_id === emp.id).sort((a, b) => a.start_date.localeCompare(b.start_date));
+        vacationExplainData[emp.id] = { emp, account, phases: empPhases, vacations: empVacations, year };
 
         const header = document.createElement('div');
         header.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:1rem 1.25rem; cursor:pointer;';
@@ -3163,23 +3166,23 @@ async function loadUrlaubsverwaltung() {
         // Konto-Übersicht
         body.innerHTML = `
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:1rem;">
-                <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem;">
-                    <div style="font-size:0.75rem; color:var(--color-text-light);">Jahresanspruch</div>
+                <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem; cursor:pointer;" onclick="showVacationExplain('${emp.id}', 'jahresanspruch')">
+                    <div style="font-size:0.75rem; color:var(--color-text-light);">Jahresanspruch ⓘ</div>
                     <div style="font-weight:700;">${account.entitlement.toFixed(2)} Tage</div>
                     <div style="font-size:0.75rem; color:var(--color-text-light);">${account.entitlementH.toFixed(2)} Std</div>
                 </div>
-                <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem;">
-                    <div style="font-size:0.75rem; color:var(--color-text-light);">Übertrag Vorjahr</div>
+                <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem; cursor:pointer;" onclick="showVacationExplain('${emp.id}', 'carryover')">
+                    <div style="font-size:0.75rem; color:var(--color-text-light);">Übertrag Vorjahr ⓘ</div>
                     <div style="font-weight:700;">${account.carryover.toFixed(2)} Tage</div>
                     <div style="font-size:0.75rem; color:var(--color-text-light);">${account.carryoverH.toFixed(2)} Std</div>
                 </div>
-                <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem;">
-                    <div style="font-size:0.75rem; color:var(--color-text-light);">Genommen</div>
+                <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem; cursor:pointer;" onclick="showVacationExplain('${emp.id}', 'genommen')">
+                    <div style="font-size:0.75rem; color:var(--color-text-light);">Genommen ⓘ</div>
                     <div style="font-weight:700;">${account.used.toFixed(2)} Tage</div>
                     <div style="font-size:0.75rem; color:var(--color-text-light);">${account.usedH.toFixed(2)} Std</div>
                 </div>
-                <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem;">
-                    <div style="font-size:0.75rem; color:var(--color-text-light);">Übrig</div>
+                <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem; cursor:pointer;" onclick="showVacationExplain('${emp.id}', 'uebrig')">
+                    <div style="font-size:0.75rem; color:var(--color-text-light);">Übrig ⓘ</div>
                     <div style="font-weight:700; color:${account.remaining <= 3 ? '#E57373' : 'var(--color-primary)'};">${account.remaining.toFixed(2)} Tage</div>
                     <div style="font-size:0.75rem; color:var(--color-text-light);">${account.remainingH.toFixed(2)} Std</div>
                 </div>
@@ -3304,6 +3307,88 @@ async function saveEintrag(empId) {
 function changeUrlaubYear(dir) {
     urlaubYear += dir;
     loadUrlaubsverwaltung();
+}
+
+function showVacationExplain(empId, type) {
+    const d = vacationExplainData[empId];
+    if (!d) return;
+    const { emp, account, phases, vacations, year } = d;
+    const daysInYear = ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0) ? 366 : 365;
+    const yearStart = `${year}-01-01`;
+    const yearEnd = `${year}-12-31`;
+    const fmt = dateStr => { const p = dateStr.split('-'); return `${p[2]}.${p[1]}.${p[0].slice(2)}`; };
+
+    let title = '', body = '';
+
+    if (type === 'jahresanspruch') {
+        title = 'Jahresanspruch – Berechnung';
+        const totalDaysPerYear = emp.vacation_days_per_year ?? 20;
+        if (phases.length > 0) {
+            body = phases.map(p => {
+                const phaseStart = new Date(Math.max(new Date(p.start_date + 'T12:00:00'), new Date(yearStart + 'T12:00:00')));
+                const phaseEnd = new Date(Math.min(p.end_date ? new Date(p.end_date + 'T12:00:00') : new Date(yearEnd + 'T12:00:00'), new Date(yearEnd + 'T12:00:00')));
+                const daysInPhase = Math.round((phaseEnd - phaseStart) / 86400000) + 1;
+                const phaseDays = p.hours_per_vacation_day === 0 ? 0 : Math.round((daysInPhase / daysInYear) * totalDaysPerYear * 100) / 100;
+                const von = fmt(phaseStart.toISOString().split('T')[0]);
+                const bis = fmt(phaseEnd.toISOString().split('T')[0]);
+                return `<div style="padding:0.4rem 0; border-bottom:1px solid var(--color-border);">
+                    <span style="color:var(--color-text-light);">${von} – ${bis}</span><br>
+                    ${daysInPhase} / ${daysInYear} Tage × ${totalDaysPerYear} = <strong>${phaseDays.toFixed(2)} Tage</strong>
+                    <span style="color:var(--color-text-light); font-size:0.8rem;">(${p.hours_per_vacation_day} Std/UT${p.notes ? ' · ' + p.notes : ''})</span>
+                </div>`;
+            }).join('');
+        } else {
+            const anteilig = emp.start_date && new Date(emp.start_date + 'T12:00:00').getFullYear() === year
+                ? ` (anteilig ab ${fmt(emp.start_date)})`
+                : '';
+            body = `<div>${totalDaysPerYear} Tage/Jahr${anteilig}</div>`;
+        }
+        body += `<div style="margin-top:0.75rem; font-weight:700;">Gesamt: ${account.entitlement.toFixed(2)} Tage / ${account.entitlementH.toFixed(2)} Std</div>`;
+
+    } else if (type === 'carryover') {
+        title = 'Übertrag Vorjahr';
+        body = `<div style="display:grid; grid-template-columns:auto 1fr; gap:0.25rem 1rem;">
+            <span style="color:var(--color-text-light);">Tage</span><strong>${account.carryover.toFixed(2)}</strong>
+            <span style="color:var(--color-text-light);">Stunden</span><strong>${account.carryoverH.toFixed(2)}</strong>
+        </div>
+        <div style="margin-top:0.75rem; font-size:0.8rem; color:var(--color-text-light);">Werte aus Mitarbeiter-Stammdaten (carry_over_days / carry_over_hours) — direkt addiert, keine Umrechnung.</div>`;
+
+    } else if (type === 'genommen') {
+        title = 'Genommen – Einträge';
+        if (vacations.length === 0) {
+            body = '<div style="color:var(--color-text-light);">Keine Einträge.</div>';
+        } else {
+            body = vacations.map(v => {
+                const typeLabel = v.type === 'payout' ? '💰' : v.type === 'manual' ? '✏️' : '🏖';
+                const hrs = v.deducted_hours != null ? ` / ${v.deducted_hours} Std` : '';
+                return `<div style="display:flex; justify-content:space-between; align-items:baseline; padding:0.35rem 0; border-bottom:1px solid var(--color-border); font-size:0.85rem;">
+                    <span>${typeLabel} ${fmt(v.start_date)}${v.reason ? ' · ' + v.reason : ''}</span>
+                    <span style="font-weight:600; margin-left:0.5rem; white-space:nowrap;">${(Math.round((v.deducted_days || 0) * 100) / 100).toFixed(2)} T${hrs}</span>
+                </div>`;
+            }).join('');
+            body += `<div style="margin-top:0.75rem; font-weight:700;">Gesamt: ${account.used.toFixed(2)} Tage / ${account.usedH.toFixed(2)} Std</div>`;
+        }
+
+    } else if (type === 'uebrig') {
+        title = 'Übrig – Formel';
+        const remColor = account.remaining <= 3 ? '#E57373' : 'var(--color-primary)';
+        body = `<div style="display:grid; grid-template-columns:auto 1fr auto; gap:0.35rem 0.75rem; align-items:baseline;">
+            <span style="color:var(--color-text-light);">Jahresanspruch</span><span></span><span><strong>${account.entitlement.toFixed(2)} T</strong> / ${account.entitlementH.toFixed(2)} Std</span>
+            <span style="color:var(--color-text-light);">+ Übertrag</span><span></span><span><strong>${account.carryover.toFixed(2)} T</strong> / ${account.carryoverH.toFixed(2)} Std</span>
+            <span style="color:var(--color-text-light);">− Genommen</span><span></span><span><strong>${account.used.toFixed(2)} T</strong> / ${account.usedH.toFixed(2)} Std</span>
+        </div>
+        <div style="margin-top:0.75rem; padding-top:0.6rem; border-top:2px solid var(--color-border); font-weight:700; font-size:1.05rem; color:${remColor};">
+            = ${account.remaining.toFixed(2)} Tage / ${account.remainingH.toFixed(2)} Std
+        </div>`;
+    }
+
+    document.getElementById('vacation-explain-title').textContent = title;
+    document.getElementById('vacation-explain-body').innerHTML = body;
+    document.getElementById('vacation-explain-modal').classList.add('active');
+}
+
+function closeVacationExplainModal() {
+    document.getElementById('vacation-explain-modal').classList.remove('active');
 }
 
 let carryOverSectionOpen = false;
