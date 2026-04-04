@@ -573,6 +573,17 @@
             <label>Notizen (optional)</label>
             <textarea id="shift-notes" rows="2"></textarea>
         </div>
+        <!-- Wiederholung -->
+        <div class="form-group">
+            <div style="display:flex; align-items:center; gap:0.75rem;">
+                <input type="checkbox" id="shift-repeat" style="width:auto;" onchange="toggleRepeat()">
+                <label style="margin:0;">Wöchentlich wiederholen</label>
+            </div>
+        </div>
+        <div id="shift-repeat-group" class="form-group" style="display:none;">
+            <label>Anzahl Wochen</label>
+            <input type="number" id="shift-repeat-weeks" min="1" max="12" value="4" placeholder="z.B. 4">
+        </div>
         <!-- Tatsächliche Zeiten (nur bei bestehender Schicht) -->
         <div id="shift-actual-group" style="display:none; margin-bottom:1rem;">
             <button type="button" onclick="toggleShiftActual()" style="display:flex; justify-content:space-between; align-items:center; width:100%; background:var(--color-gray); border:none; border-radius:8px; padding:0.6rem 0.75rem; cursor:pointer; font-size:0.9rem; font-weight:600; color:var(--color-text);">
@@ -593,17 +604,6 @@
                     <input type="number" id="shift-actual-break" placeholder="z.B. 30" min="0">
                 </div>
             </div>
-        </div>
-        <!-- Wiederholung -->
-        <div class="form-group">
-            <div style="display:flex; align-items:center; gap:0.75rem;">
-                <input type="checkbox" id="shift-repeat" style="width:auto;" onchange="toggleRepeat()">
-                <label style="margin:0;">Wöchentlich wiederholen</label>
-            </div>
-        </div>
-        <div id="shift-repeat-group" class="form-group" style="display:none;">
-            <label>Anzahl Wochen</label>
-            <input type="number" id="shift-repeat-weeks" min="1" max="12" value="4" placeholder="z.B. 4">
         </div>
         <div id="shift-error" style="color:var(--color-red); font-size:0.85rem; margin-bottom:1rem; display:none;"></div>
         <button id="shift-delete-btn" class="btn-secondary" style="margin-bottom:0.75rem; color:var(--color-red); border-color:var(--color-red);" onclick="deleteShift()">Schicht löschen</button>
