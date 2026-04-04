@@ -117,20 +117,20 @@
                     <input type="date" id="vac-cutoff" onchange="renderVacationAccount(this.value)">
                 </div>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:0.75rem;">
-                    <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem;">
-                        <div style="font-size:0.75rem; color:var(--color-text-light);">Jahresanspruch</div>
+                    <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem; cursor:pointer;" onclick="showVacExplain('jahresanspruch')">
+                        <div style="font-size:0.75rem; color:var(--color-text-light);">Jahresanspruch ⓘ</div>
                         <div id="vac-entitlement" style="font-weight:700;">–</div>
                     </div>
-                    <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem;">
-                        <div style="font-size:0.75rem; color:var(--color-text-light);">Übertrag Vorjahr</div>
+                    <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem; cursor:pointer;" onclick="showVacExplain('carryover')">
+                        <div style="font-size:0.75rem; color:var(--color-text-light);">Übertrag Vorjahr ⓘ</div>
                         <div id="vac-carryover" style="font-weight:700;">–</div>
                     </div>
-                    <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem;">
-                        <div style="font-size:0.75rem; color:var(--color-text-light);">Genommen</div>
+                    <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem; cursor:pointer;" onclick="showVacExplain('genommen')">
+                        <div style="font-size:0.75rem; color:var(--color-text-light);">Genommen ⓘ</div>
                         <div id="vac-used-detail" style="font-weight:700;">–</div>
                     </div>
-                    <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem;">
-                        <div style="font-size:0.75rem; color:var(--color-text-light);">Übrig</div>
+                    <div style="background:#F5F5F5; border-radius:8px; padding:0.5rem 0.75rem; cursor:pointer;" onclick="showVacExplain('uebrig')">
+                        <div style="font-size:0.75rem; color:var(--color-text-light);">Übrig ⓘ</div>
                         <div id="vac-remaining-detail" style="font-weight:700; color:var(--color-primary);">–</div>
                     </div>
                 </div>
@@ -383,6 +383,17 @@
         </div>
     </div>
 
+</div>
+
+<!-- MODAL: URLAUBSKONTO ERKLÄRUNG -->
+<div id="vac-explain-modal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title" id="vac-explain-title"></div>
+            <button class="modal-close" onclick="closeVacExplainModal()">✕</button>
+        </div>
+        <div id="vac-explain-body" style="font-size:0.9rem; line-height:1.7;"></div>
+    </div>
 </div>
 
 <!-- MODAL: URLAUB BEANTRAGEN -->

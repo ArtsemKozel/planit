@@ -413,6 +413,7 @@ let _vacEmp = null;
 let _vacPhases = null;
 let _vacRequests = null;
 let _vacYear = new Date().getFullYear();
+let _vacLastAccount = null;
 
 async function loadVacationAccount() {
     _vacYear = new Date().getFullYear();
@@ -428,7 +429,7 @@ async function loadVacationAccount() {
             .eq('employee_id', currentEmployee.id)
             .order('start_date'),
         db.from('vacation_requests')
-            .select('deducted_days, deducted_hours, start_date')
+            .select('deducted_days, deducted_hours, start_date, type')
             .eq('employee_id', currentEmployee.id)
             .eq('status', 'approved')
             .gte('start_date', `${_vacYear}-01-01`)
@@ -529,6 +530,10 @@ function renderVacationAccount(cutoffDate) {
     const remaining = entitlement + carryover - usedDays;
     const remainingH = entitlementH + carryoverH - usedH;
 
+    // Für Erklär-Modal speichern
+    _vacLastAccount = { entitlement, entitlementH, carryover, carryoverH,
+        used: usedDays, usedH, remaining, remainingH, usedEntries, activePhases, yearEnd, year };
+
     const fmt2 = v => v.toFixed(2);
     const sub = v => `<span style="font-size:0.75rem; color:var(--color-text-light);">${v}</span>`;
 
@@ -554,6 +559,94 @@ function renderVacationAccount(cutoffDate) {
     } else {
         phasesInfo.innerHTML = `Std. pro UT: ${hoursPerDay}h`;
     }
+}
+
+function showVacExplain(type) {
+    const d = _vacLastAccount;
+    if (!d) return;
+    const fmt = dateStr => { const p = dateStr.split('-'); return `${p[2]}.${p[1]}.${p[0].slice(2)}`; };
+    const f2 = v => v.toFixed(2);
+
+    let title = '', body = '';
+
+    if (type === 'jahresanspruch') {
+        title = 'Jahresanspruch – Berechnung';
+        const totalDaysPerYear = _vacEmp?.vacation_days_per_year ?? 20;
+        const yearStart = `${d.year}-01-01`;
+        const yearEnd = d.yearEnd;
+        if (d.activePhases.length > 0) {
+            body = d.activePhases.map(p => {
+                const phaseStart = new Date(Math.max(new Date(p.start_date + 'T12:00:00'), new Date(yearStart + 'T12:00:00')));
+                const phaseEnd = new Date(Math.min(
+                    p.end_date ? new Date(p.end_date + 'T12:00:00') : new Date(yearEnd + 'T12:00:00'),
+                    new Date(yearEnd + 'T12:00:00')
+                ));
+                const monthlyDays = totalDaysPerYear / 12;
+                let phaseDays = 0;
+                for (let m = phaseStart.getMonth(); m <= phaseEnd.getMonth(); m++) {
+                    const dim = new Date(d.year, m + 1, 0).getDate();
+                    const first = m === phaseStart.getMonth() ? phaseStart.getDate() : 1;
+                    const last  = m === phaseEnd.getMonth()   ? phaseEnd.getDate()   : dim;
+                    phaseDays += monthlyDays * ((last - first + 1) / dim);
+                }
+                if (p.hours_per_vacation_day === 0) phaseDays = 0;
+                return `<div style="padding:0.4rem 0; border-bottom:1px solid var(--color-border);">
+                    <span style="color:var(--color-text-light);">${fmt(phaseStart.toISOString().split('T')[0])} – ${fmt(phaseEnd.toISOString().split('T')[0])}</span><br>
+                    ${totalDaysPerYear}/12 × Tage = <strong>${f2(phaseDays)} Tage</strong>
+                    <span style="color:var(--color-text-light); font-size:0.8rem;">(${p.hours_per_vacation_day} Std/UT${p.notes ? ' · ' + p.notes : ''})</span>
+                </div>`;
+            }).join('');
+        } else {
+            const anteilig = _vacEmp?.start_date && new Date(_vacEmp.start_date + 'T12:00:00').getFullYear() === d.year
+                ? ` (anteilig ab ${fmt(_vacEmp.start_date)})` : '';
+            body = `<div>${totalDaysPerYear} Tage/Jahr${anteilig}</div>`;
+        }
+        body += `<div style="margin-top:0.75rem; font-weight:700;">Gesamt: ${f2(d.entitlement)} Tage / ${f2(d.entitlementH)} Std</div>`;
+
+    } else if (type === 'carryover') {
+        title = 'Übertrag Vorjahr';
+        body = `<div style="display:grid; grid-template-columns:auto 1fr; gap:0.25rem 1rem;">
+            <span style="color:var(--color-text-light);">Tage</span><strong>${f2(d.carryover)}</strong>
+            <span style="color:var(--color-text-light);">Stunden</span><strong>${f2(d.carryoverH)}</strong>
+        </div>
+        <div style="margin-top:0.75rem; font-size:0.8rem; color:var(--color-text-light);">Werte aus Mitarbeiter-Stammdaten — direkt addiert, keine Umrechnung.</div>`;
+
+    } else if (type === 'genommen') {
+        title = 'Genommen – Einträge';
+        if (!d.usedEntries.length) {
+            body = '<div style="color:var(--color-text-light);">Keine Einträge.</div>';
+        } else {
+            body = d.usedEntries.map(r => {
+                const typeLabel = r.type === 'payout' ? '💰' : r.type === 'manual' ? '✏️' : '🏖';
+                const hrs = r.deducted_hours != null ? ` / ${r.deducted_hours} Std` : '';
+                return `<div style="display:flex; justify-content:space-between; padding:0.35rem 0; border-bottom:1px solid var(--color-border); font-size:0.85rem;">
+                    <span>${typeLabel} ${fmt(r.start_date)}</span>
+                    <span style="font-weight:600;">${f2(Math.round((r.deducted_days||0)*100)/100)} T${hrs}</span>
+                </div>`;
+            }).join('');
+            body += `<div style="margin-top:0.75rem; font-weight:700;">Gesamt: ${f2(d.used)} Tage / ${f2(d.usedH)} Std</div>`;
+        }
+
+    } else if (type === 'uebrig') {
+        title = 'Übrig – Formel';
+        const remColor = d.remaining <= 3 ? '#E57373' : 'var(--color-primary)';
+        body = `<div style="display:grid; grid-template-columns:auto 1fr auto; gap:0.35rem 0.75rem; align-items:baseline;">
+            <span style="color:var(--color-text-light);">Jahresanspruch</span><span></span><span><strong>${f2(d.entitlement)} T</strong> / ${f2(d.entitlementH)} Std</span>
+            <span style="color:var(--color-text-light);">+ Übertrag</span><span></span><span><strong>${f2(d.carryover)} T</strong> / ${f2(d.carryoverH)} Std</span>
+            <span style="color:var(--color-text-light);">− Genommen</span><span></span><span><strong>${f2(d.used)} T</strong> / ${f2(d.usedH)} Std</span>
+        </div>
+        <div style="margin-top:0.75rem; padding-top:0.6rem; border-top:2px solid var(--color-border); font-weight:700; font-size:1.05rem; color:${remColor};">
+            = ${f2(d.remaining)} Tage / ${f2(d.remainingH)} Std
+        </div>`;
+    }
+
+    document.getElementById('vac-explain-title').textContent = title;
+    document.getElementById('vac-explain-body').innerHTML = body;
+    document.getElementById('vac-explain-modal').classList.add('active');
+}
+
+function closeVacExplainModal() {
+    document.getElementById('vac-explain-modal').classList.remove('active');
 }
 
 let signaturePad = null;
