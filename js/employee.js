@@ -319,7 +319,7 @@ function renderVacationCalendar(year, month, vacations) {
         dayEl.appendChild(numEl);
 
         if (dayVacations.length > 0) {
-            dayEl.style.background = '#C9A24D';
+            dayEl.style.background = goldGradient(dayVacations.length);
             dayEl.style.color = 'white';
             numEl.style.color = 'white';
             dayEl.classList.add('has-vacation');
@@ -347,6 +347,19 @@ function renderVacationCalendar(year, month, vacations) {
         }).join('');
         container.appendChild(listEl);
     }
+}
+
+function goldGradient(n) {
+    const shades = ['#C9A24D','#B8913C','#DAB35E','#A8803B','#EBC46F','#987030','#F0C47A'];
+    if (n === 1) return shades[0];
+    const stops = [];
+    for (let i = 0; i < n; i++) {
+        const pct1 = (i / n * 100).toFixed(2);
+        const pct2 = ((i + 1) / n * 100).toFixed(2);
+        const c = shades[i % shades.length];
+        stops.push(`${c} ${pct1}%`, `${c} ${pct2}%`);
+    }
+    return `linear-gradient(to right, ${stops.join(', ')})`;
 }
 
 function showEmpVacDayModal(dateStr, dayVacations) {
