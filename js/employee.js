@@ -257,7 +257,7 @@ async function loadVacationCalendar() {
 
     const { data: vacations } = await db
         .from('vacation_requests')
-        .select('*, employees_planit(name)')
+        .select('*, employees_planit(name, department)')
         .eq('user_id', currentEmployee.user_id)
         .eq('status', 'approved')
         .lte('start_date', lastDay)
@@ -270,109 +270,82 @@ function renderVacationCalendar(year, month, vacations) {
     const container = document.getElementById('vac-calendar');
     container.innerHTML = '';
 
+    const myDept = currentEmployee.department || 'Allgemein';
+    // Nur eigene + gleiche Abteilung anzeigen
+    const visible = vacations.filter(v =>
+        v.employee_id === currentEmployee.id ||
+        (v.employees_planit?.department || 'Allgemein') === myDept
+    );
+
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const firstWeekday = new Date(year, month, 1).getDay();
     const offset = firstWeekday === 0 ? 6 : firstWeekday - 1;
 
-    // Farben pro Mitarbeiter
-    const colors = ['#C9A24D','#7EB8C9','#A8C97E','#C97E9A','#9A7EC9','#C9A87E','#7EC9B8'];
-    const empColors = {};
-    let colorIdx = 0;
-
-    vacations.forEach(v => {
-        const empId = v.employee_id;
-        if (!empColors[empId]) {
-            if (empId === currentEmployee.id) {
-                empColors[empId] = '#C9A24D';
-            } else {
-                // skip gold for others
-                const c = colors.filter(x => x !== '#C9A24D')[colorIdx % (colors.length - 1)];
-                empColors[empId] = c;
-                colorIdx++;
-            }
-        }
-    });
-
-    // Wochentag-Header
-    const dayHeaders = ['Mo','Di','Mi','Do','Fr','Sa','So'];
     const grid = document.createElement('div');
     grid.className = 'calendar-grid';
 
-    dayHeaders.forEach(d => {
+    ['Mo','Di','Mi','Do','Fr','Sa','So'].forEach(d => {
         const h = document.createElement('div');
         h.className = 'calendar-day-header';
         h.textContent = d;
         grid.appendChild(h);
     });
 
-    // Leere Felder vor dem 1.
     for (let i = 0; i < offset; i++) {
         const empty = document.createElement('div');
         empty.className = 'calendar-day empty';
         grid.appendChild(empty);
     }
 
-    // Tage
+    const holidays = getBWHolidays(year);
     for (let d = 1; d <= daysInMonth; d++) {
-        const holidays = getBWHolidays(year);
         const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-        const dayVacations = vacations.filter(v => v.start_date <= dateStr && v.end_date >= dateStr);
-
+        const dayVacations = visible.filter(v => v.start_date <= dateStr && v.end_date >= dateStr);
         const isHoliday = holidays.includes(dateStr);
         const dayEl = document.createElement('div');
         dayEl.className = 'calendar-day' + (isHoliday ? ' holiday' : '');
-        dayEl.style.position = 'relative';
-        dayEl.style.flexDirection = 'column';
-        dayEl.style.gap = '2px';
 
         const numEl = document.createElement('span');
         numEl.textContent = d;
         numEl.style.fontSize = '0.8rem';
         dayEl.appendChild(numEl);
 
-        dayVacations.forEach(v => {
-            const bar = document.createElement('div');
-            bar.style.width = '100%';
-            bar.style.height = '4px';
-            bar.style.borderRadius = '2px';
-            bar.style.background = empColors[v.employee_id] || '#ccc';
-            bar.title = v.employees_planit?.name || '';
-            dayEl.appendChild(bar);
-        });
+        if (dayVacations.length > 0) {
+            dayEl.style.background = '#C9A24D';
+            dayEl.style.color = 'white';
+            numEl.style.color = 'white';
+            dayEl.classList.add('has-vacation');
+            dayEl.onclick = () => showEmpVacDayModal(dateStr, dayVacations);
+        }
 
         grid.appendChild(dayEl);
     }
 
     container.appendChild(grid);
+}
 
-    // Legende
-    const legend = document.createElement('div');
-    legend.style.display = 'flex';
-    legend.style.flexWrap = 'wrap';
-    legend.style.gap = '0.5rem';
-    legend.style.marginTop = '0.75rem';
+function showEmpVacDayModal(dateStr, dayVacations) {
+    const [y, , d] = dateStr.split('-');
+    const date = new Date(dateStr + 'T12:00:00');
+    const dayNames = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+    const monthNames = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+    document.getElementById('emp-vac-day-modal-title').textContent =
+        `${dayNames[date.getDay()]}, ${parseInt(d)}. ${monthNames[date.getMonth()]} ${y}`;
+    const typeLabel = t => t === 'payout' ? 'Auszahlung' : t === 'manual' ? 'Manuell' : 'Urlaub';
+    const typeBg    = t => t === 'payout' ? '#FFF3CC' : t === 'manual' ? '#E8D0FF' : '#D8F0D8';
+    const typeColor = t => t === 'payout' ? '#C9A24D' : t === 'manual' ? '#9B59B6' : '#4CAF50';
+    document.getElementById('emp-vac-day-modal-body').innerHTML = dayVacations.map(v => {
+        const name = v.employee_id === currentEmployee.id ? 'Ich' : (v.employees_planit?.name || '—');
+        return `<div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem 0; border-bottom:1px solid var(--color-border);">
+            <span style="font-weight:600;">${name}</span>
+            <span style="font-size:0.75rem; padding:2px 8px; border-radius:6px; background:${typeBg(v.type)}; color:${typeColor(v.type)};">${typeLabel(v.type)}</span>
+        </div>`;
+    }).join('');
+    document.getElementById('emp-vac-day-modal').classList.add('active');
+}
 
-    vacations.forEach(v => {
-        const empId = v.employee_id;
-        const name = v.employees_planit?.name || '';
-        if (legend.querySelector(`[data-emp="${empId}"]`)) return;
-        const item = document.createElement('div');
-        item.setAttribute('data-emp', empId);
-        item.style.display = 'flex';
-        item.style.alignItems = 'center';
-        item.style.gap = '4px';
-        item.style.fontSize = '0.75rem';
-        const dot = document.createElement('div');
-        dot.style.width = '10px';
-        dot.style.height = '10px';
-        dot.style.borderRadius = '50%';
-        dot.style.background = empColors[empId] || '#ccc';
-        item.appendChild(dot);
-        item.appendChild(document.createTextNode(empId === currentEmployee.id ? 'Ich' : name));
-        legend.appendChild(item);
-    });
-
-    container.appendChild(legend);
+function closeEmpVacDayModal() {
+    document.getElementById('emp-vac-day-modal').classList.remove('active');
 }
 
 function changeVacCalMonth(dir) {

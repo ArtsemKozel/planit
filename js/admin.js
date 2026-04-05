@@ -1249,16 +1249,6 @@ function renderAdminVacationCalendar(year, month, vacations) {
     const firstWeekday = new Date(year, month, 1).getDay();
     const offset = firstWeekday === 0 ? 6 : firstWeekday - 1;
 
-    const colors = ['#C9A24D','#7EB8C9','#A8C97E','#C97E9A','#9A7EC9','#C9A87E','#7EC9B8'];
-    const empColors = {};
-    let colorIdx = 0;
-    vacations.forEach(v => {
-        if (!empColors[v.employee_id]) {
-            empColors[v.employee_id] = colors[colorIdx % colors.length];
-            colorIdx++;
-        }
-    });
-
     const grid = document.createElement('div');
     grid.className = 'calendar-grid';
 
@@ -1282,25 +1272,16 @@ function renderAdminVacationCalendar(year, month, vacations) {
         const isHoliday = holidays.includes(dateStr);
         const dayEl = document.createElement('div');
         dayEl.className = 'calendar-day' + (isHoliday ? ' holiday' : '');
-        dayEl.style.flexDirection = 'column';
-        dayEl.style.gap = '2px';
 
         const numEl = document.createElement('span');
         numEl.textContent = d;
         numEl.style.fontSize = '0.8rem';
         dayEl.appendChild(numEl);
 
-        dayVacations.forEach(v => {
-            const bar = document.createElement('div');
-            bar.style.width = '100%';
-            bar.style.height = '4px';
-            bar.style.borderRadius = '2px';
-            bar.style.background = empColors[v.employee_id] || '#ccc';
-            bar.title = v.employees_planit?.name || '';
-            dayEl.appendChild(bar);
-        });
-
         if (dayVacations.length > 0) {
+            dayEl.style.background = '#C9A24D';
+            dayEl.style.color = 'white';
+            numEl.style.color = 'white';
             dayEl.classList.add('has-vacation');
             dayEl.onclick = () => showVacDayModal(dateStr, dayVacations);
         }
@@ -1310,32 +1291,6 @@ function renderAdminVacationCalendar(year, month, vacations) {
 
     container.appendChild(grid);
 
-    // Legende
-    const legend = document.createElement('div');
-    legend.style.display = 'flex';
-    legend.style.flexWrap = 'wrap';
-    legend.style.gap = '0.5rem';
-    legend.style.marginTop = '0.75rem';
-
-    vacations.forEach(v => {
-        if (legend.querySelector(`[data-emp="${v.employee_id}"]`)) return;
-        const item = document.createElement('div');
-        item.setAttribute('data-emp', v.employee_id);
-        item.style.display = 'flex';
-        item.style.alignItems = 'center';
-        item.style.gap = '4px';
-        item.style.fontSize = '0.75rem';
-        const dot = document.createElement('div');
-        dot.style.width = '10px';
-        dot.style.height = '10px';
-        dot.style.borderRadius = '50%';
-        dot.style.background = empColors[v.employee_id] || '#ccc';
-        item.appendChild(dot);
-        item.appendChild(document.createTextNode(v.employees_planit?.name || '?'));
-        legend.appendChild(item);
-    });
-
-    container.appendChild(legend);
 }
 
 function changeAdminVacCalMonth(dir) {
