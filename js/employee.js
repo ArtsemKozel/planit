@@ -359,7 +359,7 @@ function goldGradient(n) {
         const c = shades[i % shades.length];
         stops.push(`${c} ${pct1}%`, `${c} ${pct2}%`);
     }
-    return `linear-gradient(to right, ${stops.join(', ')})`;
+    return `linear-gradient(to bottom, ${stops.join(', ')})`;
 }
 
 function showEmpVacDayModal(dateStr, dayVacations) {
