@@ -322,6 +322,23 @@ function renderVacationCalendar(year, month, vacations) {
     }
 
     container.appendChild(grid);
+
+    // Liste der Urlaubseinträge dieses Monats — nur gleiche Abteilung
+    if (visible.length > 0) {
+        const fmtShort = d => { const p = d.split('-'); return `${parseInt(p[2])}.${parseInt(p[1])}.`; };
+        const typeLabel = t => t === 'payout' ? '💰' : t === 'manual' ? '✏️' : '🏖';
+        const listEl = document.createElement('div');
+        listEl.style.marginTop = '1rem';
+        const sorted = [...visible].sort((a, b) => a.start_date.localeCompare(b.start_date));
+        listEl.innerHTML = sorted.map(v => {
+            const name = v.employee_id === currentEmployee.id ? 'Ich' : (v.employees_planit?.name || '—');
+            return `<div style="display:flex; justify-content:space-between; align-items:center; padding:0.35rem 0; border-bottom:1px solid var(--color-border); font-size:0.85rem;">
+                <span>${typeLabel(v.type)} <strong>${name}</strong></span>
+                <span style="color:var(--color-text-light);">${v.type === 'manual' ? fmtShort(v.start_date) : `${fmtShort(v.start_date)} – ${fmtShort(v.end_date)}`}</span>
+            </div>`;
+        }).join('');
+        container.appendChild(listEl);
+    }
 }
 
 function showEmpVacDayModal(dateStr, dayVacations) {

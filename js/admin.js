@@ -1291,6 +1291,28 @@ function renderAdminVacationCalendar(year, month, vacations) {
 
     container.appendChild(grid);
 
+    // Liste der Urlaubseinträge dieses Monats, nach Abteilung gruppiert
+    if (vacations.length > 0) {
+        const fmtShort = d => { const p = d.split('-'); return `${parseInt(p[2])}.${parseInt(p[1])}.`; };
+        const typeLabel = t => t === 'payout' ? '💰' : t === 'manual' ? '✏️' : '🏖';
+        const depts = [...new Set(vacations.map(v => v.employees_planit?.department || 'Allgemein'))].sort();
+        const listEl = document.createElement('div');
+        listEl.style.marginTop = '1rem';
+        depts.forEach(dept => {
+            const deptVacs = vacations.filter(v => (v.employees_planit?.department || 'Allgemein') === dept)
+                .sort((a, b) => a.start_date.localeCompare(b.start_date));
+            const section = document.createElement('div');
+            section.style.marginBottom = '0.75rem';
+            section.innerHTML = `<div style="font-size:0.75rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.05em; margin-bottom:0.35rem;">${dept.toUpperCase()}</div>` +
+                deptVacs.map(v => `
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:0.35rem 0; border-bottom:1px solid var(--color-border); font-size:0.85rem;">
+                        <span>${typeLabel(v.type)} <strong>${v.employees_planit?.name || '—'}</strong></span>
+                        <span style="color:var(--color-text-light);">${v.type === 'manual' ? fmtShort(v.start_date) : `${fmtShort(v.start_date)} – ${fmtShort(v.end_date)}`}</span>
+                    </div>`).join('');
+            listEl.appendChild(section);
+        });
+        container.appendChild(listEl);
+    }
 }
 
 function changeAdminVacCalMonth(dir) {
