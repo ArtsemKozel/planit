@@ -357,19 +357,25 @@ async function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
                 grid.appendChild(cell);
             });
         });
-        // Stunden-Übersicht für diese Abteilung
-        const deptStundenDiv = document.createElement('div');
-        deptStundenDiv.style.gridColumn = '1 / -1';
-        deptStundenDiv.style.background = 'white';
-        deptStundenDiv.style.borderRadius = '8px';
-        deptStundenDiv.style.padding = '0.5rem 0.75rem';
-        deptStundenDiv.style.marginTop = '0.25rem';
-        deptStundenDiv.style.marginBottom = '0.5rem';
-        deptStundenDiv.dataset.stundenDept = dept;
+        // Stunden-Übersicht für diese Abteilung (klappbar)
+        const deptStundenWrapper = document.createElement('div');
+        deptStundenWrapper.style.gridColumn = '1 / -1';
+        deptStundenWrapper.style.marginTop = '0.25rem';
+        deptStundenWrapper.style.marginBottom = '0.5rem';
+
+        const safeId = dept.replace(/[^a-zA-Z0-9]/g, '_');
+        deptStundenWrapper.innerHTML = `
+            <div onclick="toggleDeptStunden('${safeId}')" style="font-size:0.75rem; font-weight:700; letter-spacing:0.05em; padding:0.4rem 0.75rem; border-radius:8px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; background:#C9A24D; color:white; transition:background 0.2s;">
+                <span>STUNDEN ÜBERSICHT</span>
+                <span id="stunden-toggle-${safeId}">▶</span>
+            </div>
+            <div id="stunden-body-${safeId}" style="display:none; background:white; border-radius:0 0 8px 8px; padding:0.5rem 0.75rem;" data-stunden-dept="${dept}"></div>
+        `;
 
         const deptEmps = employees.filter(e => (e.department || 'Allgemein') === dept);
-        deptStundenDiv.innerHTML = buildStundenDivHtml(deptEmps, shifts, monthShifts, kwNumber, month, monthNames);
-        grid.appendChild(deptStundenDiv);
+        deptStundenWrapper.querySelector(`#stunden-body-${safeId}`).innerHTML =
+            buildStundenDivHtml(deptEmps, shifts, monthShifts, kwNumber, month, monthNames);
+        grid.appendChild(deptStundenWrapper);
     });
 }
 
@@ -434,10 +440,8 @@ async function refreshHoursOverview() {
     });
 }
 
-async function renderHoursOverview(days, weekShifts) {
-    // Leer lassen - wird jetzt in renderWeekGrid pro Abteilung gezeigt
-    const container = document.getElementById('hours-overview');
-    if (container) container.innerHTML = '';
+async function renderHoursOverview() {
+    // Wird in renderWeekGrid pro Abteilung als klappbarer Block gezeigt
 }
 
 function changeWeek(dir) {
@@ -3465,17 +3469,19 @@ function closeVacationExplainModal() {
 }
 
 let carryOverSectionOpen = false;
-let hoursOverviewOpen = false;
-
-function toggleHoursOverview() {
-    hoursOverviewOpen = !hoursOverviewOpen;
-    const body   = document.getElementById('hours-overview-body');
-    const header = document.getElementById('hours-overview-header');
-    const toggle = document.getElementById('hours-overview-toggle');
-    body.style.display      = hoursOverviewOpen ? 'block' : 'none';
-    toggle.textContent      = hoursOverviewOpen ? '▼' : '▶';
-    header.style.background = hoursOverviewOpen ? 'var(--color-gray)' : '#C9A24D';
-    header.style.color      = hoursOverviewOpen ? 'var(--color-text-light)' : 'white';
+function toggleDeptStunden(safeId) {
+    const body   = document.getElementById(`stunden-body-${safeId}`);
+    const toggle = document.getElementById(`stunden-toggle-${safeId}`);
+    const header = toggle?.parentElement;
+    if (!body) return;
+    const open = body.style.display !== 'none';
+    body.style.display      = open ? 'none' : 'block';
+    toggle.textContent      = open ? '▶' : '▼';
+    if (header) {
+        header.style.background = open ? '#C9A24D' : 'var(--color-gray)';
+        header.style.color      = open ? 'white' : 'var(--color-text-light)';
+        header.style.borderRadius = open ? '8px' : '8px 8px 0 0';
+    }
 }
 
 function toggleCarryOverSection() {
