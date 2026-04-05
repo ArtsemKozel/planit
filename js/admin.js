@@ -3546,7 +3546,15 @@ async function saveAllCarryOvers() {
         });
     }
     if (changed === 0) { alert('Keine Änderungen.'); return; }
-    await loadCarryOverSection();
+    // Section schließen
+    const body = document.getElementById('carry-over-body');
+    const icon = document.getElementById('carry-over-toggle-icon');
+    const btn = body.previousElementSibling;
+    carryOverSectionOpen = false;
+    body.style.display = 'none';
+    icon.textContent = '▶';
+    btn.style.background = '#C9A24D';
+    btn.style.color = 'white';
     loadUrlaubsverwaltung();
 }
 
