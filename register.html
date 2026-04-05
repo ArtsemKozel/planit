@@ -95,7 +95,8 @@ window.register = async function() {
         }
     }
 
-    window.location.href = 'admin.html';
+    successDiv.textContent = 'Registrierung erfolgreich! Bitte prüfe deine Email und klicke auf den Bestätigungslink um dich anzumelden.';
+    successDiv.style.display = 'block';
 };
 
 document.addEventListener('keydown', e => {
