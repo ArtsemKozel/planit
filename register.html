@@ -44,11 +44,12 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js"></script>
 <script>
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SUPABASE_URL = 'https://ulazvcrpasnhufzlywxf.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVsYXp2Y3JwYXNuaHVmemx5d3hmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA5NTI3NzAsImV4cCI6MjA3NjUyODc3MH0.RDyhW1CILNSH2KL77ftx0vYlbwgNOQuNVgkYMcqhi0M';
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-async function register() {
+window.register = async function() {
     const restaurant = document.getElementById('reg-restaurant').value.trim();
     const email      = document.getElementById('reg-email').value.trim();
     const password   = document.getElementById('reg-password').value;
@@ -75,7 +76,7 @@ async function register() {
         return;
     }
 
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await db.auth.signUp({ email, password });
     if (error) {
         errorDiv.textContent = error.message;
         errorDiv.style.display = 'block';
@@ -84,7 +85,7 @@ async function register() {
 
     const userId = data.user?.id;
     if (userId) {
-        const { error: dbError } = await supabase
+        const { error: dbError } = await db
             .from('planit_restaurants')
             .insert({ user_id: userId, name: restaurant });
         if (dbError) {
@@ -95,10 +96,10 @@ async function register() {
     }
 
     window.location.href = 'admin.html';
-}
+};
 
 document.addEventListener('keydown', e => {
-    if (e.key === 'Enter') register();
+    if (e.key === 'Enter') window.register();
 });
 </script>
 
