@@ -1208,15 +1208,23 @@ async function loadAdminVacationCalendar() {
     const firstDay = `${monthStr}-01`;
     const lastDay = `${year}-${String(month+1).padStart(2,'0')}-${new Date(year, month+1, 0).getDate()}`;
 
-    const { data: vacations } = await db
-        .from('vacation_requests')
-        .select('*, employees_planit(name)')
-        .eq('user_id', adminSession.user.id)
-        .eq('status', 'approved')
-        .lte('start_date', lastDay)
-        .gte('end_date', firstDay);
+    const [{ data: regular }, { data: payouts }] = await Promise.all([
+        db.from('vacation_requests')
+            .select('*, employees_planit(name, department)')
+            .eq('user_id', adminSession.user.id)
+            .eq('status', 'approved')
+            .neq('type', 'payout')
+            .lte('start_date', lastDay)
+            .gte('end_date', firstDay),
+        db.from('vacation_requests')
+            .select('*, employees_planit(name, department)')
+            .eq('user_id', adminSession.user.id)
+            .eq('status', 'approved')
+            .eq('type', 'payout')
+            .eq('payout_month', monthStr)
+    ]);
 
-    renderAdminVacationCalendar(year, month, vacations || []);
+    renderAdminVacationCalendar(year, month, [...(regular || []), ...(payouts || [])]);
 }
 
 function showVacDayModal(dateStr, dayVacations) {
@@ -1268,7 +1276,7 @@ function renderAdminVacationCalendar(year, month, vacations) {
     const holidays = getBWHolidays(year);
     for (let d = 1; d <= daysInMonth; d++) {
         const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-        const dayVacations = vacations.filter(v => v.start_date <= dateStr && v.end_date >= dateStr);
+        const dayVacations = vacations.filter(v => v.type !== 'payout' && v.start_date <= dateStr && v.end_date >= dateStr);
         const isHoliday = holidays.includes(dateStr);
         const dayEl = document.createElement('div');
         dayEl.className = 'calendar-day' + (isHoliday ? ' holiday' : '');
