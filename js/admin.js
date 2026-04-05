@@ -1301,7 +1301,7 @@ function renderAdminVacationCalendar(year, month, vacations) {
         });
 
         if (dayVacations.length > 0) {
-            dayEl.style.cursor = 'pointer';
+            dayEl.classList.add('has-vacation');
             dayEl.onclick = () => showVacDayModal(dateStr, dayVacations);
         }
 

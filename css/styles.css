@@ -350,6 +350,11 @@ input[type="time"] {
     cursor: default;
 }
 
+.calendar-day.has-vacation:hover {
+    background: #EDE8DF;
+    transition: background 0.15s;
+}
+
 .calendar-day.today {
     background: var(--color-primary);
     font-weight: 700;
