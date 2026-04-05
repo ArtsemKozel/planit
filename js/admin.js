@@ -645,11 +645,13 @@ async function saveShift(payload, repeat, weeks) {
             ({ error } = await db.from('shifts').insert(payload));
         }
     }
-    // Arbeitsrecht-Warnungen
-    const warnings = await checkArbeitszeitWarnings(payload);
-    if (warnings.length > 0) {
-        const proceed = confirm('⚠️ Arbeitsrecht-Hinweise:\n\n' + warnings.join('\n\n') + '\n\nTrotzdem speichern?');
-        if (!proceed) return;
+    // Arbeitsrecht-Warnungen — nicht bei Ist-Zeiten
+    if (!payload.actual_start_time && !payload.actual_end_time) {
+        const warnings = await checkArbeitszeitWarnings(payload);
+        if (warnings.length > 0) {
+            const proceed = confirm('⚠️ Arbeitsrecht-Hinweise:\n\n' + warnings.join('\n\n') + '\n\nTrotzdem speichern?');
+            if (!proceed) return;
+        }
     }
     if (error) {
         errorDiv.textContent = 'Fehler beim Speichern.';
@@ -5379,9 +5381,9 @@ async function checkArbeitszeitWarnings(payload) {
 
     // Warnung 3: Pausenempfehlung
     const breakMinutes = payload.break_minutes || 0;
-    if (durationHours >= 9 && breakMinutes < 45) {
+    if (durationHours > 9 && breakMinutes < 45) {
         warnings.push(`☕ Pausenempfehlung: Ab 9h Arbeit mindestens 45 Min Pause (aktuell: ${breakMinutes} Min)`);
-    } else if (durationHours >= 6 && breakMinutes < 30) {
+    } else if (durationHours > 6 && breakMinutes < 30) {
         warnings.push(`☕ Pausenempfehlung: Ab 6h Arbeit mindestens 30 Min Pause (aktuell: ${breakMinutes} Min)`);
     }
 
