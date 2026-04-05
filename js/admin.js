@@ -3465,6 +3465,18 @@ function closeVacationExplainModal() {
 }
 
 let carryOverSectionOpen = false;
+let hoursOverviewOpen = false;
+
+function toggleHoursOverview() {
+    hoursOverviewOpen = !hoursOverviewOpen;
+    const body   = document.getElementById('hours-overview-body');
+    const header = document.getElementById('hours-overview-header');
+    const toggle = document.getElementById('hours-overview-toggle');
+    body.style.display      = hoursOverviewOpen ? 'block' : 'none';
+    toggle.textContent      = hoursOverviewOpen ? '▼' : '▶';
+    header.style.background = hoursOverviewOpen ? 'var(--color-gray)' : '#C9A24D';
+    header.style.color      = hoursOverviewOpen ? 'var(--color-text-light)' : 'white';
+}
 
 function toggleCarryOverSection() {
     const body = document.getElementById('carry-over-body');

@@ -58,8 +58,13 @@
         </div>
         <!-- Stunden Übersicht -->
         <div style="margin-bottom:1rem;">
-            <div style="font-size:0.85rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.05em; margin-bottom:0.75rem;">STUNDEN ÜBERSICHT</div>
-            <div id="hours-overview" class="card"></div>
+            <div id="hours-overview-header" onclick="toggleHoursOverview()" style="font-size:0.85rem; font-weight:700; letter-spacing:0.05em; padding:0.6rem 1rem; border-radius:10px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; background:#C9A24D; color:white;">
+                <span>STUNDEN ÜBERSICHT</span>
+                <span id="hours-overview-toggle">▶</span>
+            </div>
+            <div id="hours-overview-body" style="display:none; margin-top:0.5rem;">
+                <div id="hours-overview" class="card"></div>
+            </div>
         </div>
 
         <div style="display:flex; justify-content:flex-end; margin-bottom:0.75rem;">
