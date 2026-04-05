@@ -3138,7 +3138,7 @@ async function loadUrlaubsverwaltung() {
     container.innerHTML = '<div style="color:var(--color-text-light);">Wird geladen...</div>';
 
     // Frische Mitarbeiterdaten laden (inkl. carry_over_days/hours)
-    const [{ data: freshEmps }, { data: allPhases }, { data: vacations }] = await Promise.all([
+    const [{ data: freshEmps }, { data: allPhases }, { data: vacations }, { data: allShifts }] = await Promise.all([
         db.from('employees_planit')
             .select('*')
             .eq('user_id', adminSession.user.id)
@@ -3153,7 +3153,13 @@ async function loadUrlaubsverwaltung() {
             .eq('user_id', adminSession.user.id)
             .eq('status', 'approved')
             .gte('start_date', `${year}-01-01`)
-            .lte('end_date', `${year}-12-31`)
+            .lte('end_date', `${year}-12-31`),
+        db.from('shifts')
+            .select('employee_id, start_time, end_time, break_minutes, actual_start_time, actual_end_time, actual_break_minutes')
+            .eq('user_id', adminSession.user.id)
+            .gte('shift_date', `${year}-01-01`)
+            .lte('shift_date', `${year}-12-31`)
+            .not('employee_id', 'is', null)
     ]);
 
     container.innerHTML = '';
@@ -3193,6 +3199,24 @@ async function loadUrlaubsverwaltung() {
         body.id = `urlaubsbody-${emp.id}`;
         body.style.cssText = 'display:none; padding:1rem 1.25rem; border-top:1px solid var(--color-border); background:white;';
 
+        // Durchschnittliche Schichtlänge berechnen
+        const empShifts = (allShifts || []).filter(s => s.employee_id === emp.id);
+        let avgShiftText = '';
+        if (empShifts.length > 0) {
+            const totalMin = empShifts.reduce((sum, s) => {
+                const startStr = s.actual_start_time || s.start_time;
+                const endStr   = s.actual_end_time   || s.end_time;
+                const brk      = s.actual_break_minutes ?? s.break_minutes ?? 0;
+                const [sh, sm] = startStr.split(':').map(Number);
+                const [eh, em] = endStr.split(':').map(Number);
+                return sum + Math.max(0, (eh * 60 + em) - (sh * 60 + sm) - brk);
+            }, 0);
+            const avgMin = Math.round(totalMin / empShifts.length);
+            const avgH   = Math.floor(avgMin / 60);
+            const avgM   = avgMin % 60;
+            avgShiftText = ` | Ø ${avgH}h${avgM > 0 ? ` ${avgM}m` : ''} (${empShifts.length} Schichten)`;
+        }
+
         // Konto-Übersicht
         body.innerHTML = `
             <div class="form-group">
@@ -3208,9 +3232,9 @@ async function loadUrlaubsverwaltung() {
                     };
                     const von = formatShort(p.start_date);
                     const bis = p.end_date ? formatShort(p.end_date) : 'offen';
-                    return `<div style="font-size:0.8rem; color:var(--color-text-light); margin-bottom:0.25rem;">Std. pro UT: ${p.hours_per_vacation_day}h (${von} – ${bis})${p.notes ? ` · ${p.notes}` : ''}</div>`;
+                    return `<div style="font-size:0.8rem; color:var(--color-text-light); margin-bottom:0.25rem;">Std. pro UT: ${p.hours_per_vacation_day}h (${von} – ${bis})${p.notes ? ` · ${p.notes}` : ''}${avgShiftText}</div>`;
                 }).join('')
-                : `<div style="font-size:0.8rem; color:var(--color-text-light); margin-bottom:0.25rem;">Std. pro UT: ${emp.hours_per_vacation_day || 8.0}h</div>`
+                : `<div style="font-size:0.8rem; color:var(--color-text-light); margin-bottom:0.25rem;">Std. pro UT: ${emp.hours_per_vacation_day || 8.0}h${avgShiftText}</div>`
             }
             <div style="font-size:0.8rem; color:var(--color-text-light); margin-bottom:1rem;">Eintrittsdatum: ${emp.start_date ? formatDate(emp.start_date) : '–'}</div>
             <div style="font-weight:600; font-size:0.85rem; margin-bottom:0.5rem;">Einträge ${year}:</div>
