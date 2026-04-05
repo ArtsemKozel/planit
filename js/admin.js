@@ -365,7 +365,7 @@ async function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
 
         const safeId = dept.replace(/[^a-zA-Z0-9]/g, '_');
         deptStundenWrapper.innerHTML = `
-            <div onclick="toggleDeptStunden('${safeId}')" style="font-size:0.75rem; font-weight:700; letter-spacing:0.05em; padding:0.4rem 0.75rem; border-radius:8px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; background:#C9A24D; color:white; transition:background 0.2s;">
+            <div onclick="toggleDeptStunden('${safeId}')" style="font-size:0.75rem; font-weight:700; letter-spacing:0.05em; padding:10px 16px; border-radius:8px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; background:#C9A24D; color:white; transition:background 0.2s;">
                 <span>STUNDEN ÜBERSICHT</span>
                 <span id="stunden-toggle-${safeId}">▶</span>
             </div>
