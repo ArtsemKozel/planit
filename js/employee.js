@@ -255,23 +255,13 @@ async function loadVacationCalendar() {
     const firstDay = `${monthStr}-01`;
     const lastDay = `${year}-${String(month+1).padStart(2,'0')}-${new Date(year, month+1, 0).getDate()}`;
 
-    const [{ data: regular }, { data: payouts }] = await Promise.all([
-        db.from('vacation_requests')
-            .select('*, employees_planit(name, department)')
-            .eq('user_id', currentEmployee.user_id)
-            .eq('status', 'approved')
-            .neq('type', 'payout')
-            .lte('start_date', lastDay)
-            .gte('end_date', firstDay),
-        db.from('vacation_requests')
-            .select('*, employees_planit(name, department)')
-            .eq('user_id', currentEmployee.user_id)
-            .eq('status', 'approved')
-            .eq('type', 'payout')
-            .eq('payout_month', monthStr)
-    ]);
+    const { data: all } = await db.from('vacation_requests')
+        .select('*, employees_planit(name, department)')
+        .eq('user_id', currentEmployee.user_id)
+        .eq('status', 'approved')
+        .or(`and(type.neq.payout,start_date.lte.${lastDay},end_date.gte.${firstDay}),and(type.eq.payout,payout_month.eq.${monthStr})`);
 
-    renderVacationCalendar(year, month, [...(regular || []), ...(payouts || [])]);
+    renderVacationCalendar(year, month, all || []);
 }
 
 function renderVacationCalendar(year, month, vacations) {
