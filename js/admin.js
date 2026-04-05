@@ -1219,6 +1219,28 @@ async function loadAdminVacationCalendar() {
     renderAdminVacationCalendar(year, month, vacations || []);
 }
 
+function showVacDayModal(dateStr, dayVacations) {
+    const [y, , d] = dateStr.split('-');
+    const date = new Date(dateStr + 'T12:00:00');
+    const dayNames = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+    const monthNames = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+    document.getElementById('vac-day-modal-title').textContent =
+        `${dayNames[date.getDay()]}, ${parseInt(d)}. ${monthNames[date.getMonth()]} ${y}`;
+    const typeLabel = t => t === 'payout' ? 'Auszahlung' : t === 'manual' ? 'Manuell' : 'Urlaub';
+    const typeBg    = t => t === 'payout' ? '#FFF3CC' : t === 'manual' ? '#E8D0FF' : '#D8F0D8';
+    const typeColor = t => t === 'payout' ? '#C9A24D' : t === 'manual' ? '#9B59B6' : '#4CAF50';
+    document.getElementById('vac-day-modal-body').innerHTML = dayVacations.map(v => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem 0; border-bottom:1px solid var(--color-border);">
+            <span style="font-weight:600;">${v.employees_planit?.name || '—'}</span>
+            <span style="font-size:0.75rem; padding:2px 8px; border-radius:6px; background:${typeBg(v.type)}; color:${typeColor(v.type)};">${typeLabel(v.type)}</span>
+        </div>`).join('');
+    document.getElementById('vac-day-modal').classList.add('active');
+}
+
+function closeVacDayModal() {
+    document.getElementById('vac-day-modal').classList.remove('active');
+}
+
 function renderAdminVacationCalendar(year, month, vacations) {
     const container = document.getElementById('admin-vac-calendar');
     container.innerHTML = '';
@@ -1277,6 +1299,11 @@ function renderAdminVacationCalendar(year, month, vacations) {
             bar.title = v.employees_planit?.name || '';
             dayEl.appendChild(bar);
         });
+
+        if (dayVacations.length > 0) {
+            dayEl.style.cursor = 'pointer';
+            dayEl.onclick = () => showVacDayModal(dateStr, dayVacations);
+        }
 
         grid.appendChild(dayEl);
     }
