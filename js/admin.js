@@ -3493,6 +3493,10 @@ async function loadCarryOverSection() {
     }
 
     list.dataset.empIds = emps.map(e => e.id).join(',');
+    // Original-Werte merken für Änderungserkennung beim Speichern
+    list.dataset.origValues = JSON.stringify(
+        Object.fromEntries(emps.map(e => [e.id, { days: e.carry_over_days || 0, hours: e.carry_over_hours || 0 }]))
+    );
     list.innerHTML = emps.map(emp => {
         const setAt = emp.carry_over_set_at
             ? `<div style="font-size:0.72rem; color:var(--color-text-light); margin-top:0.2rem;">Eingetragen am ${formatDate(emp.carry_over_set_at.split('T')[0])}</div>`
@@ -3520,17 +3524,18 @@ async function saveAllCarryOvers() {
     const list = document.getElementById('carry-over-list');
     const empIds = (list.dataset.empIds || '').split(',').filter(Boolean);
     if (!empIds.length) return;
+    const orig = JSON.parse(list.dataset.origValues || '{}');
     const now = new Date().toISOString();
+    let changed = 0;
     for (const empId of empIds) {
-        // Werte direkt aus den Inputs lesen und als neue Werte setzen (SET, kein ADD)
-        const days = Number(document.getElementById(`co-days-${empId}`)?.value ?? 0) || 0;
+        const days  = Number(document.getElementById(`co-days-${empId}`)?.value  ?? 0) || 0;
         const hours = Number(document.getElementById(`co-hours-${empId}`)?.value ?? 0) || 0;
-        console.log(`[saveAllCarryOvers] empId=${empId} → carry_over_days=${days}, carry_over_hours=${hours}`);
-        const { data: updated, error } = await db.from('employees_planit')
+        const o = orig[empId] || { days: 0, hours: 0 };
+        if (days === o.days && hours === o.hours) continue;
+        changed++;
+        const { error } = await db.from('employees_planit')
             .update({ carry_over_days: days, carry_over_hours: hours, carry_over_set_at: now })
-            .eq('id', empId)
-            .select('id, carry_over_days, carry_over_hours');
-        console.log(`[saveAllCarryOvers] DB-Antwort:`, updated, error);
+            .eq('id', empId);
         if (error) { alert('Fehler bei ' + empId + ': ' + error.message); return; }
         await db.from('planit_audit_log').insert({
             user_id: adminSession.user.id,
@@ -3540,6 +3545,7 @@ async function saveAllCarryOvers() {
             details: { carry_over_days: days, carry_over_hours: hours }
         });
     }
+    if (changed === 0) { alert('Keine Änderungen.'); return; }
     await loadCarryOverSection();
     loadUrlaubsverwaltung();
 }
