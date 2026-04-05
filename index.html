@@ -16,12 +16,12 @@
 
         <!-- TABS -->
         <div class="login-tabs">
-            <button class="login-tab active" onclick="switchLoginTab('employee')">Mitarbeiter</button>
-            <button class="login-tab" onclick="switchLoginTab('admin')">Admin</button>
+            <button class="login-tab" onclick="switchLoginTab('employee')">Mitarbeiter</button>
+            <button class="login-tab active" onclick="switchLoginTab('admin')">Admin</button>
         </div>
 
         <!-- MITARBEITER LOGIN -->
-        <div id="employee-login">
+        <div id="employee-login" style="display: none;">
             <div class="form-group">
                 <label>Mitarbeiter-Nummer</label>
                 <input type="text" id="emp-number" placeholder="z.B. AnMu">
@@ -35,7 +35,7 @@
         </div>
 
         <!-- ADMIN LOGIN -->
-        <div id="admin-login" style="display: none;">
+        <div id="admin-login">
             <div class="form-group">
                 <label>Email</label>
                 <input type="email" id="admin-email" placeholder="admin@restaurant.de">
