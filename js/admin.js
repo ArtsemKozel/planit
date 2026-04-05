@@ -30,16 +30,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (savedTab) switchTab(savedTab);
 
     await loadEmployees();
-    await loadWeekGrid();
-    await loadAdminVacations();
-    await loadAdminSwaps();
-    await loadTeam();
     populateAvailEmployeeSelect();
-    await loadAdminAvailability();
-    await loadAdminVacationCalendar();
-    await loadRequestsBadge();
-    await loadInventurBadge();
-    await loadSickLeaves();
+    await Promise.all([
+        loadWeekGrid(),
+        loadAdminVacations(),
+        loadAdminSwaps(),
+        loadTeam(),
+        loadAdminAvailability(),
+        loadAdminVacationCalendar(),
+        loadRequestsBadge(),
+        loadInventurBadge(),
+        loadSickLeaves(),
+    ]);
 });
 
 function getBWHolidays(year) {
