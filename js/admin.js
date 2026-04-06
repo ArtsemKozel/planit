@@ -274,11 +274,6 @@ async function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
     }
 
     // Abteilungen aus Mitarbeiter-Stammdaten + Schicht-Abteilungen dieser Woche
-    console.log('[Grid] employees geladen:', employees.map(e => ({ name: e.name, department: e.department, id: e.id })));
-    const lisa = employees.find(e => e.name.toLowerCase().includes('lisa'));
-    if (lisa) console.log('[Grid] Lisa gefunden:', { name: lisa.name, department: lisa.department, id: lisa.id });
-    else console.log('[Grid] Lisa: NICHT in employees gefunden');
-
     const empDepts = employees.map(e => e.department || 'Allgemein');
     const shiftDepts = shifts.filter(s => !s.is_open && s.department).map(s => s.department);
     const departments = [...new Set([...empDepts, ...shiftDepts])];
@@ -305,15 +300,7 @@ async function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
             grid.appendChild(cell);
         });
 
-        // Nur Mitarbeiter zeigen die diese Woche eine Schicht in dieser Abteilung haben
-        const deptShiftEmpIds = [...new Set(shifts.filter(s => !s.is_open && s.department === dept).map(s => s.employee_id))];
-        const deptEmployees = deptShiftEmpIds.map(id => employees.find(e => e.id === id)).filter(Boolean);
-        console.log(`[Grid] Abteilung: ${dept}`, {
-            deptShiftEmpIds,
-            deptEmployees: deptEmployees.map(e => e.name),
-            shiftsInDept: shifts.filter(s => !s.is_open && s.department === dept).map(s => ({ emp: s.employee_id, date: s.shift_date, dept: s.department })),
-            shiftsWithNullDept: shifts.filter(s => !s.is_open && s.department === null).length,
-        });
+        const deptEmployees = employees.filter(e => (e.department || 'Allgemein') === dept);
         deptEmployees.forEach(emp => {
             const empCell = document.createElement('div');
             empCell.className = 'week-employee';
@@ -333,7 +320,7 @@ async function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
 
             days.forEach(d => {
                 const dateStr = d.toISOString().split('T')[0];
-                const shift = shifts.find(s => s.employee_id === emp.id && s.shift_date === dateStr && s.department === dept);
+                const shift = shifts.find(s => s.employee_id === emp.id && s.shift_date === dateStr && !s.is_open);
                 const cell = document.createElement('div');
                 cell.className = 'week-cell' + (shift ? ' has-shift' : '');
                 cell.style.whiteSpace = 'pre';
