@@ -365,7 +365,8 @@ async function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
                 }
 
                 cell.dataset.cell = `${emp.id}_${dateStr}`;
-                cell.onclick = () => openShiftModal(emp.id, dateStr, shift);
+                cell.dataset.dept = dept;
+                cell.onclick = () => openShiftModal(emp.id, dateStr, shift, dept);
                 grid.appendChild(cell);
             });
         });
@@ -470,7 +471,7 @@ function getMonday(date) {
 }
 
 // ── SCHICHT MODAL ─────────────────────────────────────────
-async function openShiftModal(employeeId, dateStr, existingShift) {
+async function openShiftModal(employeeId, dateStr, existingShift, defaultDept) {
     currentShiftEmployeeId = employeeId;
     currentShiftDateStr = dateStr;
     editShiftId = existingShift ? existingShift.id : null;
@@ -500,8 +501,8 @@ async function openShiftModal(employeeId, dateStr, existingShift) {
     document.getElementById('shift-employee').closest('.form-group').style.opacity = existingShift?.is_open ? '0.4' : '1';
     document.getElementById('shift-open-note-group').style.display = existingShift?.is_open ? 'block' : 'none';
     const emp = employees.find(e => e.id === (existingShift?.employee_id || employeeId));
-    const defaultDept = existingShift?.department || emp?.department || departmentNames[0] || '';
-    populateDeptSelect(document.getElementById('shift-department'), defaultDept);
+    const deptToSelect = existingShift?.department || defaultDept || emp?.department || departmentNames[0] || '';
+    populateDeptSelect(document.getElementById('shift-department'), deptToSelect);
     document.getElementById('shift-actual-group').style.display = existingShift ? 'block' : 'none';
     document.getElementById('shift-actual-body').style.display = 'none';
     document.getElementById('shift-actual-toggle').textContent = '▶';
@@ -4518,7 +4519,7 @@ async function updateShiftCell(employeeId, dateStr) {
         } else {
             cell.textContent = '+';
         }
-        cell.onclick = () => openShiftModal(employeeId, dateStr, shift || null);
+        cell.onclick = () => openShiftModal(employeeId, dateStr, shift || null, cell.dataset.dept);
     } else {
         // Offene Schicht
         await loadWeekGrid();
