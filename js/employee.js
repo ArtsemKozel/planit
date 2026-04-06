@@ -805,16 +805,16 @@ async function renderAvailGrid(year, month) {
     const container = document.getElementById('avail-grid');
     container.innerHTML = '';
 
-    // Urlaubstage laden
+    // Urlaubstage laden (auch monatsübergreifende)
     const monthStart = `${year}-${String(month+1).padStart(2,'0')}-01`;
     const monthEnd = `${year}-${String(month+1).padStart(2,'0')}-${new Date(year, month+1, 0).getDate()}`;
-    const { data: vacations, error: vacError } = await db
+    const { data: vacations } = await db
         .from('vacation_requests')
         .select('start_date, end_date')
         .eq('employee_id', currentEmployee.id)
         .eq('status', 'approved')
-        .gte('start_date', monthStart)
-        .lte('end_date', monthEnd);
+        .lte('start_date', monthEnd)
+        .gte('end_date', monthStart);
 
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const firstWeekday = new Date(year, month, 1).getDay();
