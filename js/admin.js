@@ -4576,6 +4576,15 @@ async function loadTrinkgeld() {
         allDates.push(`${monthStr}-${String(d).padStart(2, '0')}`);
     }
 
+    // Pool-Abteilungen: monatliche Gesamtstunden aus tip_hours (für täglichen Durchschnitt)
+    const poolDeptMonthMinutes = {};
+    for (const dept of (depts || [])) {
+        if (!dept.pool_department) continue;
+        poolDeptMonthMinutes[dept.department] = (tipHours || [])
+            .filter(h => h.employees_planit.department === dept.department)
+            .reduce((sum, h) => sum + h.minutes, 0);
+    }
+
     // Pro Tag berechnen
     const empMonthTotals = {};
     const dayResults = {};
@@ -4591,8 +4600,12 @@ async function loadTrinkgeld() {
         if (!depts || depts.length === 0) continue;
 
         for (const dept of depts) {
+            if (dept.pool_department) continue; // Pool-Abteilungen werden über ihren Haupt-Pool verrechnet
             const deptDayCard = dayCard * (dept.percentage / 100);
             const deptDayCash = dayCash * (dept.percentage / 100);
+
+            // Pool-Abteilungen die diesem Dept zugeordnet sind (z.B. Bäckerei → Küche)
+            const poolDepts = depts.filter(d => d.pool_department === dept.department);
 
             const empDayMinutes = {};
             let totalDeptMinutes = 0;
@@ -4602,17 +4615,51 @@ async function loadTrinkgeld() {
                 totalDeptMinutes += h.minutes;
             }
 
+            // Täglichen Durchschnitt der Pool-Abteilungen addieren
+            const poolDailyAvg = {};
+            for (const poolDept of poolDepts) {
+                const avg = (poolDeptMonthMinutes[poolDept.department] || 0) / daysInMonth;
+                poolDailyAvg[poolDept.department] = avg;
+                totalDeptMinutes += avg;
+            }
+
             if (totalDeptMinutes === 0) continue;
 
+            // Echte Mitarbeiter dieser Abteilung
             for (const [empId, minutes] of Object.entries(empDayMinutes)) {
                 const share = minutes / totalDeptMinutes;
                 if (!dayResults[dateStr].empResults[empId]) dayResults[dateStr].empResults[empId] = { card: 0, cash: 0 };
                 dayResults[dateStr].empResults[empId].card += deptDayCard * share;
                 dayResults[dateStr].empResults[empId].cash += deptDayCash * share;
-
                 if (!empMonthTotals[empId]) empMonthTotals[empId] = { card: 0, cash: 0 };
                 empMonthTotals[empId].card += deptDayCard * share;
                 empMonthTotals[empId].cash += deptDayCash * share;
+            }
+
+            // Pool-Anteil auf individuelle Pool-Mitarbeiter nach echten Tagesstunden verteilen
+            for (const poolDept of poolDepts) {
+                const poolShare = poolDailyAvg[poolDept.department] / totalDeptMinutes;
+                const poolDayCard = deptDayCard * poolShare;
+                const poolDayCash = deptDayCash * poolShare;
+
+                const poolEmpMinutes = {};
+                let poolTotalMins = 0;
+                for (const h of dayHours) {
+                    if (h.employees_planit.department !== poolDept.department) continue;
+                    poolEmpMinutes[h.employee_id] = h.minutes;
+                    poolTotalMins += h.minutes;
+                }
+                if (poolTotalMins === 0) continue;
+
+                for (const [empId, minutes] of Object.entries(poolEmpMinutes)) {
+                    const empShare = minutes / poolTotalMins;
+                    if (!dayResults[dateStr].empResults[empId]) dayResults[dateStr].empResults[empId] = { card: 0, cash: 0 };
+                    dayResults[dateStr].empResults[empId].card += poolDayCard * empShare;
+                    dayResults[dateStr].empResults[empId].cash += poolDayCash * empShare;
+                    if (!empMonthTotals[empId]) empMonthTotals[empId] = { card: 0, cash: 0 };
+                    empMonthTotals[empId].card += poolDayCard * empShare;
+                    empMonthTotals[empId].cash += poolDayCash * empShare;
+                }
             }
         }
     }
