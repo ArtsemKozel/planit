@@ -275,9 +275,9 @@ async function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
 
     // Alle Abteilungen eines Mitarbeiters (Haupt + Zusatz)
     const getEmpDepartments = (emp) => {
-        const main = emp.department || 'Allgemein';
-        const extra = (emp.departments || '').split(',').map(s => s.trim()).filter(Boolean);
-        return [...new Set([main, ...extra])];
+        const fromDepts = (emp.departments || '').split(',').map(s => s.trim()).filter(Boolean);
+        if (fromDepts.length > 0) return fromDepts;
+        return [emp.department || 'Allgemein'];
     };
 
     const departments = [...new Set(employees.flatMap(e => getEmpDepartments(e)))];
@@ -1964,12 +1964,13 @@ function openEditEmployeeModal(id) {
     document.getElementById('edit-emp-name').value = emp.name;
     document.getElementById('edit-emp-code').value = emp.login_code || '';
     document.getElementById('edit-emp-password').value = emp.password_hash || '';
-    populateDeptSelect(document.getElementById('edit-emp-department'), emp.department || departmentNames[0] || '');
-    const extraDepts = (emp.departments || '').split(',').map(s => s.trim()).filter(Boolean);
+    const selectedDepts = (emp.departments || emp.department || '').split(',').map(s => s.trim()).filter(Boolean);
     const checksContainer = document.getElementById('edit-emp-departments-checks');
-    checksContainer.innerHTML = departmentNames.filter(name => name !== (emp.department || departmentNames[0])).map(name => `
+    checksContainer.style.display = 'none';
+    checksContainer.previousElementSibling.querySelector('.toggle-arrow').textContent = '▶';
+    checksContainer.innerHTML = departmentNames.map(name => `
         <label style="display:flex; align-items:center; gap:0.35rem; font-size:0.9rem; background:#F5F5F5; padding:0.35rem 0.6rem; border-radius:8px; cursor:pointer;">
-            <input type="checkbox" value="${name}" ${extraDepts.includes(name) ? 'checked' : ''} style="width:auto;">
+            <input type="checkbox" value="${name}" ${selectedDepts.includes(name) ? 'checked' : ''} style="width:auto;">
             ${name}
         </label>
     `).join('');
@@ -2056,9 +2057,9 @@ async function submitEditEmployee() {
     const name = document.getElementById('edit-emp-name').value.trim();
     const loginCode = document.getElementById('edit-emp-code').value.trim();
     const password = document.getElementById('edit-emp-password').value.trim();
-    const department = document.getElementById('edit-emp-department').value;
     const checkedDepts = [...document.querySelectorAll('#edit-emp-departments-checks input[type=checkbox]:checked')].map(cb => cb.value);
     const departments = checkedDepts.join(',') || null;
+    const department = checkedDepts[0] || null;
     const birthdate = document.getElementById('edit-emp-birthdate').value || null;
     const vacationDays = parseInt(document.getElementById('edit-emp-vacation-days').value) || 20;
     const startDate = document.getElementById('edit-emp-start-date').value || null;
@@ -2068,6 +2069,11 @@ async function submitEditEmployee() {
 
     if (!name || !loginCode) {
         errorDiv.textContent = 'Name und Kürzel sind Pflichtfelder.';
+        errorDiv.style.display = 'block';
+        return;
+    }
+    if (checkedDepts.length === 0) {
+        errorDiv.textContent = 'Mindestens eine Abteilung muss ausgewählt sein.';
         errorDiv.style.display = 'block';
         return;
     }
