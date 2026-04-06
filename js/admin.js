@@ -36,6 +36,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadAdminVacations(),
         loadAdminSwaps(),
         loadTeam(),
+        loadDepartments(),
         loadAdminAvailability(),
         loadAdminVacationCalendar(),
         loadRequestsBadge(),
@@ -1701,6 +1702,48 @@ async function submitNewEmployee() {
     await loadTeam();
     populateAvailEmployeeSelect();
     await loadWeekGrid();
+}
+
+// ── ABTEILUNGEN ───────────────────────────────────────────
+function toggleDepartmentsSection() {
+    const body = document.getElementById('departments-body');
+    const toggle = document.getElementById('departments-toggle');
+    const isOpen = body.style.display === 'block';
+    body.style.display = isOpen ? 'none' : 'block';
+    toggle.textContent = isOpen ? '▶' : '▼';
+}
+
+async function loadDepartments() {
+    const { data: depts } = await db.from('planit_departments').select('*').eq('user_id', adminSession.user.id).order('name');
+    const container = document.getElementById('departments-list');
+    if (!container) return;
+    if (!depts || depts.length === 0) {
+        container.innerHTML = '<div style="font-size:0.85rem; color:var(--color-text-light); padding:0.25rem 0;">Keine Abteilungen vorhanden.</div>';
+        return;
+    }
+    container.innerHTML = depts.map(d => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0; border-bottom:1px solid var(--color-border);">
+            <span style="font-size:0.9rem;">${d.name}</span>
+            <button class="btn-small btn-pdf-view btn-icon" style="width:1.8rem; height:1.8rem;" onclick="deleteDepartment('${d.id}')">
+                <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            </button>
+        </div>
+    `).join('');
+}
+
+async function addDepartment() {
+    const input = document.getElementById('new-department-name');
+    const name = input.value.trim();
+    if (!name) return;
+    await db.from('planit_departments').insert({ user_id: adminSession.user.id, name });
+    input.value = '';
+    await loadDepartments();
+}
+
+async function deleteDepartment(id) {
+    if (!confirm('Abteilung wirklich löschen?')) return;
+    await db.from('planit_departments').delete().eq('id', id);
+    await loadDepartments();
 }
 
 // ── SCHICHTTAUSCH ─────────────────────────────────────────
