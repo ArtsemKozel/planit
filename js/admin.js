@@ -274,6 +274,11 @@ async function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
     }
 
     // Abteilungen aus Mitarbeiter-Stammdaten + Schicht-Abteilungen dieser Woche
+    console.log('[Grid] employees geladen:', employees.map(e => ({ name: e.name, department: e.department, id: e.id })));
+    const lisa = employees.find(e => e.name.toLowerCase().includes('lisa'));
+    if (lisa) console.log('[Grid] Lisa gefunden:', { name: lisa.name, department: lisa.department, id: lisa.id });
+    else console.log('[Grid] Lisa: NICHT in employees gefunden');
+
     const empDepts = employees.map(e => e.department || 'Allgemein');
     const shiftDepts = shifts.filter(s => !s.is_open && s.department).map(s => s.department);
     const departments = [...new Set([...empDepts, ...shiftDepts])];
