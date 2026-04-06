@@ -81,7 +81,9 @@
         <!-- Anträge -->
         <div style="display:flex; justify-content:space-between; align-items:center; margin:1.5rem 0 1rem;">
             <div class="section-title" style="margin-bottom:0;">Urlaubsanträge</div>
-            <button class="btn-primary" style="width:auto;" onclick="downloadAllVacations()">⬇ Alle</button>
+            <button class="btn-small btn-pdf-view btn-icon" onclick="downloadAllVacations()" title="Alle herunterladen">
+                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </button>
         </div>
         <div id="admin-vacation-list">
             <div class="empty-state"><p>Keine Anträge vorhanden.</p></div>
