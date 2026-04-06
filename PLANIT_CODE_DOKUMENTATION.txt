@@ -1,11 +1,12 @@
 PLANIT - CODE DOKUMENTATION
 ============================
-Datum: 3. April 2026
+Datum: 6. April 2026
 Zweck: Vollständige Code-Referenz für Claude Code (VS Code) und Claude Browser-Chat
 
 DATEI-ÜBERSICHT:
 ----------------
-index.html        Login-Seite (Admin + Mitarbeiter)
+index.html        Login-Seite (Admin-Tab initial aktiv)
+register.html     Registrierung neuer Restaurants
 employee.html     Mitarbeiter-App
 admin.html        Admin-App
 css/styles.css    Alle Styles
@@ -19,6 +20,7 @@ JS/ADMIN.JS — GLOBALE VARIABLEN
 ================================================================================
 let adminSession          Supabase Session des Admins
 let employees             Array aller aktiven Mitarbeiter (employees_planit)
+let departmentNames       Array der Abteilungsnamen aus planit_departments (NEU)
 let weekDate              Aktuell angezeigte Woche (Date-Objekt)
 let adminAvailDate        Aktuell angezeigte Verfügbarkeitswoche
 let editShiftId           ID der gerade bearbeiteten Schicht (null = neu)
@@ -36,11 +38,20 @@ JS/ADMIN.JS — FUNKTIONEN NACH BEREICH
 ================================================================================
 
 ── INIT ──────────────────────────────────────────────────────────────────────
-DOMContentLoaded            requireAdminSession(), loadEmployees(), loadWeekGrid(),
-                            loadAdminVacations(), loadAdminSwaps(), loadTeam(),
-                            populateAvailEmployeeSelect(), loadAdminAvailability(),
-                            loadAdminVacationCalendar(), loadRequestsBadge(),
-                            loadInventurBadge(), loadSickLeaves()
+DOMContentLoaded            requireAdminSession(), loadEmployees() sequentiell,
+                            dann Promise.all([
+                              loadDepartmentNames(),
+                              loadWeekGrid(),
+                              loadAdminVacations(),
+                              loadAdminSwaps(),
+                              loadTeam(),
+                              loadDepartments(),
+                              loadAdminAvailability(),
+                              loadAdminVacationCalendar(),
+                              loadRequestsBadge(),
+                              loadInventurBadge(),
+                              loadSickLeaves(),
+                            ]) — alle parallel!
 
 getBWHolidays(year)         BW-Feiertage als Array von Datumsstrings
 getEasterDates(year)        Berechnet Ostern + Folgetage
@@ -48,15 +59,15 @@ getEasterDates(year)        Berechnet Ostern + Folgetage
 ── NAVIGATION ────────────────────────────────────────────────────────────────
 switchTab(tab)              Tab wechseln; speichert in localStorage
                             Ruft entsprechende load-Funktion auf:
-                            schichtplan → loadWeekGrid()
-                            urlaub → loadAdminVacations() + loadAdminVacationCalendar()
-                            team → loadTeam()
                             stunden → loadAdminStunden()
+                            requests → loadRequests() + loadRequestsStats()
+                            urlaubsverwaltung → loadUrlaubsverwaltung()
+                            tasks → loadTasks()
+                            notes → loadNotes()
                             trinkgeld → loadTrinkgeld()
                             trinkgeld-config → loadTrinkgeldConfig()
-                            organiser → loadOrganiser()
-                            inventur → loadInventur()
-                            inventur-config → loadInventurConfig()
+                            inventur → loadInventur() + loadInventurSubmissions()
+                            inventur-config → loadInventurConfig() + loadInventurDelegation()
 
 ── WOCHENPLAN ────────────────────────────────────────────────────────────────
 loadWeekGrid()              Lädt Schichten + Krankmeldungen + Verfügbarkeiten für
@@ -66,34 +77,32 @@ renderWeekGrid(days, shifts, availCache, sickLeaves)
                             - Abteilungs-Labels
                             - Offene Schichten (Zeile "Offen")
                             - Mitarbeiter-Zeilen mit Schichtzellen
-                            - deptStundenDiv [data-stunden-dept] pro Abteilung
+                            - deptStundenDiv [data-stunden-dept] pro Abteilung (klappbar)
                             Schichten mit actual_start_time → background #E8D4A0
                             Schichten ohne actual_start_time → CSS .has-shift (#C9A24D)
 buildStundenDivHtml(deptEmps, weekShifts, monthShifts, kwNumber, month, monthNames)
                             Erzeugt HTML für die Stunden-Übersicht einer Abteilung
                             (KW-Stunden farbig + Monatsstunden grau)
+toggleDeptStunden(safeId)   Klappt Stunden-Übersicht einer Abteilung auf/zu
 refreshHoursOverview()      Lädt Wochen- und Monatsschichten neu, befüllt alle
                             [data-stunden-dept]-Divs; wird nach saveShift/deleteShift
                             aufgerufen — kein komplettes Grid-Neurendern nötig
-renderHoursOverview()       Leer (Stunden werden jetzt direkt in renderWeekGrid gezeigt)
 changeWeek(dir)             weekDate += dir * 7 Tage, dann loadWeekGrid()
 getMonday(date)             Gibt Montag der Woche zurück
-togglePlanningMode()        Planungsmodus ein/aus, lädt Grid neu
+togglePlanningMode()        Planungsmodus ein/aus; Button ist gold (#C9A24D) mit SVG-Icon
+                            und CSS-Transition
 updateShiftCell(employeeId, dateStr)
                             Aktualisiert eine einzelne Schichtzelle ohne Grid-Neurendern
-                            Lädt aktuelle Schichten für diesen Tag, setzt Klasse + Farbe
-                            actual_start_time → background #E8D4A0
 loadAvailabilityForWeek(days)  Lädt Verfügbarkeiten für alle Mitarbeiter + Woche
 
 ── SCHICHT-MODAL ─────────────────────────────────────────────────────────────
 openShiftModal(employeeId, dateStr, existingShift)
                             Öffnet shift-modal (classList.add('open'))
-                            Füllt Felder vor; actual-Felder wurden entfernt
+                            Füllt Felder vor; ruft populateDeptSelect() für shift-department
 closeShiftModal()           Schließt shift-modal; setzt editShiftId = null
 submitShift()               Liest Formular, prüft Verfügbarkeit, ruft saveShift()
 saveShift(payload, repeat, weeks)
                             Speichert Schicht (update oder insert)
-                            Arbeitsrecht-Warnung per confirm()
                             Danach: updateShiftCell() + refreshHoursOverview()
                             + syncTipHoursForShift() für betroffene Daten
 deleteShift()               Löscht shift_swaps (shift_id UND target_shift_id),
@@ -103,131 +112,200 @@ deleteShift()               Löscht shift_swaps (shift_id UND target_shift_id),
 syncTipHoursForShift(employeeId, dateStr)
                             Lädt Schicht für diesen MA+Tag; prüft sick_leaves
                             Berechnet minutes aus actual_* oder geplanten Zeiten
-                            Upsert in tip_hours (mit start_time, end_time, break_minutes)
-                            Wenn krank oder keine Schicht: löscht tip_hours-Eintrag
-checkAvailabilityWarning(empId, date, start, end)
-                            Prüft ob Schicht mit Verfügbarkeit kollidiert
+                            Upsert in tip_hours
 checkArbeitszeitWarnings(payload)
-                            Prüft 10h-Schicht, 11h-Ruhezeit, Pausenempfehlung
+                            Prüft 10h-Schicht (> 9), 11h-Ruhezeit, Pausenempfehlung (> 6h)
+                            ÜBERSPRINGT Prüfung wenn actual_start_time oder actual_end_time
+                            gesetzt sind (Ist-Zeiten)
 
-── OFFENE SCHICHTEN ──────────────────────────────────────────────────────────
-openOpenShiftModal(dateStr, dept, shift)
-                            Öffnet Modal für offene Schichten
-closeOpenShiftModal()
-saveOpenShift()
-
-── SCHICHT-VORLAGEN ──────────────────────────────────────────────────────────
-loadTemplates()             Lädt shift_templates für Dropdown im Schicht-Modal
-applyTemplate(id)           Füllt Formular mit Template-Werten
-
-── STUNDENKONTO ──────────────────────────────────────────────────────────────
-loadAdminStunden()          Lädt Mitarbeiter, Schichten, approved_hours, actual_hours
-                            Berechnet pro Mitarbeiter:
-                            - GEPLANT: aus shifts (start/end/break)
-                            - GEARBEITET: aus Schichten mit actual_* bevorzugt
-                            - ABGERECHNET: aus approved_hours
-                            - VORMONAT: carry_over_minutes aus actual_hours
-                            - SALDO: Gearbeitet - Abgerechnet + Vormonat
-                            Rendert klappbare Karten; Header als <button>
-                            (touch-action:manipulation für Mobile)
-toggleStundenEmp(empId)     Klappt Schicht-Liste eines Mitarbeiters auf/zu
-                            Zeigt Datum, geplante Zeiten, tatsächliche Zeiten (gold),
-                            berechnete Dauer pro Schicht
-changeAdminStundenMonth(dir)
-openApproveModal(btn)       Modal für approved_hours bearbeiten
-saveApproveModal()
-openCarryOverModal(btn)     Modal für carry_over_minutes bearbeiten
-saveCarryOverModal()
+── ABTEILUNGEN ───────────────────────────────────────────────────────────────
+loadDepartmentNames()       Lädt planit_departments → füllt departmentNames[]
+                            Wird beim Init und nach Abteilungs-Mutationen aufgerufen
+populateDeptSelect(el, selected)
+                            Befüllt <select>-Element dynamisch aus departmentNames[]
+                            Wird in openShiftModal, openNewEmployeeModal, openEditEmployeeModal
+toggleDepartmentsSection()  Klappt "ABTEILUNGEN" Bereich im Team-Tab auf/zu
+loadDepartments()           Lädt planit_departments, rendert Liste im Team-Tab
+addDepartment()             Liest #new-department-name, insert in planit_departments
+                            → ruft loadDepartmentNames() + loadDepartments()
+deleteDepartment(id)        Löscht Abteilung nach Bestätigung
+                            → ruft loadDepartmentNames() + loadDepartments()
 
 ── URLAUB ────────────────────────────────────────────────────────────────────
-loadAdminVacations()        Lädt vacation_requests; rendert Liste mit Status
-loadAdminVacationCalendar() Kalenderansicht mit Urlaubsbalken
+loadAdminVacations() / loadRequests()
+                            Lädt vacation_requests; rendert Liste mit Status
+                            Buttons in 2×2 Grid; "Alle" Download-Button mit SVG-Icon
+downloadAllVacations()      Lädt alle Urlaubs-PDFs als ZIP o.ä.
 approveVacation(id)         Status → 'approved', berechnet deducted_days
 rejectVacation(id)          Status → 'rejected', speichert rejection_reason
-loadVacationPdf(id)         Lädt PDF aus Supabase Storage (vacation-pdfs)
+loadRequestsStats()         Statistik-Anzeige
+
+── URLAUBSKALENDER (ADMIN) ───────────────────────────────────────────────────
+loadAdminVacationCalendar() Lädt vacation_requests für aktuellen Monat
+                            Eine OR-Abfrage (lte start_date + gte end_date)
+                            statt zwei getrennte Abfragen
+renderAdminVacationCalendar()
+                            Goldener Hintergrund (goldGradient) auf Tagen mit Urlaub
+                            has-vacation Klasse + Hover-Effekt
+                            Klickbare Tage → showVacDayModal()
+                            Monatsliste nach Abteilung gruppiert
+goldGradient(n)             CSS linear-gradient mit n Gold-Schattierungen (vertikale Streifen)
+showVacDayModal(dateStr, vacations)
+                            Modal mit Mitarbeiterliste für diesen Tag
+closeVacDayModal()
+
+── URLAUBSVERWALTUNG ─────────────────────────────────────────────────────────
+loadUrlaubsverwaltung()     Mitarbeiter-Urlaubskonten; Event-Delegation für cutoff-Input
+                            inline style="background:#F5F5F5;" auf info-box-clickable
+_cutoffChangeHandler(e)     Delegierter Handler; prüft input.dataset.empid
+updateEmpAccount(empId)     Aktualisiert einzelnes Urlaubskonto
+calculateVacationAccount(emp, phases, vacations, shifts, cutoffDate)
+                            Berechnet Resturlaub; alle Zwischenwerte Math.round(v*100)/100
+                            cutoffDate korrekt in beiden Pfaden (mit/ohne Phasen)
+saveAllCarryOvers()         Speichert Überträge; nur geänderte Werte (origValues-Vergleich)
+                            Schließt Section nach Speichern
 
 ── TEAM ──────────────────────────────────────────────────────────────────────
-loadTeam()                  Lädt employees_planit; rendert Karten
-openTeamMemberModal(id)     Öffnet Modal für Mitarbeiter-Bearbeitung
-saveTeamMember()            Speichert/erstellt Mitarbeiter
-deleteTeamMember(id)
+loadTeam()                  Lädt employees_planit + employment_phases
+                            Rendert klappbare Blöcke (toggleTeamEmployee)
+                            Zeigt Beschäftigungsphasen, kein Urlaubsinfo mehr
+toggleTeamEmployee(id)      Klappt Mitarbeiter-Block auf/zu
+openNewEmployeeModal()      Öffnet Modal; ruft populateDeptSelect(#new-emp-department)
+openEditEmployeeModal(id)   Öffnet Modal; ruft populateDeptSelect(#edit-emp-department)
+submitNewEmployee()
+submitEditEmployee()
+deleteEmployee(id, name)
 loadSickLeaves()            Lädt + rendert sick_leaves
-openSickLeaveModal()
-saveSickLeave()
-deleteSickLeave(id)
-loadPayrollDocuments()      Lädt payroll_documents (Abrechnungen)
-uploadPayrollDocument()
+openSickLeaveModal() / saveSickLeave() / deleteSickLeave(id)
 
 ── VERFÜGBARKEITEN ───────────────────────────────────────────────────────────
 loadAdminAvailability()     Lädt + rendert availability für aktuelle Woche
 populateAvailEmployeeSelect()
 
 ── TAUSCHBÖRSE ───────────────────────────────────────────────────────────────
-loadAdminSwaps()            Lädt shift_swaps mit Status 'pending'
-approveSwap(id)             Tauscht employee_id zwischen Schichten
-rejectSwap(id)
+loadAdminSwaps()            Lädt shift_swaps
+approveSwap(id) / rejectSwap(id)
+
+── STUNDENKONTO ──────────────────────────────────────────────────────────────
+loadAdminStunden()          Lädt Mitarbeiter, Schichten, approved_hours, actual_hours
+                            Berechnet GEPLANT / GEARBEITET / ABGERECHNET / VORMONAT / SALDO
+                            Rendert klappbare Karten
+toggleStundenEmp(empId)     Klappt Schicht-Liste eines Mitarbeiters auf/zu
+changeAdminStundenMonth(dir)
+openApproveModal(btn) / saveApproveModal()
+openCarryOverModal(btn) / saveCarryOverModal()
 
 ── TRINKGELD ─────────────────────────────────────────────────────────────────
 loadTrinkgeld()             Hauptfunktion; lädt parallel:
                             tip_entries, tip_departments, monthShifts, sickLeaves
                             Sync: schreibt tip_hours aus Schichten (upsert)
                             Legt alle Monatstage in tip_entries an (upsert)
-                            Berechnet Anteile pro MA pro Tag
-                            Rendert klappbare Tages-Karten (aufsteigend)
-                            Rendert Monats-Zusammenfassung + Ergebnis-Tabelle
-renderTrinkgeld() / sync    Inline in loadTrinkgeld()
-syncTipHoursForShift()      Siehe oben (Schicht-Bereich)
-openTrinkgeldDayModal(dateStr)
-                            Öffnet Modal zum Bearbeiten von Karte/Bar-Einträgen
-saveTrinkgeldDay()
-deleteTrinkgeldDay(dateStr)
-openTrinkgeldHoursModal()   Öffnet Modal für manuelle Stunden-Eingabe (tab-trinkgeld-hours)
-closeTrinkgeldHoursModal()
-loadTrinkgeldHoursEmployees(date)
-                            Rendert Mitarbeiter-Liste mit Stunden-Buttons
-                            Hidden inputs: tip-hours-start-{id}, tip-hours-end-{id},
-                            tip-hours-break-{id}, tip-hours-min-{id}
-saveTrinkgeldHours()        Speichert tip_entries + tip_hours für alle MA
-                            Liest start/end/break aus Hidden-Inputs
-loadTrinkgeldHours()        Rendert Übersicht aller tip_hours-Einträge nach Datum
-openTrinkgeldHoursModalDate(date)
-deleteTrinkgeldHoursDate(date)
-saveTrinkgeldResults()      Schreibt berechnete Monatsergebnisse in tip_results
-downloadTrinkgeldPdf()      Erstellt PDF mit Monatsergebnissen
+
+                            POOL-LOGIK (Bäckerei):
+                            - Pre-Step: poolDeptMonthMinutes + poolEmpMonthShares
+                              → Für jede Abteilung mit pool_department:
+                                  Monatsgesamtstunden aus tip_hours summieren
+                                  Monatsanteil pro Mitarbeiter (0–1) berechnen
+                            - Pro Tag: täglicher Durchschnitt (monthMins / daysInMonth)
+                              zum totalDeptMinutes des Ziel-Pools addieren
+                            - Pool-Mitarbeiter erhalten täglich ihren Anteil
+                              (unabhängig ob sie an dem Tag gearbeitet haben)
+                            - Tagesansicht: "⌀ Xh YYm" immer angezeigt (kein echter Stundenwert)
+
+                            Abteilungs-Header (KÜCHE, SERVICE, BÄCKEREI) gleiche Formatierung:
+                            font-size:0.75rem, font-weight:700, color:var(--color-primary)
+                            Rendert klappbare Tages-Karten + Monats-Zusammenfassung
+
+openTrinkgeldDayModal(dateStr) / saveTrinkgeldDay() / deleteTrinkgeldDay(dateStr)
+openTrinkgeldHoursModal() / saveTrinkgeldHours()
+loadTrinkgeldHours() / loadTrinkgeldHoursEmployees(date)
+saveTrinkgeldResults()      Schreibt Monatsergebnisse in tip_results
+downloadTrinkgeldPdf()      PDF-Button im Tab-Header
 changeTrinkgeldMonth(dir)
 
 ── TRINKGELD KONFIGURATION ───────────────────────────────────────────────────
 loadTrinkgeldConfig()       Lädt tip_config + tip_departments
-saveTrinkgeldConfig()
-loadTrinkgeldHoursConfig()  Lädt loadTrinkgeldHoursEmployees für Konfig-Tab
-saveTrinkgeldHoursConfig()
+renderTipDepartments(depts) Rendert Abteilungsliste
+addTipDepartment() / deleteTipDepartment(id) / updateTipDept(id, field, value)
+saveTipConfig()
 
 ── ORGANISER ─────────────────────────────────────────────────────────────────
-loadOrganiser()             Lädt tasks + task_steps + notes
-openTaskModal() / saveTask() / deleteTask(id)
+loadTasks() / openTaskModal() / saveTask() / deleteTask(id)
 toggleTaskStep(id)
-openNoteModal() / saveNote() / deleteNote(id)
+loadNotes() / openNoteModal() / saveNote() / deleteNote(id)
 loadTaskTemplates() / applyTaskTemplate(id)
-toggleTaskArchive(id)       Archiviert/reaktiviert Task
-tasks-archive-list          (NICHT archive-list — Konflikt mit Urlaub-Bereich)
+toggleTaskArchive(id)
+tasks-archive-list          (NICHT archive-list — Konflikt mit Urlaub-Bereich!)
 
 ── INVENTUR ──────────────────────────────────────────────────────────────────
-loadInventur()              Lädt Inventur-Einträge für aktuelles Datum
-loadInventurConfig()        Lädt Lieferanten, Waren, Gruppen; initialisiert Positionen
-saveInventurEntry(itemId)   Speichert planit_inventory_entries
-loadInventurOrder()         Bestellansicht (Sub-Tab)
-downloadInventurPdf()       Tages-PDF mit Bestell-Mengen
-downloadInventurYearPdf()   Jahresbericht-PDF
-moveInventurItem(id, dir)   Ändert inventory_position (↑↓)
-moveOrderItem(id, dir)      Ändert order_position (↑↓)
-loadInventurSubmissions()   Lädt eingereichte Mitarbeiter-Inventuren (Badge)
-openInventurItemModal() / saveInventurItem() / deleteInventurItem(id)
-openInventurGroupModal() / saveInventurGroup() / deleteInventurGroup(id)
-openSupplierModal() / saveSupplier() / deleteSupplier(id)
+loadInventur() / loadInventurConfig()
+saveInventurEntry(itemId)
+loadInventurOrder()         Bestellansicht
+downloadInventurPdf() / downloadInventurYearPdf()
+moveInventurItem(id, dir) / moveOrderItem(id, dir)
+loadInventurSubmissions()   Badge-Zähler für eingereichte Inventuren
+loadInventurDelegation() / saveInventurDelegation()
+toggleDelegationSection()
 
 ── BADGES ────────────────────────────────────────────────────────────────────
 loadRequestsBadge()         Zählt pending vacation_requests + shift_swaps
 loadInventurBadge()         Zählt neue planit_inventory_submissions
+
+================================================================================
+JS/EMPLOYEE.JS — FUNKTIONEN NACH BEREICH
+================================================================================
+
+── INIT ──────────────────────────────────────────────────────────────────────
+DOMContentLoaded            requireEmployeeSession(), dann:
+                            loadOverview(), loadVacations(), loadAvailability(),
+                            loadPayroll(), loadSwaps(), loadVacationCalendar()
+
+── ÜBERSICHT ─────────────────────────────────────────────────────────────────
+loadOverview()              3 Schichten: vergangene, nächste (Mitte), übernächste
+                            Vergangene: goldener Hintergrund außen, weißes Zeitfeld innen
+                            Nächste: weißer Hintergrund, goldener Rahmen am Zeitfeld
+                            Datum + Uhrzeit: #2C3E50
+                            ▼/▲ Toggle "Alle anzeigen"
+
+── URLAUB ────────────────────────────────────────────────────────────────────
+loadVacations()             Lädt vacation_requests des Mitarbeiters
+submitVacationRequest()
+renderVacationAccount(cutoffDate)
+                            Berechnet Resturlaub; gleiche Logik wie admin.js
+                            Math.round(v*100)/100 für alle Zwischenwerte
+                            cutoffDate korrekt in beiden Pfaden
+
+── URLAUBSKALENDER (MITARBEITER) ─────────────────────────────────────────────
+loadVacationCalendar()      Lädt vacation_requests; eine OR-Abfrage
+                            employees_planit(name, department) für Abteilungsfilter
+renderVacationCalendar()    Goldener Hintergrund (goldGradient), has-vacation Klasse
+                            Abteilungsfilter (nur eigene Abteilung)
+                            Monatsliste unterhalb des Kalenders
+                            Klickbare Tage → showEmpVacDayModal()
+goldGradient(n)             Identisch zu admin.js
+showEmpVacDayModal(dateStr, vacations) / closeEmpVacDayModal()
+
+── VERFÜGBARKEIT ─────────────────────────────────────────────────────────────
+loadAvailability()          Lädt availability für aktuellen Monat + ruft renderAvailGrid()
+renderAvailGrid(year, month)
+                            Urlaubsabfrage: lte start_date ≤ monthEnd + gte end_date ≥ monthStart
+                            (monatsübergreifend korrekt)
+                            Farben: Urlaub #D0E8FF, Schule #E8D0FF, Verfügbar #D8F0D8,
+                            Teilzeit #FFF3CC, Frei #FFD9D9
+                            Kommentar-Dreieck: position:absolute, top:0, left:0,
+                            border-top:8px solid #2C3E50, border-right:8px solid transparent
+saveAvailability()
+changeAvailMonth(dir)
+openAvailModal(day) / closeAvailModal()
+saveAvailFull() / saveAvailOff() / saveAvailSchool() / saveAvailPartial()
+clearAvailDay()
+
+── LOHNABRECHNUNG ────────────────────────────────────────────────────────────
+loadPayroll()               Lädt payroll_documents, rendert mit PDF-Link
+
+── SCHICHTTAUSCH ─────────────────────────────────────────────────────────────
+loadSwaps()                 Lädt offene Tausch-Requests
+requestSwap(shiftId) / confirmSwap(swapId) / rejectSwapEmployee(swapId)
 
 ================================================================================
 ADMIN.HTML — WICHTIGE IDs
@@ -235,8 +313,8 @@ ADMIN.HTML — WICHTIGE IDs
 
 ── TABS ──────────────────────────────────────────────────────────────────────
 tab-schichtplan             Wochenplan
-tab-urlaub                  Urlaubsverwaltung
-tab-team                    Team + Krankmeldungen
+tab-urlaub / tab-requests   Urlaubsverwaltung (je nach Implementierung)
+tab-team                    Team + Krankmeldungen + Abteilungen
 tab-stunden                 Stundenkonto
 tab-trinkgeld               Trinkgeld-Tagesansicht
 tab-trinkgeld-hours         Manuelle Stunden-Eingabe
@@ -244,54 +322,56 @@ tab-trinkgeld-config        Trinkgeld-Konfiguration
 tab-organiser               Aufgaben + Notizen
 tab-inventur                Inventur (mit Sub-Tabs: inventur, bestellung)
 tab-inventur-config         Inventur-Einstellungen
+tab-mehr                    Weitere Einstellungen
+tab-urlaubsverwaltung       Urlaubskonto-Verwaltung
 
 ── SCHICHTPLAN ───────────────────────────────────────────────────────────────
 week-grid                   Wochenraster (CSS Grid)
 week-label                  "Mo 31. März – So 6. Apr 2026"
 shift-modal                 Schicht-Modal (öffnet mit classList.add('open'))
-shift-modal-title           "Schicht erstellen" / "Schicht bearbeiten"
 shift-employee              Select: Mitarbeiter
 shift-date                  Input: Datum
-shift-start                 Input: Startzeit
-shift-end                   Input: Endzeit
+shift-start / shift-end     Input: Zeiten
 shift-break                 Input: Pause (Min)
 shift-notes                 Textarea: Notizen
 shift-is-open               Checkbox: Offene Schicht
-shift-open-note-group       Nur sichtbar wenn is_open
 shift-dept-group            Nur sichtbar wenn is_open
-shift-repeat                Checkbox: Wiederholen
-shift-repeat-group          Nur sichtbar wenn repeat
-shift-repeat-weeks          Input: Anzahl Wochen
-shift-error                 Fehleranzeige
+shift-department            Select: Abteilung (dynamisch via populateDeptSelect)
+shift-repeat / shift-repeat-group / shift-repeat-weeks
+
+── TEAM ──────────────────────────────────────────────────────────────────────
+team-list                   Mitarbeiter-Karten
+departments-body            Klappbarer Abteilungen-Bereich (display:none)
+departments-toggle          ▶/▼ Symbol
+departments-list            Liste der Abteilungen
+new-department-name         Input für neue Abteilung
+employee-modal              Neuer Mitarbeiter (classList.add('open'))
+new-emp-department          Select: Abteilung (dynamisch via populateDeptSelect)
+edit-emp-department         Select: Abteilung (dynamisch via populateDeptSelect)
+
+── URLAUBSKALENDER ───────────────────────────────────────────────────────────
+vac-day-modal               Modal für geklickten Kalender-Tag (admin)
+admin-vacation-calendar     Kalender-Container
 
 ── STUNDENKONTO ──────────────────────────────────────────────────────────────
 admin-stunden-list          Container für Mitarbeiter-Karten
-admin-stunden-month-label   Monatsbezeichnung
-stunden-toggle-{empId}      ▶/▼ Toggle-Symbol pro Mitarbeiter
-stunden-shifts-{empId}      Aufklappbare Schicht-Liste pro Mitarbeiter
+stunden-toggle-{empId} / stunden-shifts-{empId}
 
 ── TRINKGELD ─────────────────────────────────────────────────────────────────
 trinkgeld-days-list         Container für Tages-Karten
 trinkgeld-results           Zusammenfassung Monats-Ergebnisse
 trinkgeld-month-label       Monatsbezeichnung
-trinkgeld-day-body-{date}   Aufklappbarer Tages-Inhalt
-trinkgeld-day-toggle-{date} ▶/▼ Symbol
-trinkgeld-hours-employees   Mitarbeiter-Stunden-Liste im Modal
-trinkgeld-hours-date        Datum-Input im Stunden-Modal
-trinkgeld-hours-list        Übersicht aller Stunden-Einträge
-trinkgeld-entry-card        Karten-Betrag
-trinkgeld-entry-cash        Bar-Betrag
-trinkgeld-entry-id          Hidden: ID des bestehenden tip_entries
-
-Hidden inputs pro Mitarbeiter (Stunden-Modal):
-tip-hours-start-{empId}     Startzeit
-tip-hours-end-{empId}       Endzeit
-tip-hours-break-{empId}     Pause (Min)
-tip-hours-min-{empId}       Gesamtminuten
+trinkgeld-day-body-{date} / trinkgeld-day-toggle-{date}
 
 ── HEADER ────────────────────────────────────────────────────────────────────
-btn-reload                  Reload-Button oben links (location.reload())
-btn-logout                  Logout-Button oben rechts
+btn-reload / btn-logout
+
+================================================================================
+EMPLOYEE.HTML — WICHTIGE IDs
+================================================================================
+emp-vac-day-modal           Modal für geklickten Kalender-Tag (Mitarbeiter)
+avail-grid                  Verfügbarkeitskalender-Grid
+avail-month-label           Monatsbezeichnung
 
 ================================================================================
 CSS/STYLES.CSS — WICHTIGE KLASSEN
@@ -300,11 +380,8 @@ CSS/STYLES.CSS — WICHTIGE KLASSEN
 ── LAYOUT ────────────────────────────────────────────────────────────────────
 .header                     max-width: 900px; margin: 0 auto
 .card                       Weiße Box mit Schatten + Border-Radius
-.modal-overlay              Vollbild-Overlay (opacity 0, pointer-events none)
 .modal-overlay.active       Sichtbar (Standard-Modals)
-.modal-overlay.open         Sichtbar (Schicht-Modal, Swap-Modal — Ausnahme!)
-.modal                      Weißes Modal-Fenster
-.modal-header               Titel + X-Button
+.modal-overlay.open         Sichtbar (shift-modal, swap-modal — Ausnahme!)
 
 ── BUTTONS ───────────────────────────────────────────────────────────────────
 .btn-primary                Gold, weiß, Hauptaktion
@@ -312,43 +389,40 @@ CSS/STYLES.CSS — WICHTIGE KLASSEN
 .btn-small                  2.5rem × 2.5rem Icon-Button
 .btn-pdf-view               Gold-Hintergrund, weiße SVG-Icons
 .btn-icon                   Nur Icon, kein Text
-.btn-reload                 Reload-Button: position absolute, left:1rem
-.btn-logout                 Logout-Button: position absolute, right:1rem
-
-── FORMULARE ─────────────────────────────────────────────────────────────────
-input, select, textarea     font-size: 16px (kein iOS Auto-Zoom!)
-.form-group                 Label + Input gestapelt
+.btn-delete                 Rot-Hintergrund für Lösch-Buttons
 
 ── SCHICHTPLAN ───────────────────────────────────────────────────────────────
-.week-cell                  Schichtzelle: Grau, zentriert, cursor pointer
-.week-cell.has-shift        Gold (#C9A24D), fett — normale Schicht
+.week-cell.has-shift        Gold (#C9A24D) — normale Schicht
                             Wenn actual_start_time: background #E8D4A0 (inline style)
 .week-cell.open-shift       Rötlich — offene Schicht
-.week-header                Spalten-/Zeilenkopf
-.week-employee              Mitarbeiter-Namenszelle links
 
-── MONATSPFEILE ──────────────────────────────────────────────────────────────
-.month-selector button      color: #2C3E50 (nicht blau!)
+── KALENDER ──────────────────────────────────────────────────────────────────
+.calendar-day               Kalender-Tag
+.calendar-day.has-vacation  Goldener Hintergrund; hover: #EDE8DF (transition 0.15s)
+.calendar-day-header        Mo/Di/Mi... Kopfzeile
+.avail-day                  Verfügbarkeits-Tag (position:relative für Dreieck-Overlay)
 
 ── SONSTIGE ──────────────────────────────────────────────────────────────────
 .empty-state                Zentrierter Platzhalter-Text
 .section-title              Abschnitts-Überschrift
 .badge                      Rote Zahl für Benachrichtigungen
+.info-box-clickable         Admin: background #F5F5F5 (inline); Employee: background #FFFFFF (CSS)
+                            Kein cursor:pointer
 
 ================================================================================
 WICHTIGE TECHNISCHE REGELN
 ================================================================================
 
-1. Supabase-Client heißt IMMER "db" (nicht supabase, nicht client)
-2. Modal öffnen: classList.add('active') — AUSNAHME: shift-modal + swap-modal → 'open'
-3. .maybeSingle() statt .single() (kein Fehler wenn kein Ergebnis)
-4. Timezone-Fix: new Date(date + 'T12:00:00') bei Datumsoperationen
-5. Vor shifts löschen: shift_swaps (nach shift_id UND target_shift_id),
-   shift_handovers, open_shift_requests löschen
-6. renderWeekGrid() ist async
-7. updateShiftCell() nach Schicht-Änderung für einzelne Zelle
-8. refreshHoursOverview() nach Schicht-Änderung für Stunden-Summen
-9. tip_entries Unique: (user_id, entry_date)
+1.  Supabase-Client heißt IMMER "db"
+2.  Modal öffnen: classList.add('active') — AUSNAHME: shift-modal + swap-modal → 'open'
+3.  .maybeSingle() statt .single()
+4.  Timezone-Fix: new Date(date + 'T12:00:00') bei Datumsoperationen
+5.  Vor shifts löschen: shift_swaps (shift_id UND target_shift_id),
+    shift_handovers, open_shift_requests löschen
+6.  renderWeekGrid() ist async
+7.  updateShiftCell() nach Schicht-Änderung für einzelne Zelle
+8.  refreshHoursOverview() nach Schicht-Änderung für Stunden-Summen
+9.  tip_entries Unique: (user_id, entry_date)
 10. tip_hours Unique: (user_id, employee_id, work_date)
 11. actual_break_minutes ?? break_minutes ?? 0 — NICHT ||, wegen Wert 0!
 12. Organiser: Container heißt tasks-archive-list (nicht archive-list)
@@ -356,6 +430,15 @@ WICHTIGE TECHNISCHE REGELN
 14. Inventur: inventory_position = Inventur-Reihenfolge, order_position = Bestellansicht
 15. Stunden-Toggle: <button> mit touch-action:manipulation (Mobile onclick Fix)
 16. [data-stunden-dept] Attribut auf deptStundenDiv für refreshHoursOverview()
+17. departmentNames[] immer aktuell halten: loadDepartmentNames() nach jeder Mutation
+18. populateDeptSelect(el, selected) für alle Abteilungs-Selects verwenden
+19. Pool-Abteilungen: pool_department-Feld in tip_departments (z.B. "Küche")
+    → Stunden aus tip_hours summieren, /daysInMonth = täglicher Schnitt
+    → poolEmpMonthShares[dept][empId] = monatlicher Anteil (0–1)
+20. Math.round(v*100)/100 für alle Zwischenwerte im Urlaubskonto
+21. checkArbeitszeitWarnings: überspringen wenn actual_start_time || actual_end_time
+22. Verfügbarkeitskalender Urlaubsabfrage: lte start_date ≤ monthEnd + gte end_date ≥ monthStart
+23. Init: loadEmployees() sequentiell, dann alle anderen via Promise.all() parallel
 
 ================================================================================
 GIT / DEPLOYMENT
@@ -364,5 +447,5 @@ Branch: main
 Remote: github.com/ArtsemKozel/planit
 Deployment: Cloudflare Pages (automatisch bei Push auf main)
 
-Aktueller Stand (letzter Commit): 5d7dded
-Schichtplan: Stunden-Übersicht nach Speichern/Löschen sofort aktualisieren
+Letzter Commit: 0c42688
+Verfügbarkeitskalender: Dreieck-Markierung für Tage mit Kommentar

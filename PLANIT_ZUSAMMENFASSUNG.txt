@@ -1,6 +1,6 @@
 PLANIT - ZUSAMMENFASSUNG FÜR NEUEN CHAT
 ========================================
-Datum: 3. April 2026
+Datum: 6. April 2026
 
 WAS WIR BAUEN:
 --------------
@@ -19,7 +19,8 @@ TECHNISCHER STACK:
 DATEI-STRUKTUR:
 ---------------
 PlanIt/
-├── index.html (Login-Seite)
+├── index.html (Login-Seite; Admin-Tab als Standard)
+├── register.html (Registrierung neuer Restaurants)
 ├── employee.html (Mitarbeiter-App)
 ├── admin.html (Admin-Seite)
 ├── css/
@@ -49,6 +50,11 @@ LOGIN-SYSTEM:
 - Mitarbeiter: Login-Kürzel + PIN
 - Supabase-Client heißt "db"
 - Mitarbeiter-Session in localStorage
+- index.html: Admin-Tab initial aktiv (nicht Mitarbeiter)
+- register.html: Registrierung neuer Restaurants (Supabase Auth + planit_restaurants)
+  → Validierung: Restaurant ≥3 Zeichen, Email-Regex, PW ≥8/Großbuchstabe/Zahl/Sonderzeichen
+  → Nach Registrierung: Erfolgsmeldung statt Redirect
+  → window.register als explizit globale Funktion, Credentials inline
 
 DATENBANK-TABELLEN:
 -------------------
@@ -69,7 +75,7 @@ DATENBANK-TABELLEN:
 5. approved_hours (id, user_id, employee_id, month, approved_minutes)
 
 6. actual_hours (id, user_id, employee_id, month, actual_minutes, carry_over_minutes)
-   → actual_minutes wird nicht mehr manuell eingetragen; carry_over_minutes bleibt
+   → actual_minutes nicht manuell; carry_over_minutes bleibt
 
 7. open_shift_requests, shift_templates, sick_leaves, employment_phases (wie vorher)
 
@@ -78,25 +84,28 @@ DATENBANK-TABELLEN:
 10. task_templates, task_template_steps, notes (wie vorher)
 
 11. tip_config (id, user_id, mode, show_to_employees, fixed_results jsonb)
-12. tip_departments (id, user_id, department, percentage, fixed_hours_per_month, pool_department)
+12. tip_departments (id, user_id, department, percentage, pool_department)
+    → pool_department: Falls gesetzt, wird diese Abteilung über den Tagesschnitt
+      in den Küche-Pool eingerechnet (z.B. Bäckerei → Küche)
+    → fixed_hours_per_month wurde entfernt; Stunden kommen jetzt immer aus shifts
 13. tip_entries (id, user_id, entry_date, amount_card, amount_cash)
     → Unique Constraint: (user_id, entry_date)
     → Alle Tage des Monats werden beim Laden automatisch angelegt (upsert)
 14. tip_hours (id, user_id, employee_id, work_date, minutes, start_time, end_time, break_minutes)
     → Unique Constraint: (user_id, employee_id, work_date)
     → Wird automatisch aus shifts befüllt (Sync beim Laden + nach Schicht-Änderungen)
-    → start_time, end_time, break_minutes werden mitgespeichert
 15. tip_results (id, user_id, employee_id, month, amount_card, amount_cash)
 
-16. planit_suppliers (id, user_id, name, created_at)
-17. planit_inventory_items (id, user_id, supplier_id, name, unit, target_amount,
-    position, inventory_position, order_position, price_per_unit, group_id, created_at)
-    → group_id: Zuordnung zu Warengruppe
-18. planit_inventory_entries (id, user_id, item_id, entry_date, actual_amount, created_at)
-19. planit_inventory_groups (id, user_id, supplier_id, name, position, created_at)
-    → Warengruppen pro Lieferant, klappbar, benennbar
-20. planit_inventory_submissions (id, user_id, employee_id, entry_date, status, created_at)
-    → RLS aktiviert; Mitarbeiter schreibt, Admin liest
+16. planit_suppliers, planit_inventory_items, planit_inventory_entries,
+    planit_inventory_groups, planit_inventory_submissions (wie vorher)
+
+17. planit_departments (id, user_id, name)
+    → Neue Tabelle für Abteilungsverwaltung
+    → Ersetzt hardcodierte Abteilungsnamen (Service, Küche, Bar)
+    → Verwaltet im Team-Tab unter "ABTEILUNGEN"
+
+18. planit_restaurants (id, user_id, name, ...)
+    → Wird bei Registrierung angelegt
 
 SUPABASE STORAGE:
 -----------------
@@ -104,71 +113,98 @@ SUPABASE STORAGE:
 
 WAS FERTIG IST:
 ---------------
-✅ Alles aus V5 (Login, Schichtplan, Urlaub, Team, Organiser, Trinkgeld, etc.)
-✅ Arbeitsrecht-Warnungen beim Einplanen (10h, 11h Ruhezeit, Pausenempfehlung)
-✅ Vorlagen: Schritte verschieben (↑↓), bearbeiten, löschen
+✅ Alles aus V5 + alle bisherigen Features
 
-✅ INVENTUR-MODUL (komplett):
-   - Lieferanten + Waren verwalten (Einstellungen-Seite)
-   - Waren: Name, Einheit, Soll-Menge, Preis/Einheit
-   - Inventur-Seite: Datum-Navigation (← →), klappbare Lieferanten
-   - Ist-Werte eintragen, Bestellmenge automatisch berechnet (Soll - Ist)
-   - Lagerwert live berechnet (Ist × Preis), pro Lieferant + Gesamt
-   - Tages-PDF: Inventurliste mit Bestell-Mengen
-   - Jahresbericht-PDF: alle Waren mit Mengen, Preisen, Gesamtwert
-   - Inventur-Reihenfolge per Pfeil-Buttons (↑↓) in Einstellungen
-   - Klappbare Lieferanten in Einstellungen
-   - Bestell-Reihenfolge Toggle (order_position)
-   - Positionsnummern vor jeder Ware in Einstellungen
-   - Bestellansicht als Sub-Tab in tab-inventur
-   - Warengruppen pro Lieferant (planit_inventory_groups, group_id in items)
-     → selbst benennbar, klappbar, ⓘ Info-Button
-   - Mitarbeiter-Inventur (can_do_inventory, tab-inventur-emp in employee.html)
-   - Inventur delegieren in tab-inventur-config
-   - planit_inventory_submissions: Mitarbeiter reicht Inventur ein → Badge + Liste im Admin
+✅ INIT PARALLELISIERUNG:
+   - loadEmployees() sequentiell zuerst
+   - Alle anderen Funktionen via Promise.all() parallel
+   - Reduziert Gesamtladezeit erheblich
 
-✅ MOBILE / UI FIXES:
-   - Pull-to-Refresh deaktiviert (initPullToRefresh() leer)
-   - Reload-Button oben links im Header (btn-reload, gleiche Optik wie Logout)
-   - Header max-width: 900px
-   - Input font-size: 16px → kein iOS Auto-Zoom
-   - Monatspfeil-Buttons color: #2C3E50 (nicht mehr blau)
+✅ REGISTER.HTML (neu):
+   - Registrierung neuer Restaurants über Supabase Auth
+   - Validierung: Restaurantname, Email, Passwort-Regeln, Bestätigung
+   - Feldspezifische Fehlermeldungen (.field-error unter jedem Feld)
+   - Nach Registrierung: Erfolgsmeldung (kein Redirect)
+   - Link "Noch kein Konto?" in index.html
 
-✅ TATSÄCHLICHE SCHICHTZEITEN:
-   - actual_start_time, actual_end_time, actual_break_minutes in shifts
-   - Felder nur intern genutzt (kein Formular-Input mehr im Schicht-Modal)
-   - Werden für Stundenkonto und tip_hours-Sync bevorzugt
+✅ INDEX.HTML:
+   - Admin-Tab initial aktiv (nicht Mitarbeiter-Tab)
+   - Link zu register.html unter Admin-Login
 
-✅ STUNDENKONTO:
-   - "Gearbeitet" wird automatisch aus Schichten berechnet
-   - actual_* Felder bevorzugt, sonst start_time/end_time/break_minutes
-   - Kein manueller Edit-Button mehr für "Gearbeitet"
-   - carry_over_minutes bleibt aus actual_hours
-   - Mitarbeiter-Blöcke klappbar: Klick auf Header zeigt alle Schichten des Monats
-     → Datum, geplante Zeiten, tatsächliche Zeiten (gold, falls vorhanden), Dauer
-   - Toggle-Header als <button> mit touch-action:manipulation (Mobile-Fix)
-   - Stunden-Übersicht (KW + Monat) wird nach saveShift/deleteShift sofort aktualisiert
-     → refreshHoursOverview() lädt neue Schichtdaten und befüllt [data-stunden-dept]-Divs
+✅ PLANUNGSMODUS-BUTTON:
+   - Gold (#C9A24D), SVG-Icon, CSS-Transition
+   - Kein Emoji mehr
 
-✅ SCHICHTPLAN WOCHENANSICHT:
-   - Schichten mit actual_start_time werden in hellerer Farbe (#E8D4A0) angezeigt
-     → normale Schichten: #C9A24D (Gold), korrigierte: #E8D4A0 (helles Goldbeige)
-   - Stunden-Übersicht pro Abteilung (KW + Monat) direkt im Grid
-   - buildStundenDivHtml() als eigene Funktion für Wiederverwendung
+✅ ABTEILUNGEN (dynamisch):
+   - Neue Tabelle planit_departments
+   - Team-Tab: klappbarer Bereich "ABTEILUNGEN" (vor Mitarbeiterliste)
+   - CRUD: Liste aller Abteilungen, + Button + Löschen-Button pro Eintrag
+   - departmentNames[] global; beim Start via loadDepartmentNames() befüllt
+   - populateDeptSelect(el, selected): befüllt <select> dynamisch
+   - Alle drei Abteilungs-Selects (Schicht, Mitarbeiter anlegen, bearbeiten)
+     haben keine hardcodierten Options mehr
 
-✅ TRINKGELD AUTO-SYNC AUS SCHICHTPLAN:
-   - loadTrinkgeld() legt alle Monatstage automatisch in tip_entries an (upsert)
-   - Schichten werden automatisch in tip_hours synchronisiert
-   - actual_* Felder bevorzugt beim Berechnen der Minuten
-   - start_time, end_time, break_minutes werden in tip_hours mitgespeichert
-   - Krankmeldungen werden ausgeschlossen (sick_leaves)
-   - Tage aufsteigend sortiert (1 oben, letzter Tag unten)
-   - syncTipHoursForShift(): gezielter Sync nach Schicht Speichern/Löschen
-   - Mitarbeiter auch angezeigt wenn Karte/Bar = 0, aber Stunden vorhanden
+✅ TEAM-TAB:
+   - Klappbare Mitarbeiter-Blöcke (toggleTeamEmployee)
+   - Beschäftigungsphasen aus employment_phases geladen und angezeigt
+   - Urlaubsinfo entfernt aus Team-Übersicht
+   - "ABTEILUNGEN" Bereich ganz oben (vor Mitarbeiterliste)
 
-✅ SHIFT_SWAPS FIX:
-   - deleteShift() löscht auch shift_swaps nach target_shift_id
-   - Bisher nur nach shift_id gelöscht
+✅ STUNDEN-ÜBERSICHT:
+   - Klappbar pro Abteilung im Schichtplan-Grid (toggleDeptStunden)
+   - Goldener Header mit Abteilungsname und Stunden-Summe
+   - Standardmäßig eingeklappt
+
+✅ URLAUBSANTRÄGE:
+   - Buttons in 2×2 Grid angeordnet
+   - "Alle" Download-Button: btn-small mit SVG Download-Icon (kein Emoji)
+
+✅ URLAUBSKALENDER (Admin + Mitarbeiter):
+   - Klickbare Tage mit Modal (showVacDayModal / showEmpVacDayModal)
+   - Goldener Hintergrund statt farbige Linien/Legende
+   - goldGradient(n): vertikale Streifen bei mehreren Mitarbeitern
+   - Abteilungsfilter beim Mitarbeiter-Kalender
+   - Monatsliste unterhalb des Kalenders
+     → Admin: nach Abteilung gruppiert
+     → Mitarbeiter: nur eigene Abteilung
+   - payout_month-Filter für Auszahlungen
+   - Eine OR-Abfrage statt zwei getrennte Abfragen
+   - Hover-Effekt auf Tagen mit Urlaub (has-vacation Klasse)
+
+✅ ÜBERTRAG VORJAHR:
+   - Nur geänderte Werte werden gespeichert (Änderungserkennung via dataset.origValues)
+   - Section schließt sich nach Speichern automatisch
+   - carry_over_set_at nur bei tatsächlicher Änderung aktualisiert
+
+✅ URLAUBSKONTO:
+   - Alle Zwischenwerte auf 2 Dezimalstellen gerundet (Math.round(v*100)/100)
+   - Durchschnittliche Schichtlänge wird angezeigt (neben Std/UT)
+   - cutoffDate korrekt in beiden Pfaden angewendet (mit/ohne Beschäftigungsphasen)
+
+✅ CHECKARBEITSZEITWARNUNGEN:
+   - Überspringt Prüfung wenn actual_start_time oder actual_end_time gesetzt
+   - Schwellenwerte: > 9h (nicht >=) und > 6h (nicht >=)
+
+✅ TRINKGELD:
+   - PDF-Button im Tab-Header
+   - Bäckerei-Pool: Abteilungen mit pool_department-Feld werden als
+     täglicher Durchschnitt in den Ziel-Pool eingerechnet
+     → Monatsgesamtstunden / Monatstage = täglicher Durchschnitt
+     → Anteil wird täglich gutgeschrieben (auch ohne Schicht an dem Tag)
+     → In Tagesansicht: "⌀ Xh YYm" (Durchschnitt, immer angezeigt)
+   - Abteilungs-Header (KÜCHE, SERVICE, BÄCKEREI) mit gleicher Formatierung
+
+✅ VERFÜGBARKEITSKALENDER (Mitarbeiter):
+   - Genehmigte Urlaubstage blau markiert (#D0E8FF)
+   - Urlaubsabfrage monatsübergreifend (lte start_date ≤ monthEnd + gte end_date ≥ monthStart)
+   - Tage mit Kommentar: kleines Dreieck oben links (border-trick, #2C3E50)
+
+✅ MITARBEITER-ÜBERSICHT (loadOverview):
+   - 3 Schichten: vergangene, nächste (Mitte, hervorgehoben), übernächste
+   - Vergangene Schichten: goldener Hintergrund außen, weißes Zeitfeld
+   - Nächste Schicht: weißer Hintergrund, goldener Rahmen am Zeitfeld
+   - ▼/▲ Toggle "Alle anzeigen"
+   - Datum und Uhrzeit in #2C3E50
 
 SONSTIGE OFFENE FEATURES:
 --------------------------
@@ -191,12 +227,15 @@ WICHTIGE TECHNISCHE DETAILS:
 - Organiser: tasks-archive-list (nicht archive-list — Konflikt mit Urlaub)
 - Trinkgeld: saveTrinkgeldResults() nach jedem saveTrinkgeldHours()
 - Inventur: inventory_position für Inventur-Reihenfolge, order_position für Bestell-Reihenfolge
-- Inventur: Positionen werden beim Laden von loadInventurConfig() initialisiert
 - tip_entries Unique Constraint: user_id, entry_date
 - tip_hours Unique Constraint: user_id, employee_id, work_date
 - Trinkgeld-Sync: actual_break_minutes ?? break_minutes ?? 0 (nicht ||, wegen 0-Wert)
 - Stundenkonto-Toggle: <button> statt <div> für Mobile onclick-Kompatibilität
 - Schichtplan: korrigierte Schichten (actual_start_time gesetzt) → background #E8D4A0
+- departmentNames[] global in admin.js; wird bei Init + nach Abt.-Mutationen aktualisiert
+- populateDeptSelect(el, selected) zum dynamischen Befüllen von Abteilungs-Selects
+- Pool-Abteilungen: pool_department-Feld in tip_departments (z.B. "Küche")
+- Math.round(v*100)/100 für alle Zwischenwerte im Urlaubskonto
 
 ARBEITSWEISE:
 -------------
