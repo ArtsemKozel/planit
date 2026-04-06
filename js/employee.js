@@ -863,7 +863,11 @@ async function renderAvailGrid(year, month) {
         const timeHtml = (status === 'partial' && entry?.from)
             ? `<span style="font-size:0.6rem; line-height:1.2;">${entry.from}</span><span style="font-size:0.6rem; line-height:1.2;">${entry.to}</span>`
             : '';
-        div.innerHTML = `<span>${d}</span>${timeHtml}`;
+        const commentTriangle = entry?.comment
+            ? `<div style="position:absolute; top:0; left:0; width:0; height:0; border-top:8px solid #2C3E50; border-right:8px solid transparent;"></div>`
+            : '';
+        div.style.position = 'relative';
+        div.innerHTML = `${commentTriangle}<span>${d}</span>${timeHtml}`;
         div.onclick = () => openAvailModal(d);
         container.appendChild(div);
     }
