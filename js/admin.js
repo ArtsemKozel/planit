@@ -4597,7 +4597,7 @@ async function loadTrinkgeld() {
                 const empRows = empResultsSorted.map(([empId, r]) => {
                 const emp = (tipHours || []).find(h => h.employee_id === empId);
                 const name = emp ? emp.employees_planit.name : empId;
-                const currentDept = r.isFixed ? null : (emp ? emp.employees_planit.department : null);
+                const currentDept = r.isFixed ? empId : (emp ? emp.employees_planit.department : null);
                 let deptHeader = '';
                 if (currentDept && currentDept !== lastDept) {
                     lastDept = currentDept;
@@ -4615,7 +4615,7 @@ async function loadTrinkgeld() {
                 }
                 return `${deptHeader}
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; padding:0.3rem 0; border-bottom:1px solid var(--color-border);">
-                    <span>${name}</span>
+                    ${r.isFixed ? '<span style="color:var(--color-text-light);">Pool</span>' : `<span>${name}</span>`}
                     <div style="display:flex; align-items:center; gap:1rem;">
                         ${hoursDisplay ? `<span style="color:var(--color-text-light);">${hoursDisplay}</span>` : ''}
                         <span style="font-weight:600; min-width:4rem; text-align:right;">${((r.card + r.cash)).toFixed(2)} €</span>
@@ -4704,9 +4704,9 @@ async function loadTrinkgeld() {
                                 </div>`;
             }).join('')}
             ${Object.entries(fixedMonthTotals).map(([dept, totals]) => `
+                <div style="font-size:0.75rem; font-weight:700; color:var(--color-primary); padding:0.5rem 0 0.25rem; letter-spacing:0.05em;">${dept.toUpperCase()}</div>
                 <div class="list-item" style="opacity:0.7;">
                     <div class="list-item-info">
-                        <h4>${dept}</h4>
                         <p>Karte: ${totals.card.toFixed(2)} € | Bar: ${totals.cash.toFixed(2)} €</p>
                     </div>
                     <div style="text-align:right;">
