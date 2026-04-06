@@ -4611,7 +4611,7 @@ async function loadTrinkgeld() {
     const poolEmpMonthShares = {}; // dept.department → { empId: share (0–1) }
     for (const dept of (depts || [])) {
         if (!dept.pool_department) continue;
-        const deptHours = (tipHours || []).filter(h => h.employees_planit.department === dept.department);
+        const deptHours = (tipHours || []).filter(h => (h.department || h.employees_planit.department) === dept.department);
         const totalMins = deptHours.reduce((sum, h) => sum + h.minutes, 0);
         poolDeptMonthMinutes[dept.department] = totalMins;
         // Monatlichen Anteil pro Mitarbeiter berechnen
