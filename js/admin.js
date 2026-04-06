@@ -715,44 +715,43 @@ async function deleteShift() {
 async function syncTipHoursForShift(employeeId, dateStr) {
     if (!employeeId || !dateStr) return;
 
-    const { data: shift } = await db.from('shifts')
-        .select('start_time,end_time,break_minutes,actual_start_time,actual_end_time,actual_break_minutes')
+    const { data: shifts } = await db.from('shifts')
+        .select('start_time,end_time,break_minutes,actual_start_time,actual_end_time,actual_break_minutes,department')
         .eq('user_id', adminSession.user.id)
         .eq('employee_id', employeeId)
         .eq('shift_date', dateStr)
-        .eq('is_open', false)
-        .maybeSingle();
+        .eq('is_open', false);
 
-    if (!shift) {
-        await db.from('tip_hours').delete().eq('user_id', adminSession.user.id).eq('employee_id', employeeId).eq('work_date', dateStr);
-        return;
-    }
+    // Always delete existing tip_hours for this employee+date first
+    await db.from('tip_hours').delete()
+        .eq('user_id', adminSession.user.id)
+        .eq('employee_id', employeeId)
+        .eq('work_date', dateStr);
+
+    if (!shifts || shifts.length === 0) return;
 
     const { data: sick } = await db.from('sick_leaves')
         .select('id').eq('user_id', adminSession.user.id).eq('employee_id', employeeId)
         .lte('start_date', dateStr).gte('end_date', dateStr).maybeSingle();
 
-    if (sick) {
-        await db.from('tip_hours').delete().eq('user_id', adminSession.user.id).eq('employee_id', employeeId).eq('work_date', dateStr);
-        return;
+    if (sick) return;
+
+    const rows = [];
+    for (const shift of shifts) {
+        const startStr = shift.actual_start_time || shift.start_time;
+        const endStr = shift.actual_end_time || shift.end_time;
+        const breakMin = shift.actual_break_minutes ?? shift.break_minutes ?? 0;
+        const [sh, sm] = startStr.split(':').map(Number);
+        const [eh, em] = endStr.split(':').map(Number);
+        const minutes = (eh * 60 + em) - (sh * 60 + sm) - breakMin;
+        if (minutes > 0) {
+            rows.push({ user_id: adminSession.user.id, employee_id: employeeId, work_date: dateStr, minutes, department: shift.department || null });
+        }
     }
 
-    const startStr = shift.actual_start_time || shift.start_time;
-    const endStr = shift.actual_end_time || shift.end_time;
-    const breakMin = shift.actual_break_minutes ?? shift.break_minutes ?? 0;
-    const [sh, sm] = startStr.split(':').map(Number);
-    const [eh, em] = endStr.split(':').map(Number);
-    const minutes = (eh * 60 + em) - (sh * 60 + sm) - breakMin;
-
-    if (minutes <= 0) {
-        await db.from('tip_hours').delete().eq('user_id', adminSession.user.id).eq('employee_id', employeeId).eq('work_date', dateStr);
-        return;
+    if (rows.length > 0) {
+        await db.from('tip_hours').upsert(rows, { onConflict: 'user_id,employee_id,work_date,department' });
     }
-
-    await db.from('tip_hours').upsert(
-        { user_id: adminSession.user.id, employee_id: employeeId, work_date: dateStr, minutes },
-        { onConflict: 'user_id,employee_id,work_date' }
-    );
 }
 
 function toggleRepeat() {
@@ -4551,11 +4550,11 @@ async function loadTrinkgeld() {
     ] = await Promise.all([
         db.from('tip_entries').select('*').eq('user_id', adminSession.user.id).gte('entry_date', firstDay).lte('entry_date', lastDay).order('entry_date', { ascending: false }),
         db.from('tip_departments').select('*').eq('user_id', adminSession.user.id),
-        db.from('shifts').select('employee_id,shift_date,start_time,end_time,break_minutes,actual_start_time,actual_end_time,actual_break_minutes').eq('user_id', adminSession.user.id).eq('is_open', false).gte('shift_date', firstDay).lte('shift_date', lastDay),
+        db.from('shifts').select('employee_id,shift_date,start_time,end_time,break_minutes,actual_start_time,actual_end_time,actual_break_minutes,department').eq('user_id', adminSession.user.id).eq('is_open', false).gte('shift_date', firstDay).lte('shift_date', lastDay),
         db.from('sick_leaves').select('employee_id,start_date,end_date').eq('user_id', adminSession.user.id).lte('start_date', lastDay).gte('end_date', firstDay),
     ]);
 
-    // Schichten in tip_hours synchronisieren
+    // Schichten in tip_hours synchronisieren (eine Zeile pro Schicht/Abteilung)
     const tipHoursRows = [];
     for (const shift of (monthShifts || [])) {
         if (!shift.employee_id) continue;
@@ -4568,10 +4567,10 @@ async function loadTrinkgeld() {
         const [eh, em] = endStr.split(':').map(Number);
         const minutes = (eh * 60 + em) - (sh * 60 + sm) - breakMin;
         if (minutes <= 0) continue;
-        tipHoursRows.push({ user_id: adminSession.user.id, employee_id: shift.employee_id, work_date: d, minutes });
+        tipHoursRows.push({ user_id: adminSession.user.id, employee_id: shift.employee_id, work_date: d, minutes, department: shift.department || null });
     }
     if (tipHoursRows.length > 0) {
-        await db.from('tip_hours').upsert(tipHoursRows, { onConflict: 'user_id,employee_id,work_date' });
+        await db.from('tip_hours').upsert(tipHoursRows, { onConflict: 'user_id,employee_id,work_date,department' });
     }
 
     const { data: tipHours } = await db.from('tip_hours').select('*, employees_planit(name, department)').eq('user_id', adminSession.user.id).gte('work_date', firstDay).lte('work_date', lastDay);
@@ -4641,8 +4640,9 @@ async function loadTrinkgeld() {
             const empDayMinutes = {};
             let totalDeptMinutes = 0;
             for (const h of dayHours) {
-                if (h.employees_planit.department !== dept.department) continue;
-                empDayMinutes[h.employee_id] = h.minutes;
+                const hDept = h.department || h.employees_planit.department;
+                if (hDept !== dept.department) continue;
+                empDayMinutes[h.employee_id] = (empDayMinutes[h.employee_id] || 0) + h.minutes;
                 totalDeptMinutes += h.minutes;
             }
 
