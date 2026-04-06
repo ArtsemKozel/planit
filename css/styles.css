@@ -399,7 +399,7 @@ input[type="time"] {
 /* AVAILABILITY GRID */
 .availability-grid {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: 4px;
     margin-top: 1rem;
 }
@@ -414,6 +414,7 @@ input[type="time"] {
     cursor: pointer;
     background: var(--color-gray);
     border: 2px solid transparent;
+    min-width: 0;
 }
 
 .avail-day.selected {
@@ -697,7 +698,7 @@ select {
 
 #admin-avail-grid {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: 4px;
 }
 
