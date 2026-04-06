@@ -492,8 +492,9 @@ async function openShiftModal(employeeId, dateStr, existingShift) {
     document.getElementById('shift-employee').disabled = existingShift?.is_open || false;
     document.getElementById('shift-employee').closest('.form-group').style.opacity = existingShift?.is_open ? '0.4' : '1';
     document.getElementById('shift-open-note-group').style.display = existingShift?.is_open ? 'block' : 'none';
-    document.getElementById('shift-dept-group').style.display = existingShift?.is_open ? 'block' : 'none';
-    populateDeptSelect(document.getElementById('shift-department'), existingShift?.department || departmentNames[0] || '');
+    const emp = employees.find(e => e.id === (existingShift?.employee_id || employeeId));
+    const defaultDept = existingShift?.department || emp?.department || departmentNames[0] || '';
+    populateDeptSelect(document.getElementById('shift-department'), defaultDept);
     document.getElementById('shift-actual-group').style.display = existingShift ? 'block' : 'none';
     document.getElementById('shift-actual-body').style.display = 'none';
     document.getElementById('shift-actual-toggle').textContent = '▶';
@@ -544,7 +545,7 @@ async function submitShift() {
         notes: notes || null,
         is_open: isOpen,
         open_note: isOpen ? (document.getElementById('shift-open-note').value || null) : null,
-        department: isOpen ? document.getElementById('shift-department').value : null
+        department: document.getElementById('shift-department').value || null
     });
 
     const repeat = document.getElementById('shift-repeat').checked;
@@ -2631,7 +2632,6 @@ function toggleOpenShift() {
     document.getElementById('shift-employee').closest('.form-group').style.opacity = isOpen ? '0.4' : '1';
     document.getElementById('shift-employee').disabled = isOpen;
     document.getElementById('shift-open-note-group').style.display = isOpen ? 'block' : 'none';
-    document.getElementById('shift-dept-group').style.display = isOpen ? 'block' : 'none';
 }
 
 // ============================================
