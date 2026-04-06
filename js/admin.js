@@ -4505,27 +4505,32 @@ async function updateShiftCell(employeeId, dateStr) {
     const sickLeaves = [];
 
     if (employeeId) {
-        // Normale Mitarbeiter-Zelle
-        const cell = document.querySelector(`[data-cell="${employeeId}_${dateStr}"]`);
-        if (!cell) { await loadWeekGrid(); return; }
+        // Alle Zellen dieses Mitarbeiters an diesem Tag (eine pro Abteilung)
+        const cells = document.querySelectorAll(`[data-cell="${employeeId}_${dateStr}"]`);
+        if (!cells.length) { await loadWeekGrid(); return; }
 
-        const shift = (shifts || []).find(s => s.employee_id === employeeId && !s.is_open);
-        cell.className = 'week-cell' + (shift ? ' has-shift' : '');
-        cell.style.whiteSpace = 'pre';
-        cell.style.position = 'relative';
-        cell.style.background = '';
-        cell.style.color = '';
-        cell.style.fontSize = '';
-        cell.innerHTML = '';
-        if (shift) {
-            cell.textContent = `${shift.start_time.slice(0,5)}\n${shift.end_time.slice(0,5)}`;
-            if (shift.actual_start_time) {
-                cell.style.background = '#E8D4A0';
+        const empShifts = (shifts || []).filter(s => s.employee_id === employeeId && !s.is_open);
+
+        cells.forEach(cell => {
+            const cellDept = cell.dataset.dept;
+            const shift = empShifts.find(s => s.department === cellDept || (!s.department && !cellDept));
+            cell.className = 'week-cell' + (shift ? ' has-shift' : '');
+            cell.style.whiteSpace = 'pre';
+            cell.style.position = 'relative';
+            cell.style.background = '';
+            cell.style.color = '';
+            cell.style.fontSize = '';
+            cell.innerHTML = '';
+            if (shift) {
+                cell.textContent = `${shift.start_time.slice(0,5)}\n${shift.end_time.slice(0,5)}`;
+                if (shift.actual_start_time) {
+                    cell.style.background = '#E8D4A0';
+                }
+            } else {
+                cell.textContent = '+';
             }
-        } else {
-            cell.textContent = '+';
-        }
-        cell.onclick = () => openShiftModal(employeeId, dateStr, shift || null, cell.dataset.dept);
+            cell.onclick = () => openShiftModal(employeeId, dateStr, shift || null, cellDept);
+        });
     } else {
         // Offene Schicht
         await loadWeekGrid();
