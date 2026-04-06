@@ -324,7 +324,7 @@ async function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
 
             days.forEach(d => {
                 const dateStr = d.toISOString().split('T')[0];
-                const shift = shifts.find(s => s.employee_id === emp.id && s.shift_date === dateStr && !s.is_open);
+                const shift = shifts.find(s => s.employee_id === emp.id && s.shift_date === dateStr && !s.is_open && (s.department === dept || (!s.department && (emp.department || 'Allgemein') === dept)));
                 const cell = document.createElement('div');
                 cell.className = 'week-cell' + (shift ? ' has-shift' : '');
                 cell.style.whiteSpace = 'pre';
