@@ -1348,6 +1348,15 @@ async function loadAdminAvailability() {
     const employeeId = document.getElementById('avail-employee-select').value;
     if (!employeeId) return;
 
+    // Loading-Guard: parallele Aufrufe abbrechen
+    const loadId = `${employeeId}-${adminAvailDate.getFullYear()}-${adminAvailDate.getMonth()}`;
+    loadAdminAvailability._currentLoad = loadId;
+
+    // Container sofort leeren
+    const container = document.getElementById('admin-avail-grid');
+    container.innerHTML = '';
+    container.classList.remove('all-view');
+
     if (employeeId === 'all') {
         await loadAllAvailabilities();
         return;
@@ -1360,30 +1369,19 @@ async function loadAdminAvailability() {
                         'Juli','August','September','Oktober','November','Dezember'];
     document.getElementById('admin-avail-month-label').textContent = `${monthNames[month]} ${year}`;
 
-    const { data } = await db
-        .from('availability')
-        .select('*')
-        .eq('employee_id', employeeId)
-        .eq('month', monthStr)
-        .maybeSingle();
+    const [{ data }, { data: vacations }] = await Promise.all([
+        db.from('availability').select('*').eq('employee_id', employeeId).eq('month', monthStr).maybeSingle(),
+        db.from('vacation_requests').select('start_date, end_date').eq('employee_id', employeeId).eq('status', 'approved').lte('start_date', `${year}-${String(month+1).padStart(2,'0')}-${new Date(year, month+1, 0).getDate()}`).gte('end_date', monthStr),
+    ]);
 
-    // Urlaubstage laden
-    const monthStart = `${year}-${String(month+1).padStart(2,'0')}-01`;
-    const monthEnd = `${year}-${String(month+1).padStart(2,'0')}-${new Date(year, month+1, 0).getDate()}`;
-    const { data: vacations } = await db
-        .from('vacation_requests')
-        .select('start_date, end_date')
-        .eq('employee_id', employeeId)
-        .eq('status', 'approved')
-        .gte('start_date', monthStart)
-        .lte('end_date', monthEnd);
+    // Abbruch wenn zwischenzeitlich ein neuerer Aufruf gestartet wurde
+    if (loadAdminAvailability._currentLoad !== loadId) return;
 
     const availDays = (data && !Array.isArray(data.available_days)) ? data.available_days : {};
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const firstWeekday = new Date(year, month, 1).getDay();
     const offset = firstWeekday === 0 ? 6 : firstWeekday - 1;
 
-    const container = document.getElementById('admin-avail-grid');
     container.innerHTML = '';
     container.classList.remove('all-view');
 
