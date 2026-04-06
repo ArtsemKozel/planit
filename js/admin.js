@@ -303,6 +303,12 @@ async function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
         // Nur Mitarbeiter zeigen die diese Woche eine Schicht in dieser Abteilung haben
         const deptShiftEmpIds = [...new Set(shifts.filter(s => !s.is_open && s.department === dept).map(s => s.employee_id))];
         const deptEmployees = deptShiftEmpIds.map(id => employees.find(e => e.id === id)).filter(Boolean);
+        console.log(`[Grid] Abteilung: ${dept}`, {
+            deptShiftEmpIds,
+            deptEmployees: deptEmployees.map(e => e.name),
+            shiftsInDept: shifts.filter(s => !s.is_open && s.department === dept).map(s => ({ emp: s.employee_id, date: s.shift_date, dept: s.department })),
+            shiftsWithNullDept: shifts.filter(s => !s.is_open && s.department === null).length,
+        });
         deptEmployees.forEach(emp => {
             const empCell = document.createElement('div');
             empCell.className = 'week-employee';
