@@ -1487,6 +1487,10 @@ async function loadAllAvailabilities() {
         title.style.fontSize = '0.9rem';
         title.style.margin = '1rem 0 0.5rem';
         title.style.color = 'var(--color-primary)';
+        title.style.maxWidth = '480px';
+        title.style.overflow = 'hidden';
+        title.style.whiteSpace = 'nowrap';
+        title.style.textOverflow = 'ellipsis';
         title.textContent = emp.name;
         container.appendChild(title);
 
