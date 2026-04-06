@@ -4699,15 +4699,13 @@ async function loadTrinkgeld() {
                 }
                 const hours = d.hours.find(h => h.employee_id === empId);
                 let hoursDisplay = '';
-                if (hours) {
+                const poolDeptName = Object.keys(poolEmpMonthShares).find(dept => poolEmpMonthShares[dept][empId] !== undefined);
+                if (poolDeptName) {
+                    // Pool-Mitarbeiter: immer täglichen Durchschnitt anzeigen
+                    const avgMins = (poolDeptMonthMinutes[poolDeptName] || 0) / daysInMonth;
+                    if (avgMins > 0) hoursDisplay = `⌀ ${Math.floor(avgMins/60)}h ${String(Math.round(avgMins%60)).padStart(2,'0')}m`;
+                } else if (hours) {
                     hoursDisplay = `${Math.floor(hours.minutes/60)}h ${String(hours.minutes%60).padStart(2,'0')}m`;
-                } else {
-                    // Pool-Mitarbeiter: täglichen Durchschnitt anzeigen
-                    const poolDeptName = Object.keys(poolEmpMonthShares).find(dept => poolEmpMonthShares[dept][empId] !== undefined);
-                    if (poolDeptName) {
-                        const avgMins = (poolDeptMonthMinutes[poolDeptName] || 0) / daysInMonth;
-                        if (avgMins > 0) hoursDisplay = `⌀ ${Math.floor(avgMins/60)}h ${String(Math.round(avgMins%60)).padStart(2,'0')}m`;
-                    }
                 }
                 return `${deptHeader}
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; padding:0.3rem 0; border-bottom:1px solid var(--color-border);">
