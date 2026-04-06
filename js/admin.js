@@ -4671,9 +4671,10 @@ async function loadTrinkgeld() {
             // Echte Mitarbeiter dieser Abteilung
             for (const [empId, minutes] of Object.entries(empDayMinutes)) {
                 const share = minutes / totalDeptMinutes;
-                if (!dayResults[dateStr].empResults[empId]) dayResults[dateStr].empResults[empId] = { card: 0, cash: 0 };
-                dayResults[dateStr].empResults[empId].card += deptDayCard * share;
-                dayResults[dateStr].empResults[empId].cash += deptDayCash * share;
+                const key = empId + '__' + dept.department;
+                if (!dayResults[dateStr].empResults[key]) dayResults[dateStr].empResults[key] = { empId, dept: dept.department, card: 0, cash: 0 };
+                dayResults[dateStr].empResults[key].card += deptDayCard * share;
+                dayResults[dateStr].empResults[key].cash += deptDayCash * share;
                 if (!empMonthTotals[empId]) empMonthTotals[empId] = { card: 0, cash: 0 };
                 empMonthTotals[empId].card += deptDayCard * share;
                 empMonthTotals[empId].cash += deptDayCash * share;
@@ -4686,9 +4687,10 @@ async function loadTrinkgeld() {
                 const poolDayCash = deptDayCash * poolShare;
                 const shares = poolEmpMonthShares[poolDept.department] || {};
                 for (const [empId, empShare] of Object.entries(shares)) {
-                    if (!dayResults[dateStr].empResults[empId]) dayResults[dateStr].empResults[empId] = { card: 0, cash: 0 };
-                    dayResults[dateStr].empResults[empId].card += poolDayCard * empShare;
-                    dayResults[dateStr].empResults[empId].cash += poolDayCash * empShare;
+                    const key = empId + '__' + poolDept.department;
+                    if (!dayResults[dateStr].empResults[key]) dayResults[dateStr].empResults[key] = { empId, dept: poolDept.department, card: 0, cash: 0 };
+                    dayResults[dateStr].empResults[key].card += poolDayCard * empShare;
+                    dayResults[dateStr].empResults[key].cash += poolDayCash * empShare;
                     if (!empMonthTotals[empId]) empMonthTotals[empId] = { card: 0, cash: 0 };
                     empMonthTotals[empId].card += poolDayCard * empShare;
                     empMonthTotals[empId].cash += poolDayCash * empShare;
@@ -4708,42 +4710,42 @@ async function loadTrinkgeld() {
             const total = (d.card + d.cash).toFixed(2);
 
             // Nach Abteilung gruppieren
-            const getEmpInfo = (empId) => {
+            const getEmpName = (empId) => {
                 const fromHours = (tipHours || []).find(h => h.employee_id === empId);
-                if (fromHours) return { name: fromHours.employees_planit.name, department: fromHours.employees_planit.department };
+                if (fromHours) return fromHours.employees_planit.name;
                 const fromEmp = employees.find(e => e.id === empId);
-                return fromEmp ? { name: fromEmp.name, department: fromEmp.department } : { name: empId, department: null };
+                return fromEmp ? fromEmp.name : empId;
             };
-            const empResultsSorted = Object.entries(d.empResults).sort(([aId], [bId]) => {
-                const aDept = getEmpInfo(aId).department || 'zzz';
-                const bDept = getEmpInfo(bId).department || 'zzz';
-                return aDept.localeCompare(bDept);
+            const empResultsSorted = Object.values(d.empResults).sort((a, b) => {
+                const deptCmp = (a.dept || 'zzz').localeCompare(b.dept || 'zzz');
+                if (deptCmp !== 0) return deptCmp;
+                return getEmpName(a.empId).localeCompare(getEmpName(b.empId));
             });
 
             let lastDept = null;
-            const empRows = empResultsSorted.map(([empId, r]) => {
-                const { name, department: currentDept } = getEmpInfo(empId);
+            const empRows = empResultsSorted.map(r => {
+                const name = getEmpName(r.empId);
+                const currentDept = r.dept;
                 let deptHeader = '';
                 if (currentDept && currentDept !== lastDept) {
                     lastDept = currentDept;
                     deptHeader = `<div style="font-size:0.75rem; font-weight:700; color:var(--color-primary); padding:0.4rem 0 0.2rem; letter-spacing:0.05em;">${currentDept.toUpperCase()}</div>`;
                 }
-                const hours = d.hours.find(h => h.employee_id === empId);
+                const isPoolDept = (depts || []).find(pd => pd.department === currentDept && pd.pool_department);
                 let hoursDisplay = '';
-                const poolDeptName = Object.keys(poolEmpMonthShares).find(dept => poolEmpMonthShares[dept][empId] !== undefined);
-                if (poolDeptName) {
-                    // Pool-Mitarbeiter: immer täglichen Durchschnitt anzeigen
-                    const avgMins = (poolDeptMonthMinutes[poolDeptName] || 0) / daysInMonth;
+                if (isPoolDept) {
+                    const avgMins = (poolDeptMonthMinutes[currentDept] || 0) / daysInMonth;
                     if (avgMins > 0) hoursDisplay = `⌀ ${Math.floor(avgMins/60)}h ${String(Math.round(avgMins%60)).padStart(2,'0')}m`;
-                } else if (hours) {
-                    hoursDisplay = `${Math.floor(hours.minutes/60)}h ${String(hours.minutes%60).padStart(2,'0')}m`;
+                } else {
+                    const hours = d.hours.find(h => h.employee_id === r.empId && (h.department === currentDept || (!h.department && !currentDept)));
+                    if (hours) hoursDisplay = `${Math.floor(hours.minutes/60)}h ${String(hours.minutes%60).padStart(2,'0')}m`;
                 }
                 return `${deptHeader}
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; padding:0.3rem 0; border-bottom:1px solid var(--color-border);">
                     <span>${name}</span>
                     <div style="display:flex; align-items:center; gap:1rem;">
                         ${hoursDisplay ? `<span style="color:var(--color-text-light);">${hoursDisplay}</span>` : ''}
-                        <span style="font-weight:600; min-width:4rem; text-align:right;">${((r.card + r.cash)).toFixed(2)} €</span>
+                        <span style="font-weight:600; min-width:4rem; text-align:right;">${(r.card + r.cash).toFixed(2)} €</span>
                     </div>
                 </div>`;
             }).join('');
