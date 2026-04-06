@@ -678,7 +678,8 @@ async function saveShift(payload, repeat, weeks) {
         return;
     }
     closeShiftModal();
-    await loadWeekGrid();
+    await updateShiftCell(currentShiftEmployeeId, currentShiftDateStr);
+    await refreshHoursOverview();
     if (payload.employee_id) {
         if (!editShiftId && repeat && weeks > 1) {
             for (let i = 0; i < weeks; i++) {
@@ -707,7 +708,8 @@ async function deleteShift() {
         return;
     }
     closeShiftModal();
-    await loadWeekGrid();
+    await updateShiftCell(currentShiftEmployeeId, currentShiftDateStr);
+    await refreshHoursOverview();
     await syncTipHoursForShift(currentShiftEmployeeId, currentShiftDateStr);
 }
 
