@@ -4578,7 +4578,6 @@ async function loadTrinkgeld() {
 
     // Pro Tag berechnen
     const empMonthTotals = {};
-    const fixedMonthTotals = {};
     const dayResults = {};
 
     for (const dateStr of allDates) {
@@ -4592,15 +4591,11 @@ async function loadTrinkgeld() {
         if (!depts || depts.length === 0) continue;
 
         for (const dept of depts) {
-            if (dept.fixed_hours_per_month) continue;
             const deptDayCard = dayCard * (dept.percentage / 100);
             const deptDayCash = dayCash * (dept.percentage / 100);
 
-            const fixedDepts = (depts || []).filter(d => d.pool_department === dept.department && d.fixed_hours_per_month);
-            let totalDeptMinutes = 0;
-            fixedDepts.forEach(d => { totalDeptMinutes += (d.fixed_hours_per_month / daysInMonth) * 60; });
-
             const empDayMinutes = {};
+            let totalDeptMinutes = 0;
             for (const h of dayHours) {
                 if (h.employees_planit.department !== dept.department) continue;
                 empDayMinutes[h.employee_id] = h.minutes;
@@ -4608,18 +4603,6 @@ async function loadTrinkgeld() {
             }
 
             if (totalDeptMinutes === 0) continue;
-
-            for (const fixedDept of fixedDepts) {
-                    const fixedMins = (fixedDept.fixed_hours_per_month / daysInMonth) * 60;
-                    const share = fixedMins / totalDeptMinutes;
-                    if (!dayResults[dateStr].empResults[fixedDept.department]) dayResults[dateStr].empResults[fixedDept.department] = { card: 0, cash: 0, isFixed: true };
-                    dayResults[dateStr].empResults[fixedDept.department].card += deptDayCard * share;
-                    dayResults[dateStr].empResults[fixedDept.department].cash += deptDayCash * share;
-                    // Monatssumme für Bäckerei
-                    if (!fixedMonthTotals[fixedDept.department]) fixedMonthTotals[fixedDept.department] = { card: 0, cash: 0 };
-                    fixedMonthTotals[fixedDept.department].card += deptDayCard * share;
-                    fixedMonthTotals[fixedDept.department].cash += deptDayCash * share;
-                }
 
             for (const [empId, minutes] of Object.entries(empDayMinutes)) {
                 const share = minutes / totalDeptMinutes;
@@ -4645,37 +4628,29 @@ async function loadTrinkgeld() {
             const total = (d.card + d.cash).toFixed(2);
 
             // Nach Abteilung gruppieren
-            const empResultsSorted = Object.entries(d.empResults).sort(([aId, aR], [bId, bR]) => {
+            const empResultsSorted = Object.entries(d.empResults).sort(([aId], [bId]) => {
                 const aEmp = (tipHours || []).find(h => h.employee_id === aId);
                 const bEmp = (tipHours || []).find(h => h.employee_id === bId);
-                const aDept = aR.isFixed ? 'zzz' : (aEmp ? aEmp.employees_planit.department : 'zzz');
-                const bDept = bR.isFixed ? 'zzz' : (bEmp ? bEmp.employees_planit.department : 'zzz');
+                const aDept = aEmp ? aEmp.employees_planit.department : 'zzz';
+                const bDept = bEmp ? bEmp.employees_planit.department : 'zzz';
                 return aDept.localeCompare(bDept);
             });
 
             let lastDept = null;
-                const empRows = empResultsSorted.map(([empId, r]) => {
+            const empRows = empResultsSorted.map(([empId, r]) => {
                 const emp = (tipHours || []).find(h => h.employee_id === empId);
                 const name = emp ? emp.employees_planit.name : empId;
-                const currentDept = r.isFixed ? empId : (emp ? emp.employees_planit.department : null);
+                const currentDept = emp ? emp.employees_planit.department : null;
                 let deptHeader = '';
                 if (currentDept && currentDept !== lastDept) {
                     lastDept = currentDept;
                     deptHeader = `<div style="font-size:0.75rem; font-weight:700; color:var(--color-primary); padding:0.4rem 0 0.2rem; letter-spacing:0.05em;">${currentDept.toUpperCase()}</div>`;
                 }
                 const hours = d.hours.find(h => h.employee_id === empId);
-                let hoursDisplay = hours ? `${Math.floor(hours.minutes/60)}h ${String(hours.minutes%60).padStart(2,'0')}m` : '';
-                // Fixer Anteil — tägliche Stunden berechnen
-                if (!hoursDisplay && r.isFixed && depts) {
-                    const fixedDept = depts.find(d => d.department === empId);
-                    if (fixedDept && fixedDept.fixed_hours_per_month) {
-                        const dailyMins = (fixedDept.fixed_hours_per_month / daysInMonth) * 60;
-                        hoursDisplay = `${Math.floor(dailyMins/60)}h ${String(Math.round(dailyMins%60)).padStart(2,'0')}m`;
-                    }
-                }
+                const hoursDisplay = hours ? `${Math.floor(hours.minutes/60)}h ${String(hours.minutes%60).padStart(2,'0')}m` : '';
                 return `${deptHeader}
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; padding:0.3rem 0; border-bottom:1px solid var(--color-border);">
-                    ${r.isFixed ? '<span style="color:var(--color-text-light);">Pool</span>' : `<span>${name}</span>`}
+                    <span>${name}</span>
                     <div style="display:flex; align-items:center; gap:1rem;">
                         ${hoursDisplay ? `<span style="color:var(--color-text-light);">${hoursDisplay}</span>` : ''}
                         <span style="font-weight:600; min-width:4rem; text-align:right;">${((r.card + r.cash)).toFixed(2)} €</span>
@@ -4762,18 +4737,7 @@ async function loadTrinkgeld() {
                                         ${empHoursDisplay ? `<div style="font-size:0.8rem; color:var(--color-text-light);">${empHoursDisplay}</div>` : ''}
                                     </div>
                                 </div>`;
-            }).join('')}
-            ${Object.entries(fixedMonthTotals).map(([dept, totals]) => `
-                <div style="font-size:0.75rem; font-weight:700; color:var(--color-primary); padding:0.5rem 0 0.25rem; letter-spacing:0.05em;">${dept.toUpperCase()}</div>
-                <div class="list-item" style="opacity:0.7;">
-                    <div class="list-item-info">
-                        <p>Karte: ${totals.card.toFixed(2)} € | Bar: ${totals.cash.toFixed(2)} €</p>
-                    </div>
-                    <div style="text-align:right;">
-                        <div style="font-weight:700; color:var(--color-text-light);">${(totals.card + totals.cash).toFixed(2)} €</div>
-                    </div>
-                </div>
-            `).join('')}`;
+            }).join('')}`;
     }
 }
 
