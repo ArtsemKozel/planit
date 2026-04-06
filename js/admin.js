@@ -1,5 +1,6 @@
 let adminSession = null;
 let employees = [];
+let departmentNames = [];
 let weekDate = new Date();
 let adminAvailDate = new Date();
 let editShiftId = null;
@@ -32,6 +33,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadEmployees();
     populateAvailEmployeeSelect();
     await Promise.all([
+        loadDepartmentNames(),
         loadWeekGrid(),
         loadAdminVacations(),
         loadAdminSwaps(),
@@ -491,7 +493,7 @@ async function openShiftModal(employeeId, dateStr, existingShift) {
     document.getElementById('shift-employee').closest('.form-group').style.opacity = existingShift?.is_open ? '0.4' : '1';
     document.getElementById('shift-open-note-group').style.display = existingShift?.is_open ? 'block' : 'none';
     document.getElementById('shift-dept-group').style.display = existingShift?.is_open ? 'block' : 'none';
-    document.getElementById('shift-department').value = existingShift?.department || 'Service';
+    populateDeptSelect(document.getElementById('shift-department'), existingShift?.department || departmentNames[0] || '');
     document.getElementById('shift-actual-group').style.display = existingShift ? 'block' : 'none';
     document.getElementById('shift-actual-body').style.display = 'none';
     document.getElementById('shift-actual-toggle').textContent = '▶';
@@ -1648,6 +1650,7 @@ function openNewEmployeeModal() {
     document.getElementById('new-emp-name').value = '';
     document.getElementById('new-emp-code').value = '';
     document.getElementById('new-emp-password').value = '';
+    populateDeptSelect(document.getElementById('new-emp-department'), departmentNames[0] || '');
 }
 
 function closeNewEmployeeModal() {
@@ -1705,6 +1708,18 @@ async function submitNewEmployee() {
 }
 
 // ── ABTEILUNGEN ───────────────────────────────────────────
+async function loadDepartmentNames() {
+    const { data } = await db.from('planit_departments').select('name').eq('user_id', adminSession.user.id).order('name');
+    departmentNames = (data || []).map(d => d.name);
+}
+
+function populateDeptSelect(selectEl, selectedValue) {
+    selectEl.innerHTML = departmentNames.map(name =>
+        `<option value="${name}" ${name === selectedValue ? 'selected' : ''}>${name}</option>`
+    ).join('');
+    if (selectedValue) selectEl.value = selectedValue;
+}
+
 function toggleDepartmentsSection() {
     const body = document.getElementById('departments-body');
     const toggle = document.getElementById('departments-toggle');
@@ -1737,12 +1752,14 @@ async function addDepartment() {
     if (!name) return;
     await db.from('planit_departments').insert({ user_id: adminSession.user.id, name });
     input.value = '';
+    await loadDepartmentNames();
     await loadDepartments();
 }
 
 async function deleteDepartment(id) {
     if (!confirm('Abteilung wirklich löschen?')) return;
     await db.from('planit_departments').delete().eq('id', id);
+    await loadDepartmentNames();
     await loadDepartments();
 }
 
@@ -1939,7 +1956,7 @@ function openEditEmployeeModal(id) {
     document.getElementById('edit-emp-name').value = emp.name;
     document.getElementById('edit-emp-code').value = emp.login_code || '';
     document.getElementById('edit-emp-password').value = emp.password_hash || '';
-    document.getElementById('edit-emp-department').value = emp.department || 'Allgemein';
+    populateDeptSelect(document.getElementById('edit-emp-department'), emp.department || departmentNames[0] || '');
     document.getElementById('edit-emp-error').style.display = 'none';
     document.getElementById('edit-emp-birthdate').value = emp.birthdate || '';
     document.getElementById('edit-emp-vacation-days').value = emp.vacation_days_per_year ?? 20;
