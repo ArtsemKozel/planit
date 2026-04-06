@@ -1969,7 +1969,7 @@ function openEditEmployeeModal(id) {
     populateDeptSelect(document.getElementById('edit-emp-department'), emp.department || departmentNames[0] || '');
     const extraDepts = (emp.departments || '').split(',').map(s => s.trim()).filter(Boolean);
     const checksContainer = document.getElementById('edit-emp-departments-checks');
-    checksContainer.innerHTML = departmentNames.map(name => `
+    checksContainer.innerHTML = departmentNames.filter(name => name !== (emp.department || departmentNames[0])).map(name => `
         <label style="display:flex; align-items:center; gap:0.35rem; font-size:0.9rem; background:#F5F5F5; padding:0.35rem 0.6rem; border-radius:8px; cursor:pointer;">
             <input type="checkbox" value="${name}" ${extraDepts.includes(name) ? 'checked' : ''} style="width:auto;">
             ${name}
