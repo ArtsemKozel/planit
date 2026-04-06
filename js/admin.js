@@ -4576,13 +4576,25 @@ async function loadTrinkgeld() {
         allDates.push(`${monthStr}-${String(d).padStart(2, '0')}`);
     }
 
-    // Pool-Abteilungen: monatliche Gesamtstunden aus tip_hours (für täglichen Durchschnitt)
+    // Pool-Abteilungen: monatliche Gesamtstunden + Monatsanteile pro Mitarbeiter (für täglichen Durchschnitt)
     const poolDeptMonthMinutes = {};
+    const poolEmpMonthShares = {}; // dept.department → { empId: share (0–1) }
     for (const dept of (depts || [])) {
         if (!dept.pool_department) continue;
-        poolDeptMonthMinutes[dept.department] = (tipHours || [])
-            .filter(h => h.employees_planit.department === dept.department)
-            .reduce((sum, h) => sum + h.minutes, 0);
+        const deptHours = (tipHours || []).filter(h => h.employees_planit.department === dept.department);
+        const totalMins = deptHours.reduce((sum, h) => sum + h.minutes, 0);
+        poolDeptMonthMinutes[dept.department] = totalMins;
+        // Monatlichen Anteil pro Mitarbeiter berechnen
+        const empTotals = {};
+        for (const h of deptHours) {
+            empTotals[h.employee_id] = (empTotals[h.employee_id] || 0) + h.minutes;
+        }
+        poolEmpMonthShares[dept.department] = {};
+        if (totalMins > 0) {
+            for (const [empId, mins] of Object.entries(empTotals)) {
+                poolEmpMonthShares[dept.department][empId] = mins / totalMins;
+            }
+        }
     }
 
     // Pro Tag berechnen
@@ -4636,23 +4648,13 @@ async function loadTrinkgeld() {
                 empMonthTotals[empId].cash += deptDayCash * share;
             }
 
-            // Pool-Anteil auf individuelle Pool-Mitarbeiter nach echten Tagesstunden verteilen
+            // Pool-Anteil auf individuelle Pool-Mitarbeiter nach monatlichem Anteil verteilen (tägl. Durchschnitt)
             for (const poolDept of poolDepts) {
                 const poolShare = poolDailyAvg[poolDept.department] / totalDeptMinutes;
                 const poolDayCard = deptDayCard * poolShare;
                 const poolDayCash = deptDayCash * poolShare;
-
-                const poolEmpMinutes = {};
-                let poolTotalMins = 0;
-                for (const h of dayHours) {
-                    if (h.employees_planit.department !== poolDept.department) continue;
-                    poolEmpMinutes[h.employee_id] = h.minutes;
-                    poolTotalMins += h.minutes;
-                }
-                if (poolTotalMins === 0) continue;
-
-                for (const [empId, minutes] of Object.entries(poolEmpMinutes)) {
-                    const empShare = minutes / poolTotalMins;
+                const shares = poolEmpMonthShares[poolDept.department] || {};
+                for (const [empId, empShare] of Object.entries(shares)) {
                     if (!dayResults[dateStr].empResults[empId]) dayResults[dateStr].empResults[empId] = { card: 0, cash: 0 };
                     dayResults[dateStr].empResults[empId].card += poolDayCard * empShare;
                     dayResults[dateStr].empResults[empId].cash += poolDayCash * empShare;
@@ -4675,26 +4677,38 @@ async function loadTrinkgeld() {
             const total = (d.card + d.cash).toFixed(2);
 
             // Nach Abteilung gruppieren
+            const getEmpInfo = (empId) => {
+                const fromHours = (tipHours || []).find(h => h.employee_id === empId);
+                if (fromHours) return { name: fromHours.employees_planit.name, department: fromHours.employees_planit.department };
+                const fromEmp = employees.find(e => e.id === empId);
+                return fromEmp ? { name: fromEmp.name, department: fromEmp.department } : { name: empId, department: null };
+            };
             const empResultsSorted = Object.entries(d.empResults).sort(([aId], [bId]) => {
-                const aEmp = (tipHours || []).find(h => h.employee_id === aId);
-                const bEmp = (tipHours || []).find(h => h.employee_id === bId);
-                const aDept = aEmp ? aEmp.employees_planit.department : 'zzz';
-                const bDept = bEmp ? bEmp.employees_planit.department : 'zzz';
+                const aDept = getEmpInfo(aId).department || 'zzz';
+                const bDept = getEmpInfo(bId).department || 'zzz';
                 return aDept.localeCompare(bDept);
             });
 
             let lastDept = null;
             const empRows = empResultsSorted.map(([empId, r]) => {
-                const emp = (tipHours || []).find(h => h.employee_id === empId);
-                const name = emp ? emp.employees_planit.name : empId;
-                const currentDept = emp ? emp.employees_planit.department : null;
+                const { name, department: currentDept } = getEmpInfo(empId);
                 let deptHeader = '';
                 if (currentDept && currentDept !== lastDept) {
                     lastDept = currentDept;
                     deptHeader = `<div style="font-size:0.75rem; font-weight:700; color:var(--color-primary); padding:0.4rem 0 0.2rem; letter-spacing:0.05em;">${currentDept.toUpperCase()}</div>`;
                 }
                 const hours = d.hours.find(h => h.employee_id === empId);
-                const hoursDisplay = hours ? `${Math.floor(hours.minutes/60)}h ${String(hours.minutes%60).padStart(2,'0')}m` : '';
+                let hoursDisplay = '';
+                if (hours) {
+                    hoursDisplay = `${Math.floor(hours.minutes/60)}h ${String(hours.minutes%60).padStart(2,'0')}m`;
+                } else {
+                    // Pool-Mitarbeiter: täglichen Durchschnitt anzeigen
+                    const poolDeptName = Object.keys(poolEmpMonthShares).find(dept => poolEmpMonthShares[dept][empId] !== undefined);
+                    if (poolDeptName) {
+                        const avgMins = (poolDeptMonthMinutes[poolDeptName] || 0) / daysInMonth;
+                        if (avgMins > 0) hoursDisplay = `⌀ ${Math.floor(avgMins/60)}h ${String(Math.round(avgMins%60)).padStart(2,'0')}m`;
+                    }
+                }
                 return `${deptHeader}
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; padding:0.3rem 0; border-bottom:1px solid var(--color-border);">
                     <span>${name}</span>
