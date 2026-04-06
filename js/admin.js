@@ -273,7 +273,10 @@ async function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
         return;
     }
 
-    const departments = [...new Set(employees.map(e => e.department || 'Allgemein'))];
+    // Abteilungen aus Mitarbeiter-Stammdaten + Schicht-Abteilungen dieser Woche
+    const empDepts = employees.map(e => e.department || 'Allgemein');
+    const shiftDepts = shifts.filter(s => !s.is_open && s.department).map(s => s.department);
+    const departments = [...new Set([...empDepts, ...shiftDepts])];
 
     departments.forEach(dept => {
         addDayHeaders(dept.toUpperCase());
@@ -297,7 +300,9 @@ async function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
             grid.appendChild(cell);
         });
 
-        const deptEmployees = employees.filter(e => (e.department || 'Allgemein') === dept);
+        // Nur Mitarbeiter zeigen die diese Woche eine Schicht in dieser Abteilung haben
+        const deptShiftEmpIds = [...new Set(shifts.filter(s => !s.is_open && s.department === dept).map(s => s.employee_id))];
+        const deptEmployees = deptShiftEmpIds.map(id => employees.find(e => e.id === id)).filter(Boolean);
         deptEmployees.forEach(emp => {
             const empCell = document.createElement('div');
             empCell.className = 'week-employee';
@@ -317,7 +322,7 @@ async function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
 
             days.forEach(d => {
                 const dateStr = d.toISOString().split('T')[0];
-                const shift = shifts.find(s => s.employee_id === emp.id && s.shift_date === dateStr);
+                const shift = shifts.find(s => s.employee_id === emp.id && s.shift_date === dateStr && s.department === dept);
                 const cell = document.createElement('div');
                 cell.className = 'week-cell' + (shift ? ' has-shift' : '');
                 cell.style.whiteSpace = 'pre';
