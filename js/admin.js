@@ -273,10 +273,14 @@ async function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
         return;
     }
 
-    // Abteilungen aus Mitarbeiter-Stammdaten + Schicht-Abteilungen dieser Woche
-    const empDepts = employees.map(e => e.department || 'Allgemein');
-    const shiftDepts = shifts.filter(s => !s.is_open && s.department).map(s => s.department);
-    const departments = [...new Set([...empDepts, ...shiftDepts])];
+    // Alle Abteilungen eines Mitarbeiters (Haupt + Zusatz)
+    const getEmpDepartments = (emp) => {
+        const main = emp.department || 'Allgemein';
+        const extra = (emp.departments || '').split(',').map(s => s.trim()).filter(Boolean);
+        return [...new Set([main, ...extra])];
+    };
+
+    const departments = [...new Set(employees.flatMap(e => getEmpDepartments(e)))];
 
     departments.forEach(dept => {
         addDayHeaders(dept.toUpperCase());
@@ -300,14 +304,8 @@ async function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
             grid.appendChild(cell);
         });
 
-        // Hauptabteilung-Mitarbeiter + Fremd-Mitarbeiter mit Schicht in dieser Abteilung
-        const homeEmps = employees.filter(e => (e.department || 'Allgemein') === dept);
-        const homeEmpIds = new Set(homeEmps.map(e => e.id));
-        const crossEmpIds = [...new Set(shifts.filter(s => !s.is_open && s.department === dept && !homeEmpIds.has(s.employee_id)).map(s => s.employee_id))];
-        const crossEmps = crossEmpIds.map(id => employees.find(e => e.id === id)).filter(Boolean);
-        const deptEmployees = [...homeEmps, ...crossEmps];
+        const deptEmployees = employees.filter(e => getEmpDepartments(e).includes(dept));
         deptEmployees.forEach(emp => {
-        const isHome = homeEmpIds.has(emp.id);
             const empCell = document.createElement('div');
             empCell.className = 'week-employee';
             const parts = emp.name.trim().split(' ');
@@ -326,7 +324,7 @@ async function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
 
             days.forEach(d => {
                 const dateStr = d.toISOString().split('T')[0];
-                const shift = shifts.find(s => s.employee_id === emp.id && s.shift_date === dateStr && !s.is_open && (isHome || s.department === dept));
+                const shift = shifts.find(s => s.employee_id === emp.id && s.shift_date === dateStr && !s.is_open);
                 const cell = document.createElement('div');
                 cell.className = 'week-cell' + (shift ? ' has-shift' : '');
                 cell.style.whiteSpace = 'pre';
@@ -1969,6 +1967,14 @@ function openEditEmployeeModal(id) {
     document.getElementById('edit-emp-code').value = emp.login_code || '';
     document.getElementById('edit-emp-password').value = emp.password_hash || '';
     populateDeptSelect(document.getElementById('edit-emp-department'), emp.department || departmentNames[0] || '');
+    const extraDepts = (emp.departments || '').split(',').map(s => s.trim()).filter(Boolean);
+    const checksContainer = document.getElementById('edit-emp-departments-checks');
+    checksContainer.innerHTML = departmentNames.map(name => `
+        <label style="display:flex; align-items:center; gap:0.35rem; font-size:0.9rem; background:#F5F5F5; padding:0.35rem 0.6rem; border-radius:8px; cursor:pointer;">
+            <input type="checkbox" value="${name}" ${extraDepts.includes(name) ? 'checked' : ''} style="width:auto;">
+            ${name}
+        </label>
+    `).join('');
     document.getElementById('edit-emp-error').style.display = 'none';
     document.getElementById('edit-emp-birthdate').value = emp.birthdate || '';
     document.getElementById('edit-emp-vacation-days').value = emp.vacation_days_per_year ?? 20;
@@ -2053,6 +2059,8 @@ async function submitEditEmployee() {
     const loginCode = document.getElementById('edit-emp-code').value.trim();
     const password = document.getElementById('edit-emp-password').value.trim();
     const department = document.getElementById('edit-emp-department').value;
+    const checkedDepts = [...document.querySelectorAll('#edit-emp-departments-checks input[type=checkbox]:checked')].map(cb => cb.value);
+    const departments = checkedDepts.join(',') || null;
     const birthdate = document.getElementById('edit-emp-birthdate').value || null;
     const vacationDays = parseInt(document.getElementById('edit-emp-vacation-days').value) || 20;
     const startDate = document.getElementById('edit-emp-start-date').value || null;
@@ -2067,7 +2075,7 @@ async function submitEditEmployee() {
     }
 
     const is_apprentice = document.getElementById('edit-emp-apprentice').checked;
-    const payload = { name, login_code: loginCode, department, birthdate, vacation_days_per_year: vacationDays, is_apprentice, start_date: startDate, hours_per_vacation_day: hoursPerVacationDay };
+    const payload = { name, login_code: loginCode, department, departments, birthdate, vacation_days_per_year: vacationDays, is_apprentice, start_date: startDate, hours_per_vacation_day: hoursPerVacationDay };
     if (password) payload.password_hash = password;
 
     const { error } = await db.from('employees_planit').update(payload).eq('id', editEmployeeId);
