@@ -1262,6 +1262,13 @@
     </div>
 </div>
 
+<!-- SHIFT CONTEXT MENU -->
+<div id="shift-context-menu" style="display:none; position:fixed; z-index:9999; background:white; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.18); min-width:220px; overflow:hidden;">
+    <button onclick="ctxDeleteShift()" style="display:block; width:100%; padding:0.85rem 1rem; text-align:left; background:none; border:none; border-bottom:1px solid var(--color-border); font-size:0.9rem; cursor:pointer; color:var(--color-danger);">Diese Schicht löschen</button>
+    <button onclick="ctxDeleteEmpWeek()" style="display:block; width:100%; padding:0.85rem 1rem; text-align:left; background:none; border:none; border-bottom:1px solid var(--color-border); font-size:0.9rem; cursor:pointer;">Alle Schichten dieses Mitarbeiters diese Woche</button>
+    <button onclick="ctxDeleteDeptWeek()" style="display:block; width:100%; padding:0.85rem 1rem; text-align:left; background:none; border:none; font-size:0.9rem; cursor:pointer;">Alle Schichten dieser Abteilung diese Woche</button>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/auth.js"></script>
 <script src="js/admin.js"></script>

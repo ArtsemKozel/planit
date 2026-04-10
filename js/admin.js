@@ -23,6 +23,102 @@ let currentShiftDateStr = null;
 let trinkgeldDate = new Date();
 window.window.inventurSortMode = 'inventory';
 
+// ── SCHICHT KONTEXTMENÜ ───────────────────────────────────
+let _ctxShift = null;
+let _ctxDept = null;
+let _ctxLongPressTimer = null;
+
+function _showShiftContextMenu(e, shift, dept) {
+    if (!shift) return;
+    e.preventDefault();
+    e.stopPropagation();
+    _ctxShift = shift;
+    _ctxDept = dept;
+    const menu = document.getElementById('shift-context-menu');
+    menu.style.display = 'block';
+    const x = e.clientX ?? (e.touches?.[0]?.clientX ?? 0);
+    const y = e.clientY ?? (e.touches?.[0]?.clientY ?? 0);
+    const mw = 240, mh = 130;
+    menu.style.left = Math.min(x, window.innerWidth - mw) + 'px';
+    menu.style.top  = Math.min(y, window.innerHeight - mh) + 'px';
+}
+
+function closeShiftContextMenu() {
+    document.getElementById('shift-context-menu').style.display = 'none';
+    _ctxShift = null;
+    _ctxDept = null;
+}
+
+document.addEventListener('click', e => {
+    const menu = document.getElementById('shift-context-menu');
+    if (menu && !menu.contains(e.target)) closeShiftContextMenu();
+});
+
+document.addEventListener('contextmenu', e => {
+    if (!e.target.closest('#shift-context-menu')) closeShiftContextMenu();
+});
+
+async function ctxDeleteShift() {
+    if (!_ctxShift) return;
+    if (!confirm(`Schicht am ${_ctxShift.shift_date} wirklich löschen?`)) { closeShiftContextMenu(); return; }
+    const id = _ctxShift.id;
+    const empId = _ctxShift.employee_id;
+    const date = _ctxShift.shift_date;
+    closeShiftContextMenu();
+    await db.from('shifts').delete().eq('id', id);
+    await syncTipHoursForShift(empId, date);
+    await loadWeekGrid();
+}
+
+async function ctxDeleteEmpWeek() {
+    if (!_ctxShift) return;
+    const emp = employees.find(e => e.id === _ctxShift.employee_id);
+    const name = emp?.name || 'diesen Mitarbeiter';
+    const monday = getMonday(weekDate);
+    const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+    const firstDay = monday.toISOString().split('T')[0];
+    const lastDay  = sunday.toISOString().split('T')[0];
+    if (!confirm(`Alle Schichten von ${name} diese Woche (${firstDay} – ${lastDay}) löschen?`)) { closeShiftContextMenu(); return; }
+    const empId = _ctxShift.employee_id;
+    closeShiftContextMenu();
+    const { data: toDelete } = await db.from('shifts').select('id, shift_date')
+        .eq('user_id', adminSession.user.id).eq('employee_id', empId)
+        .gte('shift_date', firstDay).lte('shift_date', lastDay).eq('is_open', false);
+    if (toDelete?.length) {
+        await db.from('shifts').delete().in('id', toDelete.map(s => s.id));
+        for (const s of toDelete) await syncTipHoursForShift(empId, s.shift_date);
+    }
+    await loadWeekGrid();
+}
+
+async function ctxDeleteDeptWeek() {
+    if (!_ctxDept) return;
+    const monday = getMonday(weekDate);
+    const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+    const firstDay = monday.toISOString().split('T')[0];
+    const lastDay  = sunday.toISOString().split('T')[0];
+    if (!confirm(`Alle Schichten der Abteilung "${_ctxDept}" diese Woche (${firstDay} – ${lastDay}) löschen?`)) { closeShiftContextMenu(); return; }
+    const dept = _ctxDept;
+    closeShiftContextMenu();
+    const { data: toDelete } = await db.from('shifts').select('id, employee_id, shift_date')
+        .eq('user_id', adminSession.user.id).eq('department', dept)
+        .gte('shift_date', firstDay).lte('shift_date', lastDay).eq('is_open', false);
+    if (toDelete?.length) {
+        await db.from('shifts').delete().in('id', toDelete.map(s => s.id));
+        for (const s of toDelete) await syncTipHoursForShift(s.employee_id, s.shift_date);
+    }
+    await loadWeekGrid();
+}
+
+function _attachShiftContextMenu(cell, shift, dept) {
+    cell.addEventListener('contextmenu', e => _showShiftContextMenu(e, shift, dept));
+    cell.addEventListener('touchstart', e => {
+        _ctxLongPressTimer = setTimeout(() => _showShiftContextMenu(e, shift, dept), 500);
+    }, { passive: true });
+    cell.addEventListener('touchend',   () => clearTimeout(_ctxLongPressTimer), { passive: true });
+    cell.addEventListener('touchmove',  () => clearTimeout(_ctxLongPressTimer), { passive: true });
+}
+
 // ── INIT ──────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
     adminSession = await requireAdminSession();
@@ -400,6 +496,7 @@ async function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
                 cell.dataset.cell = `${emp.id}_${dateStr}`;
                 cell.dataset.dept = dept;
                 cell.onclick = () => openShiftModal(emp.id, dateStr, shift, dept);
+                if (shift) _attachShiftContextMenu(cell, shift, dept);
                 grid.appendChild(cell);
             });
         });
