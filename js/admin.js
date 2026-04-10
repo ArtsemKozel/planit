@@ -538,8 +538,8 @@ async function openShiftModal(employeeId, dateStr, existingShift, defaultDept) {
     document.getElementById('shift-actual-group').style.display = existingShift ? 'block' : 'none';
     document.getElementById('shift-actual-body').style.display = 'none';
     document.getElementById('shift-actual-toggle').textContent = '▶';
-    document.getElementById('shift-actual-start').value = existingShift?.actual_start_time ? existingShift.actual_start_time.slice(0, 5) : (existingShift?.start_time ? existingShift.start_time.slice(0, 5) : '');
-    document.getElementById('shift-actual-end').value = existingShift?.actual_end_time ? existingShift.actual_end_time.slice(0, 5) : (existingShift?.end_time ? existingShift.end_time.slice(0, 5) : '');
+    document.getElementById('shift-actual-start').value = existingShift?.actual_start_time ? existingShift.actual_start_time.slice(0, 5) : '';
+    document.getElementById('shift-actual-end').value = existingShift?.actual_end_time ? existingShift.actual_end_time.slice(0, 5) : '';
     document.getElementById('shift-actual-break').value = existingShift?.actual_break_minutes ?? '';
     document.getElementById('shift-repeat').checked = false;
     document.getElementById('shift-repeat-group').style.display = 'none';
