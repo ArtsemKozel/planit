@@ -1407,8 +1407,8 @@ async function loadOverview() {
             const isPast = s.shift_date < today;
             const innerBg = isPast ? '#C9A24D' : 'white';
             const innerBorder = highlighted ? `box-shadow:0 0 0 2px var(--color-primary);` : '';
-            const row = document.createElement('div');
-            row.style.cssText = `display:flex; align-items:center; gap:1rem; padding:0.75rem; border-radius:12px; margin-bottom:0.5rem; background:var(--color-gray); cursor:pointer;`;
+            const row = document.createElement('button');
+            row.style.cssText = `display:flex; align-items:center; gap:1rem; padding:0.75rem; border-radius:12px; margin-bottom:0.5rem; background:var(--color-gray); cursor:pointer; width:100%; border:none; text-align:left; touch-action:manipulation;`;
             row.innerHTML = `
                 <div style="min-width:2.5rem; text-align:center;">
                     <div style="font-size:1.3rem; font-weight:700; line-height:1; color:#2C3E50;">${d.getDate()}</div>
