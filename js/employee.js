@@ -2041,7 +2041,7 @@ async function openColleaguesModal(shift) {
 
     const { data: dayShifts, error } = await db
         .from('shifts')
-        .select('*, employees_planit(name)')
+        .select('*, employees_planit!shifts_employee_id_fkey(name)')
         .eq('user_id', currentEmployee.user_id)
         .eq('shift_date', dateStr)
         .eq('is_open', false)
