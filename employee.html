@@ -385,6 +385,17 @@
 
 </div>
 
+<!-- MODAL: KOLLEGEN AN DIESEM TAG -->
+<div id="colleagues-modal" class="modal-overlay" onclick="if(event.target===this)closeColleaguesModal()">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="modal-title" id="colleagues-modal-title">Kollegen</span>
+            <button class="modal-close" onclick="closeColleaguesModal()">✕</button>
+        </div>
+        <div id="colleagues-modal-body" style="padding:1rem;"></div>
+    </div>
+</div>
+
 <!-- MODAL: URLAUBSKONTO ERKLÄRUNG -->
 <div id="emp-vac-day-modal" class="modal-overlay" onclick="if(event.target===this)closeEmpVacDayModal()">
     <div class="modal">

@@ -1408,7 +1408,7 @@ async function loadOverview() {
             const innerBg = isPast ? '#C9A24D' : 'white';
             const innerBorder = highlighted ? `box-shadow:0 0 0 2px var(--color-primary);` : '';
             const row = document.createElement('div');
-            row.style.cssText = `display:flex; align-items:center; gap:1rem; padding:0.75rem; border-radius:12px; margin-bottom:0.5rem; background:var(--color-gray);`;
+            row.style.cssText = `display:flex; align-items:center; gap:1rem; padding:0.75rem; border-radius:12px; margin-bottom:0.5rem; background:var(--color-gray); cursor:pointer;`;
             row.innerHTML = `
                 <div style="min-width:2.5rem; text-align:center;">
                     <div style="font-size:1.3rem; font-weight:700; line-height:1; color:#2C3E50;">${d.getDate()}</div>
@@ -1419,6 +1419,7 @@ async function loadOverview() {
                     ${s.notes ? `<div style="font-size:0.8rem; color:var(--color-text-light);">${s.notes}</div>` : ''}
                 </div>
             `;
+            row.onclick = () => openColleaguesModal(s);
             return row;
         };
 
@@ -2023,4 +2024,44 @@ async function submitEmpInventur() {
         submitted_at: new Date().toISOString()
     });
     alert('Inventur wurde abgeschlossen und gespeichert!');
+}
+// ── KOLLEGEN-MODAL ────────────────────────────────────────
+async function openColleaguesModal(shift) {
+    const dateStr = shift.shift_date;
+    const myDept = shift.department || currentEmployee.department;
+    const d = new Date(dateStr + 'T12:00:00');
+    const dayNames = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+    const label = `${d.getDate()}. ${d.toLocaleDateString('de-DE', { month: 'long' })} — ${dayNames[d.getDay()]}`;
+
+    document.getElementById('colleagues-modal-title').textContent = label;
+    document.getElementById('colleagues-modal-body').innerHTML = '<div style="color:var(--color-text-light); font-size:0.9rem;">Lädt…</div>';
+    document.getElementById('colleagues-modal').classList.add('open');
+
+    const { data: dayShifts } = await db
+        .from('shifts')
+        .select('*, employees_planit(name)')
+        .eq('user_id', currentEmployee.user_id)
+        .eq('shift_date', dateStr)
+        .eq('is_open', false)
+        .neq('employee_id', currentEmployee.id);
+
+    const colleagues = (dayShifts || []).filter(s => (s.department || currentEmployee.department) === myDept);
+
+    const body = document.getElementById('colleagues-modal-body');
+    if (colleagues.length === 0) {
+        body.innerHTML = '<div style="color:var(--color-text-light); font-size:0.9rem;">Keine Kollegen an diesem Tag in deiner Abteilung.</div>';
+        return;
+    }
+
+    colleagues.sort((a, b) => a.start_time.localeCompare(b.start_time));
+    body.innerHTML = colleagues.map(s => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:0.6rem 0; border-bottom:1px solid var(--color-border);">
+            <div style="font-weight:600; font-size:0.95rem;">${s.employees_planit?.name || '—'}</div>
+            <div style="font-size:0.85rem; color:var(--color-text-light);">${s.start_time.slice(0,5)} – ${s.end_time.slice(0,5)}</div>
+        </div>
+    `).join('');
+}
+
+function closeColleaguesModal() {
+    document.getElementById('colleagues-modal').classList.remove('open');
 }
