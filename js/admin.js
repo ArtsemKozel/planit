@@ -4,6 +4,7 @@ let departmentNames = [];
 let weekDate = new Date();
 let adminAvailDate = new Date();
 let editShiftId = null;
+let _shiftModalScrollY = 0;
 let planningMode = false;
 let availabilityCache = {};
 let urlaubYear = new Date().getFullYear();
@@ -504,6 +505,7 @@ function getMonday(date) {
 
 // ── SCHICHT MODAL ─────────────────────────────────────────
 async function openShiftModal(employeeId, dateStr, existingShift, defaultDept) {
+    _shiftModalScrollY = window.scrollY;
     currentShiftEmployeeId = employeeId;
     currentShiftDateStr = dateStr;
     editShiftId = existingShift ? existingShift.id : null;
@@ -551,6 +553,7 @@ async function openShiftModal(employeeId, dateStr, existingShift, defaultDept) {
 function closeShiftModal() {
     document.getElementById('shift-modal').classList.remove('open');
     editShiftId = null;
+    window.scrollTo({ top: _shiftModalScrollY, behavior: 'instant' });
 }
 
 async function submitShift() {
