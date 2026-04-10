@@ -222,6 +222,13 @@
                 <span>›</span>
             </div>
         </div>
+        <div style="font-size:0.75rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.08em; text-align:center; margin:1.5rem 0 0.5rem;">EINSTELLUNGEN</div>
+        <div class="mehr-list">
+            <div class="mehr-item" onclick="switchTab('restaurant-info')">
+                <span>Restaurant-Info</span>
+                <span>›</span>
+            </div>
+        </div>
         <div style="font-size:0.75rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.08em; text-align:center; margin:1.5rem 0 0.5rem;">ORGANISER</div>
             <div class="mehr-list">
                 <div class="mehr-item" onclick="switchTab('tasks')">
@@ -239,6 +246,38 @@
             </div>
         </div>
     
+
+    <!-- TAB: RESTAURANT-INFO -->
+    <div id="tab-restaurant-info" class="tab-content">
+        <div style="display:grid; grid-template-columns:1fr auto 1fr; align-items:center; margin-bottom:1.5rem;">
+            <button onclick="switchTab('mehr')" style="background:none; border:none; color:var(--color-primary); font-size:0.95rem; cursor:pointer; text-align:left; display:flex; align-items:center; gap:0.25rem;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                Mehr
+            </button>
+            <div style="font-size:1.1rem; font-weight:700; color:var(--color-text);">Restaurant-Info</div>
+            <div></div>
+        </div>
+        <div class="card">
+            <div class="form-group">
+                <label>Restaurant-Name</label>
+                <input type="text" id="restaurant-name" placeholder="z.B. Café Sonnenschein">
+            </div>
+            <div class="form-group">
+                <label>Straße</label>
+                <input type="text" id="restaurant-street" placeholder="z.B. Hauptstraße 1">
+            </div>
+            <div class="form-group">
+                <label>PLZ</label>
+                <input type="text" id="restaurant-zip" placeholder="z.B. 70173">
+            </div>
+            <div class="form-group">
+                <label>Ort</label>
+                <input type="text" id="restaurant-city" placeholder="z.B. Stuttgart">
+            </div>
+            <div id="restaurant-info-error" style="display:none; color:var(--color-danger); font-size:0.85rem; margin-bottom:0.5rem;"></div>
+            <button class="btn-primary" onclick="saveRestaurantInfo()">Speichern</button>
+        </div>
+    </div>
 
     <!-- TAB: STUNDEN GENEHMIGEN -->
     <div id="tab-stunden" class="tab-content">

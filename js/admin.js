@@ -102,7 +102,39 @@ function switchTab(tab) {
     if (tab === 'trinkgeld-config') loadTrinkgeldConfig();
     if (tab === 'inventur') { loadInventur(); loadInventurSubmissions(); }
     if (tab === 'inventur-config') { loadInventurConfig(); loadInventurDelegation(); }
+    if (tab === 'restaurant-info') loadRestaurantInfo();
     localStorage.setItem('planit_admin_tab', tab);
+}
+
+// ── RESTAURANT-INFO ───────────────────────────────────────
+async function loadRestaurantInfo() {
+    const { data } = await db.from('planit_restaurants').select('*').eq('user_id', adminSession.user.id).maybeSingle();
+    document.getElementById('restaurant-name').value = data?.name || '';
+    document.getElementById('restaurant-street').value = data?.street || '';
+    document.getElementById('restaurant-zip').value = data?.zip || '';
+    document.getElementById('restaurant-city').value = data?.city || '';
+}
+
+async function saveRestaurantInfo() {
+    const errorDiv = document.getElementById('restaurant-info-error');
+    errorDiv.style.display = 'none';
+    const payload = {
+        user_id: adminSession.user.id,
+        name: document.getElementById('restaurant-name').value.trim(),
+        street: document.getElementById('restaurant-street').value.trim(),
+        zip: document.getElementById('restaurant-zip').value.trim(),
+        city: document.getElementById('restaurant-city').value.trim(),
+    };
+    const { error } = await db.from('planit_restaurants').upsert(payload, { onConflict: 'user_id' });
+    if (error) {
+        errorDiv.textContent = 'Fehler beim Speichern.';
+        errorDiv.style.display = 'block';
+        return;
+    }
+    const btn = document.querySelector('[onclick="saveRestaurantInfo()"]');
+    const orig = btn.textContent;
+    btn.textContent = 'Gespeichert ✓';
+    setTimeout(() => { btn.textContent = orig; }, 2000);
 }
 
 // ── MITARBEITER LADEN ─────────────────────────────────────
