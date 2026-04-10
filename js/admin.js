@@ -2254,24 +2254,24 @@ async function loadAdminStunden() {
         return;
     }
 
-    // Alle Schichten des Monats laden
-    const { data: shifts } = await db
-        .from('shifts')
-        .select('*')
-        .gte('shift_date', firstDay)
-        .lte('shift_date', lastDay);
-
-    // Geleistete Stunden laden
-    const { data: approved } = await db
-        .from('approved_hours')
-        .select('*')
-        .eq('month', monthStr);
-
-    // Ist-Stunden laden
-    const { data: actualHours } = await db
-        .from('actual_hours')
-        .select('*')
-        .eq('month', monthStr);
+    // Alle Daten parallel laden
+    const [
+        { data: shifts },
+        { data: approved },
+        { data: actualHours },
+        { data: vacations },
+    ] = await Promise.all([
+        db.from('shifts').select('*').gte('shift_date', firstDay).lte('shift_date', lastDay),
+        db.from('approved_hours').select('*').eq('month', monthStr),
+        db.from('actual_hours').select('*').eq('month', monthStr),
+        db.from('vacation_requests')
+            .select('employee_id, deducted_days, deducted_hours')
+            .eq('user_id', adminSession.user.id)
+            .eq('status', 'approved')
+            .eq('type', 'vacation')
+            .lte('start_date', lastDay)
+            .gte('end_date', firstDay),
+    ]);
 
     // Vormonat carry_over direkt aus actual_hours des aktuellen Monats
 
@@ -2305,7 +2305,25 @@ async function loadAdminStunden() {
             const [eh, em] = endStr.split(':').map(Number);
             actualMinutes += (eh * 60 + em) - (sh * 60 + sm) - breakMin;
         });
-        const actualDisplay = `${Math.floor(actualMinutes / 60)}h ${String(actualMinutes % 60).padStart(2, '0')}m`;
+
+        // Urlaubsstunden für diesen Monat
+        const empVacations = (vacations || []).filter(v => v.employee_id === emp.id);
+        const hoursPerDay = emp.hours_per_vacation_day || 8;
+        let vacationMinutes = 0;
+        empVacations.forEach(v => {
+            if (v.deducted_hours != null) {
+                vacationMinutes += Math.round(v.deducted_hours * 60);
+            } else if (v.deducted_days) {
+                vacationMinutes += Math.round(v.deducted_days * hoursPerDay * 60);
+            }
+        });
+
+        const totalMinutes = actualMinutes + vacationMinutes;
+        const fmtMins = m => `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`;
+        let actualDisplay = fmtMins(totalMinutes);
+        if (vacationMinutes > 0) {
+            actualDisplay += ` <span style="font-size:0.75rem; color:var(--color-text-light);">(inkl. ${fmtMins(vacationMinutes)} Urlaub)</span>`;
+        }
 
         // Vormonat-Differenz (carry_over bleibt aus actual_hours)
         const actualEntry = (actualHours || []).find(a => a.employee_id === emp.id);
@@ -2313,7 +2331,7 @@ async function loadAdminStunden() {
 
         // Aktuelle Differenz
         const diffMinutes = approvedMinutes !== null
-            ? actualMinutes - approvedMinutes + prevDiffMinutes
+            ? totalMinutes - approvedMinutes + prevDiffMinutes
             : null;
         const diffDisplay = diffMinutes !== null
             ? `${diffMinutes >= 0 ? '+' : ''}${Math.floor(Math.abs(diffMinutes)/60)}h ${String(Math.abs(diffMinutes)%60).padStart(2,'00')}m`
