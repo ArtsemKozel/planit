@@ -382,7 +382,7 @@ async function renderWeekGrid(days, shifts, availCache = {}, sickLeaves = []) {
         deptLabel.style.gridColumn = '1 / -1';
         deptLabel.style.display = 'flex';
         deptLabel.style.alignItems = 'center';
-        deptLabel.style.justifyContent = 'center';
+        deptLabel.style.justifyContent = 'space-between';
         deptLabel.style.gap = '0.5rem';
         deptLabel.style.fontWeight = '600';
         deptLabel.style.fontSize = '0.8rem';
