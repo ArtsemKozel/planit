@@ -2029,6 +2029,8 @@ async function submitEmpInventur() {
 async function openColleaguesModal(shift) {
     const dateStr = shift.shift_date;
     const myDept = shift.department || currentEmployee.department;
+    console.log('[Kollegen] Datum:', dateStr, '| Abteilung:', myDept, '| shift.department:', shift.department, '| emp.department:', currentEmployee.department);
+
     const d = new Date(dateStr + 'T12:00:00');
     const dayNames = ['So','Mo','Di','Mi','Do','Fr','Sa'];
     const label = `${d.getDate()}. ${d.toLocaleDateString('de-DE', { month: 'long' })} — ${dayNames[d.getDay()]}`;
@@ -2037,7 +2039,7 @@ async function openColleaguesModal(shift) {
     document.getElementById('colleagues-modal-body').innerHTML = '<div style="color:var(--color-text-light); font-size:0.9rem;">Lädt…</div>';
     document.getElementById('colleagues-modal').classList.add('open');
 
-    const { data: dayShifts } = await db
+    const { data: dayShifts, error } = await db
         .from('shifts')
         .select('*, employees_planit(name)')
         .eq('user_id', currentEmployee.user_id)
@@ -2045,7 +2047,10 @@ async function openColleaguesModal(shift) {
         .eq('is_open', false)
         .neq('employee_id', currentEmployee.id);
 
+    console.log('[Kollegen] Supabase-Ergebnis:', { dayShifts, error });
+
     const colleagues = (dayShifts || []).filter(s => (s.department || currentEmployee.department) === myDept);
+    console.log('[Kollegen] Nach Abteilungs-Filter:', colleagues);
 
     const body = document.getElementById('colleagues-modal-body');
     if (colleagues.length === 0) {
