@@ -2082,35 +2082,24 @@ async function openTerminationModal() {
     document.getElementById('termination-notice').style.display = 'none';
     document.getElementById('termination-error').style.display = 'none';
 
-    const { data: emp } = await db
-        .from('employees_planit')
-        .select('notice_period_weeks')
-        .eq('id', currentEmployee.id)
-        .maybeSingle();
-
-    const weeks = emp?.notice_period_weeks || 4;
     const today = new Date();
-
-    // Frühestmöglicher Termin: heute + notice_period_weeks Wochen
-    const earliest = new Date(today);
-    earliest.setDate(earliest.getDate() + weeks * 7);
-
-    // Monatsende-Regel
-    let year = earliest.getFullYear();
-    let month = earliest.getMonth(); // 0-based
-
-    if (today.getDate() >= 15) {
-        // Heute ab 15. → Ende des übernächsten Monats ab heute
-        month += 1;
-    }
-    // Monatsende = letzter Tag von `month`
-    const lastDay = new Date(year, month + 1, 0);
-
+    const day = today.getDate();
+    const nextMonth = today.getMonth() + 1; // 0-based → nächster Monat
+    const year = today.getFullYear();
     const monthNames = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
-    const label = `${lastDay.getDate()}. ${monthNames[lastDay.getMonth()]} ${lastDay.getFullYear()}`;
 
+    let minDate;
+    if (day <= 15) {
+        // 1.–15.: Mindesttermin = 15. des nächsten Monats
+        minDate = new Date(year, nextMonth, 15);
+    } else {
+        // 16.–31.: Mindesttermin = letzter Tag des nächsten Monats
+        minDate = new Date(year, nextMonth + 1, 0);
+    }
+
+    const label = `${minDate.getDate()}. ${monthNames[minDate.getMonth()]} ${minDate.getFullYear()}`;
     const notice = document.getElementById('termination-notice');
-    notice.textContent = `Frühestmöglicher letzter Arbeitstag: ${label} (Kündigungsfrist: ${weeks} Wochen)`;
+    notice.textContent = `Frühestmöglicher letzter Arbeitstag: ${label}`;
     notice.style.display = 'block';
 }
 
@@ -2130,24 +2119,19 @@ async function submitTermination() {
     }
 
     // Mindesttermin prüfen (nicht blockierend)
-    const { data: emp } = await db
-        .from('employees_planit')
-        .select('notice_period_weeks')
-        .eq('id', currentEmployee.id)
-        .maybeSingle();
-
-    const weeks = emp?.notice_period_weeks || 4;
     const today = new Date();
-    const earliest = new Date(today);
-    earliest.setDate(earliest.getDate() + weeks * 7);
-    let month = earliest.getMonth();
-    if (today.getDate() >= 15) month += 1;
-    const minDate = new Date(earliest.getFullYear(), month + 1, 0);
+    const day = today.getDate();
+    const nextMonth = today.getMonth() + 1;
+    const minDate = day <= 15
+        ? new Date(today.getFullYear(), nextMonth, 15)
+        : new Date(today.getFullYear(), nextMonth + 1, 0);
     const minDateStr = minDate.toISOString().split('T')[0];
 
     if (date < minDateStr) {
+        const { data: emp } = await db.from('employees_planit').select('notice_period_weeks').eq('id', currentEmployee.id).maybeSingle();
+        const weeks = emp?.notice_period_weeks || 4;
         const monthNames = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
-        errorDiv.textContent = `Hinweis: Das gewählte Datum liegt vor dem frühestmöglichen Termin (${minDate.getDate()}. ${monthNames[minDate.getMonth()]} ${minDate.getFullYear()}). Der Antrag wird trotzdem eingereicht.`;
+        errorDiv.textContent = `Hinweis: Das gewählte Datum liegt vor dem frühestmöglichen Termin (${minDate.getDate()}. ${monthNames[minDate.getMonth()]} ${minDate.getFullYear()}). Kündigungsfrist laut Vertrag: ${weeks} Wochen. Der Antrag wird trotzdem eingereicht.`;
         errorDiv.style.display = 'block';
     }
 
