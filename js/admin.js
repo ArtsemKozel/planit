@@ -3076,10 +3076,10 @@ async function loadTerminations() {
             ${address ? `<div style="font-size:0.85rem; color:var(--color-text-light); margin-bottom:0.25rem;">${address}</div>` : ''}
             <div style="font-size:0.85rem; margin-bottom:0.25rem;">Letzter Arbeitstag: <strong>${date}</strong></div>
             ${t.reason ? `<div style="font-size:0.85rem; color:var(--color-text-light); margin-bottom:0.75rem;">Grund: ${t.reason}</div>` : '<div style="margin-bottom:0.75rem;"></div>'}
-            <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-                ${t.pdf_url ? `<button class="btn-secondary" style="flex:1;" onclick="downloadTerminationPdf('${t.pdf_url}')">PDF</button>` : ''}
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+                ${t.pdf_url ? `<button class="btn-small btn-pdf-view btn-icon" onclick="downloadTerminationPdf('${t.pdf_url}')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>` : ''}
                 ${t.status === 'pending' ? `<button class="btn-primary" style="flex:1;" onclick="approveTermination('${t.id}')">Genehmigen</button>` : ''}
-                <button class="btn-secondary" style="flex:1; color:var(--color-danger);" onclick="deleteTermination('${t.id}')">Löschen</button>
+                <button class="btn-small btn-delete btn-icon" onclick="deleteTermination('${t.id}')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
             </div>
         </div>`;
     }).join('');
