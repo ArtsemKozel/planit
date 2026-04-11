@@ -1367,6 +1367,37 @@ async function loadOverview() {
         sickCard.style.display = 'none';
 }
 
+    // Kündigung prüfen
+    const { data: termination } = await db
+        .from('planit_terminations')
+        .select('id, created_at, requested_date, status')
+        .eq('employee_id', currentEmployee.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    const terminationCard = document.getElementById('termination-info-card');
+    if (termination) {
+        const submittedDate = new Date(termination.created_at).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
+        const lastDay = termination.requested_date ? new Date(termination.requested_date + 'T12:00:00').toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' }) : '–';
+        const badgeColor = termination.status === 'approved' ? '#2d7a2d' : termination.status === 'rejected' ? 'var(--color-danger)' : '#B8860B';
+        const badgeBg = termination.status === 'approved' ? '#E6F4E6' : termination.status === 'rejected' ? '#FFE8E8' : '#FFF3CD';
+        const badgeLabel = termination.status === 'approved' ? 'Genehmigt' : termination.status === 'rejected' ? 'Abgelehnt' : 'Ausstehend';
+        terminationCard.style.display = 'block';
+        terminationCard.innerHTML = `
+            <div style="background:#F5F0FF; border-radius:12px; padding:1rem; margin-bottom:1rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                    <div style="font-weight:700; font-size:0.95rem;">Kündigung eingereicht</div>
+                    <span style="font-size:0.78rem; font-weight:700; color:${badgeColor}; background:${badgeBg}; border-radius:6px; padding:0.2rem 0.55rem;">${badgeLabel}</span>
+                </div>
+                <div style="font-size:0.85rem; color:var(--color-text-light); margin-bottom:0.2rem;">Eingereicht am: ${submittedDate}</div>
+                <div style="font-size:0.85rem; color:var(--color-text-light); margin-bottom:0.75rem;">Letzter Arbeitstag: <strong>${lastDay}</strong></div>
+                <button class="btn-secondary" style="font-size:0.85rem; color:var(--color-danger);" onclick="deleteOwnTermination('${termination.id}')">Antrag zurückziehen</button>
+            </div>`;
+    } else {
+        terminationCard.style.display = 'none';
+    }
+
     // Eigene Schichten laden
     const { data: shifts } = await db
         .from('shifts')
@@ -2314,4 +2345,10 @@ async function submitTermination() {
     document.getElementById('termination-preview-modal').classList.remove('active');
     document.getElementById('termination-modal').classList.remove('active');
     alert('Deine Kündigung wurde eingereicht. Die Verwaltung wird sich bei dir melden.');
+}
+
+async function deleteOwnTermination(id) {
+    if (!confirm('Kündigungsantrag wirklich zurückziehen?')) return;
+    await db.from('planit_terminations').delete().eq('id', id);
+    loadOverview();
 }
