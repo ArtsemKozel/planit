@@ -3076,11 +3076,11 @@ async function loadTerminations() {
             ${address ? `<div style="font-size:0.85rem; color:var(--color-text-light); margin-bottom:0.25rem;">${address}</div>` : ''}
             <div style="font-size:0.85rem; margin-bottom:0.25rem;">Letzter Arbeitstag: <strong>${date}</strong></div>
             ${t.reason ? `<div style="font-size:0.85rem; color:var(--color-text-light); margin-bottom:0.75rem;">Grund: ${t.reason}</div>` : '<div style="margin-bottom:0.75rem;"></div>'}
-            ${t.status === 'pending' ? `
-            <div style="display:flex; gap:0.5rem;">
-                <button class="btn-primary" style="flex:1;" onclick="approveTermination('${t.id}')">Genehmigen</button>
-                <button class="btn-secondary" style="flex:1; color:var(--color-danger);" onclick="rejectTermination('${t.id}')">Ablehnen</button>
-            </div>` : ''}
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                ${t.pdf_url ? `<button class="btn-secondary" style="flex:1;" onclick="window.open('${t.pdf_url}','_blank')">PDF</button>` : ''}
+                ${t.status === 'pending' ? `<button class="btn-primary" style="flex:1;" onclick="approveTermination('${t.id}')">Genehmigen</button>` : ''}
+                <button class="btn-secondary" style="flex:1; color:var(--color-danger);" onclick="deleteTermination('${t.id}')">Löschen</button>
+            </div>
         </div>`;
     }).join('');
 }
@@ -3095,6 +3095,13 @@ async function approveTermination(id) {
 async function rejectTermination(id) {
     if (!confirm('Kündigung ablehnen?')) return;
     await db.from('planit_terminations').update({ status: 'rejected' }).eq('id', id);
+    await loadTerminations();
+    await loadTerminationBadge();
+}
+
+async function deleteTermination(id) {
+    if (!confirm('Kündigungsantrag unwiderruflich löschen?')) return;
+    await db.from('planit_terminations').delete().eq('id', id);
     await loadTerminations();
     await loadTerminationBadge();
 }

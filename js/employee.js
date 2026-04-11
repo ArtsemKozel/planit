@@ -2238,7 +2238,7 @@ async function submitTermination() {
         errorDiv.style.display = 'block';
     }
 
-    const { error } = await db.from('planit_terminations').insert({
+    const { data: inserted, error } = await db.from('planit_terminations').insert({
         user_id: currentEmployee.user_id,
         employee_id: currentEmployee.id,
         street,
@@ -2247,7 +2247,7 @@ async function submitTermination() {
         requested_date: date,
         reason: reason || null,
         status: 'pending',
-    });
+    }).select('id').single();
 
     if (error) {
         errorDiv.textContent = 'Fehler beim Speichern. Bitte erneut versuchen.';
@@ -2255,6 +2255,60 @@ async function submitTermination() {
         return;
     }
 
+    // PDF generieren
+    try {
+        const previewBody = document.getElementById('termination-preview-body');
+        const fullText = previewBody ? previewBody.textContent : '';
+        const splitMarker = 'Mit freundlichen Grüßen';
+        const splitIdx = fullText.indexOf(splitMarker);
+        const textBefore = splitIdx >= 0 ? fullText.substring(0, splitIdx + splitMarker.length) : fullText;
+        const textAfter  = splitIdx >= 0 ? fullText.substring(splitIdx + splitMarker.length).trim() : '';
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        const lh = 5;
+        let y = 20;
+
+        const linesBefore = doc.splitTextToSize(textBefore, 170);
+        doc.text(linesBefore, 20, y);
+        y += linesBefore.length * lh + 4;
+
+        // Unterschrift
+        const sigCanvas = document.getElementById('termination-signature-canvas');
+        if (sigCanvas) {
+            try {
+                const dataUrl = sigCanvas.toDataURL('image/png');
+                const blank = document.createElement('canvas');
+                blank.width = sigCanvas.width; blank.height = sigCanvas.height;
+                if (dataUrl !== blank.toDataURL('image/png')) {
+                    doc.addImage(dataUrl, 'PNG', 20, y, 60, 25);
+                    y += 28;
+                }
+            } catch(e) {}
+        }
+
+        if (textAfter) {
+            const linesAfter = doc.splitTextToSize(textAfter, 170);
+            doc.text(linesAfter, 20, y);
+        }
+
+        const pdfBlob = doc.output('blob');
+        const fileName = `${currentEmployee.id}_${date}.pdf`;
+        const { error: uploadError } = await db.storage
+            .from('termination-pdfs')
+            .upload(fileName, pdfBlob, { contentType: 'application/pdf', upsert: true });
+
+        if (!uploadError && inserted?.id) {
+            const { data: urlData } = db.storage.from('termination-pdfs').getPublicUrl(fileName);
+            await db.from('planit_terminations').update({ pdf_url: urlData.publicUrl }).eq('id', inserted.id);
+        }
+    } catch(pdfErr) {
+        console.warn('PDF-Generierung fehlgeschlagen:', pdfErr);
+    }
+
+    document.getElementById('termination-preview-modal').classList.remove('active');
     document.getElementById('termination-modal').classList.remove('active');
     alert('Deine Kündigung wurde eingereicht. Die Verwaltung wird sich bei dir melden.');
 }
