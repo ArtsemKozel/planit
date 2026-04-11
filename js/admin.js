@@ -210,6 +210,7 @@ function switchTab(tab) {
     if (tab === 'inventur') { loadInventur(); loadInventurSubmissions(); }
     if (tab === 'inventur-config') { loadInventurConfig(); loadInventurDelegation(); }
     if (tab === 'restaurant-info') loadRestaurantInfo();
+    if (tab === 'terminations') loadTerminations();
     localStorage.setItem('planit_admin_tab', tab);
 }
 
@@ -3040,6 +3041,59 @@ async function loadRequestsBadge() {
     } else {
         badge.style.display = 'none';
     }
+}
+
+async function loadTerminations() {
+    const container = document.getElementById('terminations-list');
+    container.innerHTML = '<div style="color:var(--color-text-light); font-size:0.9rem;">Lädt…</div>';
+
+    const { data } = await db
+        .from('planit_terminations')
+        .select('*, employees_planit(name)')
+        .eq('user_id', adminSession.user.id)
+        .order('created_at', { ascending: false });
+
+    if (!data || data.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>Keine Kündigungsanträge vorhanden.</p></div>';
+        return;
+    }
+
+    container.innerHTML = data.map(t => {
+        const name = t.employees_planit?.name || '–';
+        const date = t.requested_date ? new Date(t.requested_date + 'T12:00:00').toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' }) : '–';
+        const statusColor = t.status === 'approved' ? '#2d7a2d' : t.status === 'rejected' ? 'var(--color-danger)' : 'var(--color-text-light)';
+        const statusLabel = t.status === 'approved' ? 'Genehmigt' : t.status === 'rejected' ? 'Abgelehnt' : 'Offen';
+        const address = [t.street, `${t.zip || ''} ${t.city || ''}`.trim()].filter(Boolean).join(', ');
+        return `
+        <div class="card" style="margin-bottom:0.75rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                <div style="font-weight:700; font-size:1rem;">${name}</div>
+                <span style="font-size:0.8rem; font-weight:600; color:${statusColor};">${statusLabel}</span>
+            </div>
+            ${address ? `<div style="font-size:0.85rem; color:var(--color-text-light); margin-bottom:0.25rem;">${address}</div>` : ''}
+            <div style="font-size:0.85rem; margin-bottom:0.25rem;">Letzter Arbeitstag: <strong>${date}</strong></div>
+            ${t.reason ? `<div style="font-size:0.85rem; color:var(--color-text-light); margin-bottom:0.75rem;">Grund: ${t.reason}</div>` : '<div style="margin-bottom:0.75rem;"></div>'}
+            ${t.status === 'pending' ? `
+            <div style="display:flex; gap:0.5rem;">
+                <button class="btn-primary" style="flex:1;" onclick="approveTermination('${t.id}')">Genehmigen</button>
+                <button class="btn-secondary" style="flex:1; color:var(--color-danger);" onclick="rejectTermination('${t.id}')">Ablehnen</button>
+            </div>` : ''}
+        </div>`;
+    }).join('');
+}
+
+async function approveTermination(id) {
+    if (!confirm('Kündigung genehmigen?')) return;
+    await db.from('planit_terminations').update({ status: 'approved' }).eq('id', id);
+    await loadTerminations();
+    await loadTerminationBadge();
+}
+
+async function rejectTermination(id) {
+    if (!confirm('Kündigung ablehnen?')) return;
+    await db.from('planit_terminations').update({ status: 'rejected' }).eq('id', id);
+    await loadTerminations();
+    await loadTerminationBadge();
 }
 
 async function loadTerminationBadge() {
