@@ -1342,15 +1342,30 @@ async function loadOverview() {
     document.getElementById('overview-month').textContent = `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
     document.getElementById('overview-open-month').textContent = `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
 
-    // Krankmeldung prüfen
-    const { data: sickLeave } = await db
-        .from('sick_leaves')
-        .select('start_date, end_date')
-        .eq('employee_id', currentEmployee.id)
-        .gte('end_date', today)
-        .order('start_date')
-        .limit(1)
-        .maybeSingle();
+    const [
+        { data: sickLeave },
+        { data: termination },
+        { data: shifts },
+        { data: sickShifts },
+        { data: mySickLeave },
+    ] = await Promise.all([
+        db.from('sick_leaves').select('start_date, end_date')
+            .eq('employee_id', currentEmployee.id)
+            .gte('end_date', today).order('start_date').limit(1).maybeSingle(),
+        db.from('planit_terminations').select('id, created_at, requested_date, status')
+            .eq('employee_id', currentEmployee.id)
+            .order('created_at', { ascending: false }).limit(1).maybeSingle(),
+        db.from('shifts').select('*')
+            .eq('employee_id', currentEmployee.id)
+            .gte('shift_date', monthStart).lte('shift_date', monthEnd).order('shift_date'),
+        db.from('shifts').select('*')
+            .eq('user_id', currentEmployee.user_id)
+            .eq('is_open', true).eq('open_note', 'Krankmeldung')
+            .gte('shift_date', monthStart).lte('shift_date', monthEnd).order('shift_date'),
+        db.from('sick_leaves').select('start_date, end_date')
+            .eq('employee_id', currentEmployee.id)
+            .gte('end_date', monthStart).lte('start_date', monthEnd).maybeSingle(),
+    ]);
 
     const sickCard = document.getElementById('sick-leave-card');
     if (sickLeave) {
@@ -1365,16 +1380,7 @@ async function loadOverview() {
             </div>`;
     } else {
         sickCard.style.display = 'none';
-}
-
-    // Kündigung prüfen
-    const { data: termination } = await db
-        .from('planit_terminations')
-        .select('id, created_at, requested_date, status')
-        .eq('employee_id', currentEmployee.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+    }
 
     const terminationCard = document.getElementById('termination-info-card');
     if (termination) {
@@ -1402,34 +1408,6 @@ async function loadOverview() {
         terminationCard.style.display = 'none';
     }
 
-    // Eigene Schichten laden
-    const { data: shifts } = await db
-        .from('shifts')
-        .select('*')
-        .eq('employee_id', currentEmployee.id)
-        .gte('shift_date', monthStart)
-        .lte('shift_date', monthEnd)
-        .order('shift_date');
-
-    // Krankmeldungs-Schichten laden
-    const { data: sickShifts } = await db
-        .from('shifts')
-        .select('*')
-        .eq('user_id', currentEmployee.user_id)
-        .eq('is_open', true)
-        .eq('open_note', 'Krankmeldung')
-        .gte('shift_date', monthStart)
-        .lte('shift_date', monthEnd)
-        .order('shift_date');
-
-    // Krankmeldung prüfen ob Schichten dazugehören
-    const { data: mySickLeave } = await db
-        .from('sick_leaves')
-        .select('start_date, end_date')
-        .eq('employee_id', currentEmployee.id)
-        .gte('end_date', monthStart)
-        .lte('start_date', monthEnd)
-        .maybeSingle();
 
     const mySickShifts = (sickShifts || []).filter(s => 
         mySickLeave && s.shift_date >= mySickLeave.start_date && s.shift_date <= mySickLeave.end_date
