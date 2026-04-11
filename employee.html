@@ -275,6 +275,10 @@
                 <span>Profil</span>
                 <span>›</span>
             </div>
+            <div class="mehr-item" onclick="openTerminationModal()" style="color:var(--color-danger);">
+                <span>Kündigung</span>
+                <span>›</span>
+            </div>
         </div>
     </div>
 
@@ -381,6 +385,44 @@
         </div>
     </div>
 
+</div>
+
+<!-- MODAL: KÜNDIGUNG -->
+<div id="termination-modal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('active')">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">Kündigung einreichen</div>
+            <button class="modal-close" onclick="document.getElementById('termination-modal').classList.remove('active')">✕</button>
+        </div>
+        <div style="padding:1rem;">
+            <div class="form-group">
+                <label>Straße</label>
+                <input type="text" id="termination-street" placeholder="z.B. Hauptstraße 1">
+            </div>
+            <div class="form-group">
+                <label>PLZ</label>
+                <input type="text" id="termination-zip" placeholder="z.B. 70173">
+            </div>
+            <div class="form-group">
+                <label>Ort</label>
+                <input type="text" id="termination-city" placeholder="z.B. Stuttgart">
+            </div>
+            <div class="form-group">
+                <label>Gewünschter letzter Arbeitstag</label>
+                <input type="date" id="termination-date" style="width:100%; height:48px; font-size:16px;">
+            </div>
+            <div class="form-group">
+                <label>Grund (optional)</label>
+                <textarea id="termination-reason" rows="3" placeholder="Grund der Kündigung..." style="width:100%; resize:vertical;"></textarea>
+            </div>
+            <div id="termination-notice" style="background:#FFF3CD; border-radius:8px; padding:0.75rem; font-size:0.85rem; margin-bottom:1rem; display:none;"></div>
+            <div id="termination-error" style="color:var(--color-danger); font-size:0.85rem; margin-bottom:0.5rem; display:none;"></div>
+            <div style="display:flex; gap:0.75rem;">
+                <button class="btn-secondary" style="flex:1;" onclick="document.getElementById('termination-modal').classList.remove('active')">Abbrechen</button>
+                <button class="btn-primary" style="flex:1; background:var(--color-danger);" onclick="submitTermination()">Absenden</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- MODAL: KOLLEGEN AN DIESEM TAG -->
