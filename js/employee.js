@@ -1390,9 +1390,13 @@ async function loadOverview() {
                     <div style="font-weight:700; font-size:0.95rem;">Kündigung eingereicht</div>
                     <span style="font-size:0.78rem; font-weight:700; color:${badgeColor}; background:${badgeBg}; border-radius:6px; padding:0.2rem 0.55rem;">${badgeLabel}</span>
                 </div>
-                <div style="font-size:0.85rem; color:var(--color-text-light); margin-bottom:0.2rem;">Eingereicht am: ${submittedDate}</div>
-                <div style="font-size:0.85rem; color:var(--color-text-light); margin-bottom:0.75rem;">Letzter Arbeitstag: <strong>${lastDay}</strong></div>
-                <button class="btn-secondary" style="font-size:0.85rem; color:var(--color-danger);" onclick="deleteOwnTermination('${termination.id}')">Antrag zurückziehen</button>
+                <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+                    <div>
+                        <div style="font-size:0.85rem; color:var(--color-text-light); margin-bottom:0.2rem;">Eingereicht am: ${submittedDate}</div>
+                        <div style="font-size:0.85rem; color:var(--color-text-light);">Letzter Arbeitstag: <strong>${lastDay}</strong></div>
+                    </div>
+                    <button class="btn-small btn-delete btn-icon" onclick="deleteOwnTermination('${termination.id}')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
+                </div>
             </div>`;
     } else {
         terminationCard.style.display = 'none';
