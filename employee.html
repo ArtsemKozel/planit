@@ -418,11 +418,11 @@
             </div>
             <div id="termination-notice" style="background:#FFF3CD; border-radius:8px; padding:0.75rem; font-size:0.85rem; margin-bottom:1rem; display:none;"></div>
             <div class="form-group">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
-                    <label style="margin:0;">Unterschrift</label>
+                <label>Unterschrift</label>
+                <div style="display:flex; align-items:center; gap:0.5rem;">
+                    <canvas id="termination-signature-canvas" style="border:1px solid #E0E0E0; border-radius:8px; flex:1; height:120px; touch-action:none;"></canvas>
                     <button class="btn-small btn-delete btn-icon" onclick="clearTerminationSignature()"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
                 </div>
-                <canvas id="termination-signature-canvas" style="border:1px solid #E0E0E0; border-radius:8px; width:100%; height:120px; touch-action:none;"></canvas>
             </div>
             <div id="termination-error" style="color:var(--color-danger); font-size:0.85rem; margin-bottom:0.5rem; display:none;"></div>
             <div style="display:flex; gap:0.75rem;">
