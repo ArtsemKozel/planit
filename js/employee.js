@@ -2171,7 +2171,7 @@ async function previewTermination() {
     const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     body.innerHTML =
         `<span style="white-space:pre-wrap;">${esc(textBefore)}</span>` +
-        (sigDataUrl ? `<br><img src="${sigDataUrl}" style="max-width:180px; display:block; margin:0.5rem 0;">` : ``) +
+        (sigDataUrl ? `<br><img src="${sigDataUrl}" style="max-width:180px; display:block; margin:2rem 0 0;">` : ``) +
         `<span style="white-space:pre-wrap;">${esc(textAfter)}</span>`;
 
     document.getElementById('termination-preview-signature').style.display = 'none';
