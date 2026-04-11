@@ -644,9 +644,13 @@ async function openShiftModal(employeeId, dateStr, existingShift, defaultDept) {
     
     document.getElementById('shift-is-open').checked = existingShift ? (existingShift.is_open || false) : false;
     document.getElementById('shift-open-note').value = existingShift ? (existingShift.open_note || '') : '';
-    document.getElementById('shift-employee').disabled = existingShift?.is_open || false;
-    document.getElementById('shift-employee').closest('.form-group').style.opacity = existingShift?.is_open ? '0.4' : '1';
-    document.getElementById('shift-open-note-group').style.display = existingShift?.is_open ? 'block' : 'none';
+    const isOpen = existingShift?.is_open || false;
+    const empGroup = document.getElementById('shift-employee').closest('.form-group');
+    document.getElementById('shift-employee').disabled = isOpen;
+    // Dropdown ausblenden wenn Mitarbeiter vorausgewählt (normaler Klick auf Zeile), sichtbar bei offenen Schichten
+    empGroup.style.display = employeeId && !isOpen ? 'none' : 'block';
+    empGroup.style.opacity = isOpen ? '0.4' : '1';
+    document.getElementById('shift-open-note-group').style.display = isOpen ? 'block' : 'none';
     const emp = employees.find(e => e.id === (existingShift?.employee_id || employeeId));
     const deptToSelect = existingShift?.department || defaultDept || emp?.department || departmentNames[0] || '';
     populateDeptSelect(document.getElementById('shift-department'), deptToSelect);
