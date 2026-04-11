@@ -2296,9 +2296,12 @@ async function submitTermination() {
 
         const pdfBlob = doc.output('blob');
         const fileName = `${currentEmployee.id}_${date}.pdf`;
-        const { error: uploadError } = await db.storage
+        const { data: uploadData, error: uploadError } = await db.storage
             .from('termination-pdfs')
             .upload(fileName, pdfBlob, { contentType: 'application/pdf', upsert: true });
+
+        console.log('Upload error:', uploadError);
+        console.log('Upload data:', uploadData);
 
         if (!uploadError && inserted?.id) {
             const { data: urlData } = db.storage.from('termination-pdfs').getPublicUrl(fileName);
