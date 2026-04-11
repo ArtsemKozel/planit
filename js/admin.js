@@ -149,6 +149,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadAdminVacationCalendar(),
         loadRequestsBadge(),
         loadInventurBadge(),
+        loadTerminationBadge(),
         loadSickLeaves(),
     ]);
 });
@@ -3038,6 +3039,24 @@ async function loadRequestsBadge() {
         badge.style.display = 'inline';
     } else {
         badge.style.display = 'none';
+    }
+}
+
+async function loadTerminationBadge() {
+    const { data } = await db
+        .from('planit_terminations')
+        .select('id')
+        .eq('user_id', adminSession.user.id)
+        .eq('status', 'pending');
+
+    const badge = document.getElementById('termination-badge');
+    if (badge) {
+        if (data && data.length > 0) {
+            badge.textContent = data.length;
+            badge.style.display = 'inline';
+        } else {
+            badge.style.display = 'none';
+        }
     }
 }
 
