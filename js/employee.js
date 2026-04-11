@@ -2075,3 +2075,41 @@ async function openColleaguesModal(shift) {
 function closeColleaguesModal() {
     document.getElementById('colleagues-modal').classList.remove('open');
 }
+
+// ── KÜNDIGUNG ─────────────────────────────────────────────
+async function openTerminationModal() {
+    document.getElementById('termination-modal').classList.add('active');
+    document.getElementById('termination-notice').style.display = 'none';
+    document.getElementById('termination-error').style.display = 'none';
+
+    const { data: emp } = await db
+        .from('employees_planit')
+        .select('notice_period_weeks')
+        .eq('id', currentEmployee.id)
+        .maybeSingle();
+
+    const weeks = emp?.notice_period_weeks || 4;
+    const today = new Date();
+
+    // Frühestmöglicher Termin: heute + notice_period_weeks Wochen
+    const earliest = new Date(today);
+    earliest.setDate(earliest.getDate() + weeks * 7);
+
+    // Monatsende-Regel
+    let year = earliest.getFullYear();
+    let month = earliest.getMonth(); // 0-based
+
+    if (today.getDate() >= 15) {
+        // Heute ab 15. → Ende des übernächsten Monats ab heute
+        month += 1;
+    }
+    // Monatsende = letzter Tag von `month`
+    const lastDay = new Date(year, month + 1, 0);
+
+    const monthNames = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+    const label = `${lastDay.getDate()}. ${monthNames[lastDay.getMonth()]} ${lastDay.getFullYear()}`;
+
+    const notice = document.getElementById('termination-notice');
+    notice.textContent = `Frühestmöglicher letzter Arbeitstag: ${label} (Kündigungsfrist: ${weeks} Wochen)`;
+    notice.style.display = 'block';
+}
