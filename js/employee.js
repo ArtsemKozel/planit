@@ -654,6 +654,7 @@ function closeVacExplainModal() {
 }
 
 let signaturePad = null;
+let terminationSignaturePad = null;
 
 function openVacationModal() {
     document.getElementById('vacation-modal').classList.add('open');
@@ -679,6 +680,29 @@ function initSignaturePad() {
 
 function clearSignature() {
     const canvas = document.getElementById('signature-canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function initTerminationSignaturePad() {
+    const canvas = document.getElementById('termination-signature-canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth;
+    canvas.height = 120;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    let drawing = false;
+    // remove old listeners by cloning
+    const fresh = canvas.cloneNode(true);
+    canvas.parentNode.replaceChild(fresh, canvas);
+    const ctx2 = fresh.getContext('2d');
+    fresh.addEventListener('pointerdown', e => { drawing = true; ctx2.beginPath(); ctx2.moveTo(e.offsetX, e.offsetY); });
+    fresh.addEventListener('pointermove', e => { if (!drawing) return; ctx2.lineTo(e.offsetX, e.offsetY); ctx2.stroke(); });
+    fresh.addEventListener('pointerup', () => drawing = false);
+    fresh.addEventListener('pointerleave', () => drawing = false);
+}
+
+function clearTerminationSignature() {
+    const canvas = document.getElementById('termination-signature-canvas');
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
@@ -2135,6 +2159,25 @@ async function previewTermination() {
     ].filter(l => l !== undefined).join('\n');
 
     document.getElementById('termination-preview-body').textContent = text;
+
+    // Unterschrift einbetten
+    const sigCanvas = document.getElementById('termination-signature-canvas');
+    const sigImg = document.getElementById('termination-preview-signature');
+    try {
+        const dataUrl = sigCanvas.toDataURL('image/png');
+        // Prüfen ob Canvas leer (nur transparente Pixel)
+        const blank = document.createElement('canvas');
+        blank.width = sigCanvas.width; blank.height = sigCanvas.height;
+        if (dataUrl !== blank.toDataURL('image/png')) {
+            sigImg.src = dataUrl;
+            sigImg.style.display = 'block';
+        } else {
+            sigImg.style.display = 'none';
+        }
+    } catch(e) {
+        sigImg.style.display = 'none';
+    }
+
     document.getElementById('termination-preview-modal').classList.add('active');
 }
 
@@ -2142,6 +2185,7 @@ async function openTerminationModal() {
     document.getElementById('termination-modal').classList.add('active');
     document.getElementById('termination-notice').style.display = 'none';
     document.getElementById('termination-error').style.display = 'none';
+    setTimeout(initTerminationSignaturePad, 50);
 
     const today = new Date();
     const day = today.getDate();
