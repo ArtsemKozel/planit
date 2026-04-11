@@ -2296,17 +2296,16 @@ async function submitTermination() {
         }
 
         const pdfBlob = doc.output('blob');
-        const fileName = `${currentEmployee.id}_${date}.pdf`;
+        const fileName = `${currentEmployee.user_id}/${currentEmployee.id}_${date}.pdf`;
         const { data: uploadData, error: uploadError } = await db.storage
             .from('termination-pdfs')
-            .upload(fileName, pdfBlob, { contentType: 'application/pdf', upsert: true });
+            .upload(fileName, pdfBlob, { contentType: 'application/pdf' });
 
         console.log('Upload error:', uploadError);
         console.log('Upload data:', uploadData);
 
         if (!uploadError && inserted?.id) {
-            const { data: urlData } = db.storage.from('termination-pdfs').getPublicUrl(fileName);
-            await db.from('planit_terminations').update({ pdf_url: urlData.publicUrl }).eq('id', inserted.id);
+            await db.from('planit_terminations').update({ pdf_url: fileName }).eq('id', inserted.id);
         }
     } catch(pdfErr) {
         console.error('PDF-Generierung fehlgeschlagen:', pdfErr);

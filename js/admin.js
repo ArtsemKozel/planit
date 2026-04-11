@@ -3077,7 +3077,7 @@ async function loadTerminations() {
             <div style="font-size:0.85rem; margin-bottom:0.25rem;">Letzter Arbeitstag: <strong>${date}</strong></div>
             ${t.reason ? `<div style="font-size:0.85rem; color:var(--color-text-light); margin-bottom:0.75rem;">Grund: ${t.reason}</div>` : '<div style="margin-bottom:0.75rem;"></div>'}
             <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-                ${t.pdf_url ? `<button class="btn-secondary" style="flex:1;" onclick="window.open('${t.pdf_url}','_blank')">PDF</button>` : ''}
+                ${t.pdf_url ? `<button class="btn-secondary" style="flex:1;" onclick="downloadTerminationPdf('${t.pdf_url}')">PDF</button>` : ''}
                 ${t.status === 'pending' ? `<button class="btn-primary" style="flex:1;" onclick="approveTermination('${t.id}')">Genehmigen</button>` : ''}
                 <button class="btn-secondary" style="flex:1; color:var(--color-danger);" onclick="deleteTermination('${t.id}')">Löschen</button>
             </div>
@@ -3097,6 +3097,14 @@ async function rejectTermination(id) {
     await db.from('planit_terminations').update({ status: 'rejected' }).eq('id', id);
     await loadTerminations();
     await loadTerminationBadge();
+}
+
+async function downloadTerminationPdf(filePath) {
+    const { data, error } = await db.storage
+        .from('termination-pdfs')
+        .createSignedUrl(filePath, 60);
+    if (error || !data?.signedUrl) { alert('PDF konnte nicht geladen werden.'); return; }
+    window.open(data.signedUrl, '_blank');
 }
 
 async function deleteTermination(id) {
