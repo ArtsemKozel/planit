@@ -2113,3 +2113,61 @@ async function openTerminationModal() {
     notice.textContent = `Frühestmöglicher letzter Arbeitstag: ${label} (Kündigungsfrist: ${weeks} Wochen)`;
     notice.style.display = 'block';
 }
+
+async function submitTermination() {
+    const street = document.getElementById('termination-street').value.trim();
+    const zip    = document.getElementById('termination-zip').value.trim();
+    const city   = document.getElementById('termination-city').value.trim();
+    const date   = document.getElementById('termination-date').value;
+    const reason = document.getElementById('termination-reason').value.trim();
+    const errorDiv = document.getElementById('termination-error');
+    errorDiv.style.display = 'none';
+
+    if (!street || !zip || !city || !date) {
+        errorDiv.textContent = 'Bitte Straße, PLZ, Ort und Datum ausfüllen.';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    // Mindesttermin prüfen (nicht blockierend)
+    const { data: emp } = await db
+        .from('employees_planit')
+        .select('notice_period_weeks')
+        .eq('id', currentEmployee.id)
+        .maybeSingle();
+
+    const weeks = emp?.notice_period_weeks || 4;
+    const today = new Date();
+    const earliest = new Date(today);
+    earliest.setDate(earliest.getDate() + weeks * 7);
+    let month = earliest.getMonth();
+    if (today.getDate() >= 15) month += 1;
+    const minDate = new Date(earliest.getFullYear(), month + 1, 0);
+    const minDateStr = minDate.toISOString().split('T')[0];
+
+    if (date < minDateStr) {
+        const monthNames = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+        errorDiv.textContent = `Hinweis: Das gewählte Datum liegt vor dem frühestmöglichen Termin (${minDate.getDate()}. ${monthNames[minDate.getMonth()]} ${minDate.getFullYear()}). Der Antrag wird trotzdem eingereicht.`;
+        errorDiv.style.display = 'block';
+    }
+
+    const { error } = await db.from('planit_terminations').insert({
+        user_id: currentEmployee.user_id,
+        employee_id: currentEmployee.id,
+        street,
+        zip,
+        city,
+        requested_date: date,
+        reason: reason || null,
+        status: 'pending',
+    });
+
+    if (error) {
+        errorDiv.textContent = 'Fehler beim Speichern. Bitte erneut versuchen.';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    document.getElementById('termination-modal').classList.remove('active');
+    alert('Deine Kündigung wurde eingereicht. Die Verwaltung wird sich bei dir melden.');
+}
