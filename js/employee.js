@@ -2131,7 +2131,7 @@ async function previewTermination() {
     const lastDay = new Date(date + 'T12:00:00').toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
     const todayStr = new Date().toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
 
-    const text = [
+    const textBefore = [
         `${empName}`,
         `${street}`,
         `${zip} ${city}`,
@@ -2152,31 +2152,29 @@ async function previewTermination() {
         `Ich bitte um eine schriftliche Bestätigung des Kündigungseingangs sowie des letzten Arbeitstages.`,
         ``,
         `Mit freundlichen Grüßen`,
-        ``,
-        ``,
-        `_________________________`,
-        empName,
     ].filter(l => l !== undefined).join('\n');
 
-    document.getElementById('termination-preview-body').textContent = text;
+    const textAfter = `\n_________________________\n${empName}`;
 
-    // Unterschrift einbetten
+    // Unterschrift auslesen
     const sigCanvas = document.getElementById('termination-signature-canvas');
-    const sigImg = document.getElementById('termination-preview-signature');
+    let sigDataUrl = null;
     try {
         const dataUrl = sigCanvas.toDataURL('image/png');
-        // Prüfen ob Canvas leer (nur transparente Pixel)
         const blank = document.createElement('canvas');
         blank.width = sigCanvas.width; blank.height = sigCanvas.height;
-        if (dataUrl !== blank.toDataURL('image/png')) {
-            sigImg.src = dataUrl;
-            sigImg.style.display = 'block';
-        } else {
-            sigImg.style.display = 'none';
-        }
-    } catch(e) {
-        sigImg.style.display = 'none';
-    }
+        if (dataUrl !== blank.toDataURL('image/png')) sigDataUrl = dataUrl;
+    } catch(e) {}
+
+    // Preview-Body aufbauen: Text vor Unterschrift, Bild, Text nach Unterschrift
+    const body = document.getElementById('termination-preview-body');
+    const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    body.innerHTML =
+        `<span style="white-space:pre-wrap;">${esc(textBefore)}</span>` +
+        (sigDataUrl ? `<br><img src="${sigDataUrl}" style="max-width:180px; display:block; margin:0.5rem 0;">` : ``) +
+        `<span style="white-space:pre-wrap;">${esc(textAfter)}</span>`;
+
+    document.getElementById('termination-preview-signature').style.display = 'none';
 
     document.getElementById('termination-preview-modal').classList.add('active');
 }
