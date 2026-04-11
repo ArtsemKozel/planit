@@ -1385,7 +1385,7 @@ async function loadOverview() {
         const badgeLabel = termination.status === 'approved' ? 'Genehmigt' : termination.status === 'rejected' ? 'Abgelehnt' : 'Ausstehend';
         terminationCard.style.display = 'block';
         terminationCard.innerHTML = `
-            <div style="background:#F5F0FF; border-radius:12px; padding:1rem; margin-bottom:1rem;">
+            <div class="card" style="margin-bottom:1rem;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
                     <div style="font-weight:700; font-size:0.95rem;">Kündigung eingereicht</div>
                     <span style="font-size:0.78rem; font-weight:700; color:${badgeColor}; background:${badgeBg}; border-radius:6px; padding:0.2rem 0.55rem;">${badgeLabel}</span>
