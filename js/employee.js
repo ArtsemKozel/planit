@@ -2264,6 +2264,7 @@ async function submitTermination() {
         const textBefore = splitIdx >= 0 ? fullText.substring(0, splitIdx + splitMarker.length) : fullText;
         const textAfter  = splitIdx >= 0 ? fullText.substring(splitIdx + splitMarker.length).trim() : '';
 
+        console.log('jsPDF geladen:', typeof window.jspdf);
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
         doc.setFontSize(10);
@@ -2308,7 +2309,7 @@ async function submitTermination() {
             await db.from('planit_terminations').update({ pdf_url: urlData.publicUrl }).eq('id', inserted.id);
         }
     } catch(pdfErr) {
-        console.warn('PDF-Generierung fehlgeschlagen:', pdfErr);
+        console.error('PDF-Generierung fehlgeschlagen:', pdfErr);
     }
 
     document.getElementById('termination-preview-modal').classList.remove('active');
