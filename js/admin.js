@@ -647,9 +647,12 @@ async function openShiftModal(employeeId, dateStr, existingShift, defaultDept) {
     const isOpen = existingShift?.is_open || false;
     const empGroup = document.getElementById('shift-employee').closest('.form-group');
     document.getElementById('shift-employee').disabled = isOpen;
-    // Dropdown ausblenden wenn Mitarbeiter vorausgewählt (normaler Klick auf Zeile), sichtbar bei offenen Schichten
-    empGroup.style.display = employeeId && !isOpen ? 'none' : 'block';
+    // Felder ausblenden wenn Mitarbeiter + Datum + Abteilung vorausgewählt (normaler Klick auf Zeile)
+    const preselected = !!(employeeId && dateStr && defaultDept && !isOpen);
+    empGroup.style.display = preselected ? 'none' : 'block';
     empGroup.style.opacity = isOpen ? '0.4' : '1';
+    document.getElementById('shift-date').closest('.form-group').style.display = preselected ? 'none' : 'block';
+    document.getElementById('shift-dept-group').style.display = preselected ? 'none' : 'block';
     document.getElementById('shift-open-note-group').style.display = isOpen ? 'block' : 'none';
     const emp = employees.find(e => e.id === (existingShift?.employee_id || employeeId));
     const deptToSelect = existingShift?.department || defaultDept || emp?.department || departmentNames[0] || '';
