@@ -2077,6 +2077,67 @@ function closeColleaguesModal() {
 }
 
 // ── KÜNDIGUNG ─────────────────────────────────────────────
+async function previewTermination() {
+    const street = document.getElementById('termination-street').value.trim();
+    const zip    = document.getElementById('termination-zip').value.trim();
+    const city   = document.getElementById('termination-city').value.trim();
+    const date   = document.getElementById('termination-date').value;
+    const reason = document.getElementById('termination-reason').value.trim();
+    const errorDiv = document.getElementById('termination-error');
+    errorDiv.style.display = 'none';
+
+    if (!street || !zip || !city || !date) {
+        errorDiv.textContent = 'Bitte Straße, PLZ, Ort und Datum ausfüllen.';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    const [{ data: restaurant }, { data: emp }] = await Promise.all([
+        db.from('planit_restaurants').select('*').eq('user_id', currentEmployee.user_id).maybeSingle(),
+        db.from('employees_planit').select('name').eq('id', currentEmployee.id).maybeSingle(),
+    ]);
+
+    const empName = emp?.name || currentEmployee.name || '';
+    const restName = restaurant?.name || '[Restaurant-Name]';
+    const restStreet = restaurant?.street || '';
+    const restZip = restaurant?.zip || '';
+    const restCity = restaurant?.city || '';
+    const restAddress = [restStreet, `${restZip} ${restCity}`.trim()].filter(Boolean).join('\n');
+
+    const lastDay = new Date(date + 'T12:00:00').toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
+    const todayStr = new Date().toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
+
+    const text = [
+        `${empName}`,
+        `${street}`,
+        `${zip} ${city}`,
+        ``,
+        `${restName}`,
+        restAddress,
+        ``,
+        ``,
+        `${city}, ${todayStr}`,
+        ``,
+        `Betreff: Kündigung meines Arbeitsverhältnisses`,
+        ``,
+        `Sehr geehrte Damen und Herren,`,
+        ``,
+        `hiermit kündige ich mein Arbeitsverhältnis mit ${restName} fristgemäß zum ${lastDay}.`,
+        reason ? `\nGrund: ${reason}` : '',
+        ``,
+        `Ich bitte um eine schriftliche Bestätigung des Kündigungseingangs sowie des letzten Arbeitstages.`,
+        ``,
+        `Mit freundlichen Grüßen`,
+        ``,
+        ``,
+        `_________________________`,
+        empName,
+    ].filter(l => l !== undefined).join('\n');
+
+    document.getElementById('termination-preview-body').textContent = text;
+    document.getElementById('termination-preview-modal').classList.add('active');
+}
+
 async function openTerminationModal() {
     document.getElementById('termination-modal').classList.add('active');
     document.getElementById('termination-notice').style.display = 'none';
