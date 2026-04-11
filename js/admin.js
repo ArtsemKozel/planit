@@ -233,7 +233,10 @@ async function saveRestaurantInfo() {
         zip: document.getElementById('restaurant-zip').value.trim(),
         city: document.getElementById('restaurant-city').value.trim(),
     };
-    const { error } = await db.from('planit_restaurants').upsert(payload, { onConflict: 'user_id' });
+    const { data: existing } = await db.from('planit_restaurants').select('id').eq('user_id', adminSession.user.id).maybeSingle();
+    const { error } = existing
+        ? await db.from('planit_restaurants').update(payload).eq('user_id', adminSession.user.id)
+        : await db.from('planit_restaurants').insert(payload);
     if (error) {
         errorDiv.textContent = 'Fehler beim Speichern.';
         errorDiv.style.display = 'block';
