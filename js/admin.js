@@ -3100,11 +3100,16 @@ async function rejectTermination(id) {
 }
 
 async function downloadTerminationPdf(filePath) {
+    const win = window.open('', '_blank');
     const { data, error } = await db.storage
         .from('termination-pdfs')
         .createSignedUrl(filePath, 60);
-    if (error || !data?.signedUrl) { alert('PDF konnte nicht geladen werden.'); return; }
-    window.open(data.signedUrl, '_blank');
+    if (error || !data?.signedUrl) {
+        win.close();
+        alert('PDF konnte nicht geladen werden.');
+        return;
+    }
+    win.location.href = data.signedUrl;
 }
 
 async function deleteTermination(id) {
