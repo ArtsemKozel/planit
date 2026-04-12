@@ -3169,11 +3169,17 @@ async function deleteTermination(id) {
     if (!confirm('Kündigungsantrag unwiderruflich löschen?')) return;
     const { data: t } = await db.from('planit_terminations').select('employee_id, approved_date').eq('id', id).maybeSingle();
     await db.from('planit_terminations').delete().eq('id', id);
-    if (t?.employee_id && t?.approved_date) {
-        await db.from('employment_phases')
-            .update({ end_date: null })
+    if (t?.employee_id) {
+        const { data: phase } = await db.from('employment_phases')
+            .select('id')
             .eq('employee_id', t.employee_id)
-            .eq('end_date', t.approved_date);
+            .not('end_date', 'is', null)
+            .order('start_date', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+        if (phase) {
+            await db.from('employment_phases').update({ end_date: null }).eq('id', phase.id);
+        }
     }
     await loadTerminations();
     await loadTerminationBadge();
