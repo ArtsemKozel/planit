@@ -3089,8 +3089,15 @@ async function loadTerminations() {
 
 async function approveTermination(id) {
     if (!confirm('Kündigung genehmigen?')) return;
-    const { data: t } = await db.from('planit_terminations').select('requested_date').eq('id', id).maybeSingle();
-    await db.from('planit_terminations').update({ status: 'approved', approved_date: t?.requested_date || null }).eq('id', id);
+    const { data: t } = await db.from('planit_terminations').select('requested_date, employee_id').eq('id', id).maybeSingle();
+    const approvedDate = t?.requested_date || null;
+    await db.from('planit_terminations').update({ status: 'approved', approved_date: approvedDate }).eq('id', id);
+    if (approvedDate && t?.employee_id) {
+        await db.from('employment_phases')
+            .update({ end_date: approvedDate })
+            .eq('employee_id', t.employee_id)
+            .is('end_date', null);
+    }
     await loadTerminations();
     await loadTerminationBadge();
 }
