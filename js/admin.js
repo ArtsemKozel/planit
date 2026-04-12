@@ -3167,7 +3167,14 @@ async function downloadTerminationPdf(filePath) {
 
 async function deleteTermination(id) {
     if (!confirm('Kündigungsantrag unwiderruflich löschen?')) return;
+    const { data: t } = await db.from('planit_terminations').select('employee_id, approved_date').eq('id', id).maybeSingle();
     await db.from('planit_terminations').delete().eq('id', id);
+    if (t?.employee_id && t?.approved_date) {
+        await db.from('employment_phases')
+            .update({ end_date: null })
+            .eq('employee_id', t.employee_id)
+            .eq('end_date', t.approved_date);
+    }
     await loadTerminations();
     await loadTerminationBadge();
 }
