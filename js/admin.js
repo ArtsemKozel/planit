@@ -3071,6 +3071,7 @@ async function loadMehrBadge() {
         db.from('planit_inventory_submissions').select('id').eq('user_id', uid),
     ]);
     const total = (terminations?.length || 0) + (vacations?.length || 0) + (inventur?.length || 0);
+    console.log('mehr total:', total);
     const badge = document.getElementById('mehr-badge');
     if (!badge) return;
     const baseStyle = 'position:absolute; top:-4px; right:-6px; z-index:10; background:var(--color-danger); color:white; border-radius:50%; font-size:0.6rem; font-weight:700; min-width:14px; height:14px; line-height:14px; text-align:center; padding:0 2px;';
