@@ -44,7 +44,10 @@
         <span>Team</span>
     </button>
     <button class="bottom-nav-item" onclick="switchTab('mehr')" id="nav-mehr">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+        <div style="position:relative; display:inline-flex;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+            <span id="mehr-badge" style="display:none; position:absolute; top:-4px; right:-6px; background:var(--color-danger); color:white; border-radius:50%; font-size:0.6rem; font-weight:700; min-width:14px; height:14px; line-height:14px; text-align:center; padding:0 2px;"></span>
+        </div>
         <span>Mehr</span>
     </button>
 </div>

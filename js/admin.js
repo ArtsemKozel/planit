@@ -3062,12 +3062,23 @@ async function rejectRequest(requestId) {
     await loadRequests();
 }
 
+function loadMehrBadge() {
+    const counts = ['requests-badge', 'termination-badge', 'inventur-badge']
+        .map(id => { const el = document.getElementById(id); return el && el.style.display !== 'none' ? (parseInt(el.textContent) || 0) : 0; })
+        .reduce((a, b) => a + b, 0);
+    const badge = document.getElementById('mehr-badge');
+    if (badge) {
+        if (counts > 0) { badge.textContent = counts; badge.style.display = 'inline'; }
+        else { badge.style.display = 'none'; }
+    }
+}
+
 async function loadRequestsBadge() {
     const { data } = await db
         .from('open_shift_requests')
         .select('id')
         .eq('status', 'pending');
-    
+
     const badge = document.getElementById('requests-badge');
     if (data && data.length > 0) {
         badge.textContent = data.length;
@@ -3075,6 +3086,7 @@ async function loadRequestsBadge() {
     } else {
         badge.style.display = 'none';
     }
+    loadMehrBadge();
 }
 
 async function loadTerminations() {
@@ -3204,6 +3216,7 @@ async function loadTerminationBadge() {
             badge.style.display = 'none';
         }
     }
+    loadMehrBadge();
 }
 
 async function loadInventurBadge() {
@@ -3219,6 +3232,7 @@ async function loadInventurBadge() {
     } else {
         badge.style.display = 'none';
     }
+    loadMehrBadge();
 }
 
 async function loadInventurSubmissions() {
