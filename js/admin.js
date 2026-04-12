@@ -3092,6 +3092,7 @@ async function loadUrlaubBadge() {
         .eq('user_id', adminSession.user.id)
         .eq('status', 'pending');
 
+    console.log('urlaub badge count:', data?.length);
     const badge = document.getElementById('urlaub-badge');
     if (!badge) return;
     if (data && data.length > 0) {
