@@ -3065,10 +3065,13 @@ async function rejectRequest(requestId) {
 
 function loadMehrBadge() {
     const tab = document.getElementById('tab-mehr');
-    if (!tab) return;
-    const total = Array.from(tab.querySelectorAll('span[id$="-badge"]'))
+    if (!tab) { console.log('loadMehrBadge: #tab-mehr nicht gefunden'); return; }
+    const spans = Array.from(tab.querySelectorAll('span[id$="-badge"]'));
+    console.log('loadMehrBadge spans:', spans.map(el => ({ id: el.id, display: el.style.display, text: el.textContent })));
+    const total = spans
         .filter(el => el.style.display !== 'none')
         .reduce((sum, el) => sum + (parseInt(el.textContent) || 0), 0);
+    console.log('loadMehrBadge total:', total);
     const badge = document.getElementById('mehr-badge');
     if (badge) {
         if (total > 0) { badge.textContent = total; badge.style.display = 'inline'; }
