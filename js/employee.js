@@ -420,7 +420,7 @@ async function loadVacationAccount() {
     _vacYear = new Date().getFullYear();
     document.getElementById('vacation-year-label').textContent = _vacYear;
 
-    const [{ data: emp }, { data: phases }, { data: requests }] = await Promise.all([
+    const [{ data: emp }, { data: phases }, { data: requests }, { data: termination }] = await Promise.all([
         db.from('employees_planit')
             .select('vacation_days_per_year, start_date, hours_per_vacation_day, carry_over_days, carry_over_hours')
             .eq('id', currentEmployee.id)
@@ -434,7 +434,13 @@ async function loadVacationAccount() {
             .eq('employee_id', currentEmployee.id)
             .eq('status', 'approved')
             .gte('start_date', `${_vacYear}-01-01`)
-            .lte('start_date', `${_vacYear}-12-31`)
+            .lte('start_date', `${_vacYear}-12-31`),
+        db.from('planit_terminations')
+            .select('requested_date')
+            .eq('employee_id', currentEmployee.id)
+            .eq('status', 'approved')
+            .limit(1)
+            .maybeSingle(),
     ]);
 
     _vacEmp = emp;
@@ -442,9 +448,16 @@ async function loadVacationAccount() {
     _vacRequests = requests || [];
 
     const cutoffEl = document.getElementById('vac-cutoff');
-    cutoffEl.value = `${_vacYear}-12-31`;
+    const terminationCutoff = termination?.requested_date || null;
+    if (terminationCutoff) {
+        cutoffEl.value = terminationCutoff;
+        cutoffEl.disabled = true;
+    } else {
+        cutoffEl.value = `${_vacYear}-12-31`;
+        cutoffEl.disabled = false;
+    }
 
-    renderVacationAccount(`${_vacYear}-12-31`);
+    renderVacationAccount(terminationCutoff || `${_vacYear}-12-31`);
 }
 
 function renderVacationAccount(cutoffDate) {
