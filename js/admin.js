@@ -3082,6 +3082,7 @@ function loadMehrBadge() {
         } else {
             badge.setAttribute('style', baseStyle + ' display:none;');
         }
+        console.log('mehr-badge style nach set:', document.getElementById('mehr-badge')?.getAttribute('style'));
     }
 }
 
