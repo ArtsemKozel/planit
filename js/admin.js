@@ -150,9 +150,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadAdminVacationCalendar(),
         loadArchiveBadge(),
         loadSickLeaves(),
+        loadRequestsBadge(),
+        loadTerminationBadge(),
+        loadInventurBadge(),
+        loadMehrBadge(),
     ]);
-    await Promise.all([loadRequestsBadge(), loadTerminationBadge(), loadInventurBadge()]);
-    setTimeout(() => loadMehrBadge(), 500);
 });
 
 function getBWHolidays(year) {
@@ -3061,22 +3063,22 @@ async function rejectRequest(requestId) {
     await loadRequests();
 }
 
-function loadMehrBadge() {
-    const tab = document.getElementById('tab-mehr');
-    if (!tab) return;
-    const spans = Array.from(tab.querySelectorAll('span[id$="-badge"]'));
-    const total = spans
-        .filter(el => el.style.display !== 'none')
-        .reduce((sum, el) => sum + (parseInt(el.textContent) || 0), 0);
+async function loadMehrBadge() {
+    const uid = adminSession.user.id;
+    const [{ data: terminations }, { data: vacations }, { data: inventur }] = await Promise.all([
+        db.from('planit_terminations').select('id').eq('user_id', uid).eq('status', 'pending'),
+        db.from('vacation_requests').select('id').eq('user_id', uid).eq('status', 'pending'),
+        db.from('planit_inventory_submissions').select('id').eq('user_id', uid),
+    ]);
+    const total = (terminations?.length || 0) + (vacations?.length || 0) + (inventur?.length || 0);
     const badge = document.getElementById('mehr-badge');
-    if (badge) {
-        const baseStyle = 'position:absolute; top:-4px; right:-6px; z-index:10; background:var(--color-danger); color:white; border-radius:50%; font-size:0.6rem; font-weight:700; min-width:14px; height:14px; line-height:14px; text-align:center; padding:0 2px;';
-        if (total > 0) {
-            badge.textContent = total;
-            badge.setAttribute('style', baseStyle + ' display:inline;');
-        } else if (badge.style.display !== 'inline') {
-            badge.setAttribute('style', baseStyle + ' display:none;');
-        }
+    if (!badge) return;
+    const baseStyle = 'position:absolute; top:-4px; right:-6px; z-index:10; background:var(--color-danger); color:white; border-radius:50%; font-size:0.6rem; font-weight:700; min-width:14px; height:14px; line-height:14px; text-align:center; padding:0 2px;';
+    if (total > 0) {
+        badge.textContent = total;
+        badge.setAttribute('style', baseStyle + ' display:inline;');
+    } else {
+        badge.setAttribute('style', baseStyle + ' display:none;');
     }
 }
 
