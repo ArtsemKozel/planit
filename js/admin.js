@@ -3063,13 +3063,16 @@ async function rejectRequest(requestId) {
     await loadRequests();
 }
 
-function loadMehrBadge() {
-    const counts = ['requests-badge', 'termination-badge', 'inventur-badge']
-        .map(id => { const el = document.getElementById(id); return el && el.style.display !== 'none' ? (parseInt(el.textContent) || 0) : 0; })
-        .reduce((a, b) => a + b, 0);
+async function loadMehrBadge() {
+    const [{ count: cReq }, { count: cTerm }, { count: cInv }] = await Promise.all([
+        db.from('open_shift_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        db.from('planit_terminations').select('*', { count: 'exact', head: true }).eq('user_id', adminSession.user.id).eq('status', 'pending'),
+        db.from('planit_inventory_submissions').select('*', { count: 'exact', head: true }).eq('user_id', adminSession.user.id),
+    ]);
+    const total = (cReq ?? 0) + (cTerm ?? 0) + (cInv ?? 0);
     const badge = document.getElementById('mehr-badge');
     if (badge) {
-        if (counts > 0) { badge.textContent = counts; badge.style.display = 'inline'; }
+        if (total > 0) { badge.textContent = total; badge.style.display = 'inline'; }
         else { badge.style.display = 'none'; }
     }
 }
