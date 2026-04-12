@@ -420,7 +420,7 @@ async function loadVacationAccount() {
     _vacYear = new Date().getFullYear();
     document.getElementById('vacation-year-label').textContent = _vacYear;
 
-    const [{ data: emp }, { data: phases }, { data: requests }, { data: termination }] = await Promise.all([
+    const [{ data: emp }, { data: phases }, { data: requests }] = await Promise.all([
         db.from('employees_planit')
             .select('vacation_days_per_year, start_date, hours_per_vacation_day, carry_over_days, carry_over_hours')
             .eq('id', currentEmployee.id)
@@ -435,12 +435,6 @@ async function loadVacationAccount() {
             .eq('status', 'approved')
             .gte('start_date', `${_vacYear}-01-01`)
             .lte('start_date', `${_vacYear}-12-31`),
-        db.from('planit_terminations')
-            .select('approved_date')
-            .eq('employee_id', currentEmployee.id)
-            .eq('status', 'approved')
-            .limit(1)
-            .maybeSingle(),
     ]);
 
     _vacEmp = emp;
@@ -448,20 +442,32 @@ async function loadVacationAccount() {
     _vacRequests = requests || [];
 
     const cutoffEl = document.getElementById('vac-cutoff');
-    const terminationCutoff = termination?.approved_date || null;
-    if (terminationCutoff) {
-        cutoffEl.value = terminationCutoff;
+    cutoffEl.value = `${_vacYear}-12-31`;
+    cutoffEl.disabled = false;
+
+    renderVacationAccount(`${_vacYear}-12-31`);
+}
+
+async function renderVacationAccount(cutoffDate) {
+    if (!_vacEmp && !_vacPhases) return;
+
+    // Genehmigte Kündigung prüfen
+    const { data: termination } = await db.from('planit_terminations')
+        .select('approved_date')
+        .eq('employee_id', currentEmployee.id)
+        .eq('status', 'approved')
+        .limit(1)
+        .maybeSingle();
+
+    const cutoffEl = document.getElementById('vac-cutoff');
+    if (termination?.approved_date) {
+        cutoffDate = termination.approved_date;
+        cutoffEl.value = termination.approved_date;
         cutoffEl.disabled = true;
     } else {
-        cutoffEl.value = `${_vacYear}-12-31`;
         cutoffEl.disabled = false;
     }
 
-    renderVacationAccount(terminationCutoff || `${_vacYear}-12-31`);
-}
-
-function renderVacationAccount(cutoffDate) {
-    if (!_vacEmp && !_vacPhases) return;
     const year = _vacYear;
     const yearStart = `${year}-01-01`;
     const yearEnd = cutoffDate || `${year}-12-31`;
