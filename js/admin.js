@@ -3063,13 +3063,12 @@ async function rejectRequest(requestId) {
     await loadRequests();
 }
 
-async function loadMehrBadge() {
-    const [{ count: cReq }, { count: cTerm }, { count: cInv }] = await Promise.all([
-        db.from('open_shift_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        db.from('planit_terminations').select('*', { count: 'exact', head: true }).eq('user_id', adminSession.user.id).eq('status', 'pending'),
-        db.from('planit_inventory_submissions').select('*', { count: 'exact', head: true }).eq('user_id', adminSession.user.id),
-    ]);
-    const total = (cReq ?? 0) + (cTerm ?? 0) + (cInv ?? 0);
+function loadMehrBadge() {
+    const tab = document.getElementById('tab-mehr');
+    if (!tab) return;
+    const total = Array.from(tab.querySelectorAll('span[id$="-badge"]'))
+        .filter(el => el.style.display !== 'none')
+        .reduce((sum, el) => sum + (parseInt(el.textContent) || 0), 0);
     const badge = document.getElementById('mehr-badge');
     if (badge) {
         if (total > 0) { badge.textContent = total; badge.style.display = 'inline'; }
