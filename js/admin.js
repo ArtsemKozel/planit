@@ -3078,6 +3078,7 @@ async function loadMehrBadge() {
     if (total > 0) {
         badge.textContent = total;
         badge.setAttribute('style', baseStyle + ' display:inline;');
+        console.log('mehr-badge nach set:', badge.style.display, badge.textContent);
     } else {
         badge.setAttribute('style', baseStyle + ' display:none;');
     }
