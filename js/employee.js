@@ -2297,7 +2297,6 @@ async function submitTermination() {
         const textBefore = splitIdx >= 0 ? fullText.substring(0, splitIdx + splitMarker.length) : fullText;
         const textAfter  = splitIdx >= 0 ? fullText.substring(splitIdx + splitMarker.length).trim() : '';
 
-        console.log('jsPDF geladen:', typeof window.jspdf);
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
         doc.setFontSize(10);
@@ -2330,12 +2329,9 @@ async function submitTermination() {
 
         const pdfBlob = doc.output('blob');
         const fileName = `${currentEmployee.user_id}/${currentEmployee.id}_${date}.pdf`;
-        const { data: uploadData, error: uploadError } = await db.storage
+        const { error: uploadError } = await db.storage
             .from('termination-pdfs')
             .upload(fileName, pdfBlob, { contentType: 'application/pdf' });
-
-        console.log('Upload error:', uploadError);
-        console.log('Upload data:', uploadData);
 
         if (!uploadError && inserted?.id) {
             await db.from('planit_terminations').update({ pdf_url: fileName }).eq('id', inserted.id);

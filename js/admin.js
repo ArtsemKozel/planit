@@ -3064,24 +3064,20 @@ async function rejectRequest(requestId) {
 
 function loadMehrBadge() {
     const tab = document.getElementById('tab-mehr');
-    if (!tab) { console.log('loadMehrBadge: #tab-mehr nicht gefunden'); return; }
+    if (!tab) return;
     const spans = Array.from(tab.querySelectorAll('span[id$="-badge"]'));
-    console.log('loadMehrBadge spans:', spans.map(el => ({ id: el.id, display: el.style.display, text: el.textContent })));
     const total = spans
         .filter(el => el.style.display !== 'none')
         .reduce((sum, el) => sum + (parseInt(el.textContent) || 0), 0);
-    console.log('loadMehrBadge total:', total);
     const badge = document.getElementById('mehr-badge');
-    console.log('mehr-badge element:', badge);
     if (badge) {
         const baseStyle = 'position:absolute; top:-4px; right:-6px; z-index:10; background:var(--color-danger); color:white; border-radius:50%; font-size:0.6rem; font-weight:700; min-width:14px; height:14px; line-height:14px; text-align:center; padding:0 2px;';
         if (total > 0) {
             badge.textContent = total;
             badge.setAttribute('style', baseStyle + ' display:inline;');
-        } else {
+        } else if (badge.style.display !== 'inline') {
             badge.setAttribute('style', baseStyle + ' display:none;');
         }
-        console.log('mehr-badge style nach set:', document.getElementById('mehr-badge')?.getAttribute('style'));
     }
 }
 
