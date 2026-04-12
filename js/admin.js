@@ -3073,6 +3073,7 @@ function loadMehrBadge() {
         .reduce((sum, el) => sum + (parseInt(el.textContent) || 0), 0);
     console.log('loadMehrBadge total:', total);
     const badge = document.getElementById('mehr-badge');
+    console.log('mehr-badge element:', badge);
     if (badge) {
         if (total > 0) { badge.textContent = total; badge.style.display = 'inline'; }
         else { badge.style.display = 'none'; }
