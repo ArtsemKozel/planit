@@ -151,6 +151,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadRequestsBadge(),
         loadInventurBadge(),
         loadTerminationBadge(),
+        loadArchiveBadge(),
         loadSickLeaves(),
     ]);
 });
@@ -1719,6 +1720,35 @@ async function loadAllAvailabilities() {
 
 // ── TEAM ──────────────────────────────────────────────────
 async function loadTeam() {
+    // Archivierungs-Hinweis
+    const today = new Date().toISOString().split('T')[0];
+    const { data: archivePending } = await db
+        .from('planit_terminations')
+        .select('employee_id, approved_date, employees_planit!planit_terminations_employee_id_fkey(name, is_active)')
+        .eq('user_id', adminSession.user.id)
+        .eq('status', 'approved')
+        .lte('approved_date', today);
+
+    const toArchive = (archivePending || []).filter(t => t.employees_planit?.is_active === true);
+    const archiveCard = document.getElementById('archive-pending-card');
+    if (toArchive.length > 0) {
+        archiveCard.style.display = 'block';
+        archiveCard.innerHTML = `
+            <div class="card" style="border-left:3px solid var(--color-danger);">
+                <div style="font-size:0.8rem; font-weight:700; color:var(--color-danger); margin-bottom:0.75rem;">ARCHIVIERUNG AUSSTEHEND</div>
+                ${toArchive.map(t => `
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:0.35rem 0; border-top:1px solid var(--color-border);">
+                        <div>
+                            <div style="font-weight:600; font-size:0.9rem;">${t.employees_planit?.name || '–'}</div>
+                            <div style="font-size:0.78rem; color:var(--color-text-light);">Letzter Arbeitstag: ${new Date(t.approved_date + 'T12:00:00').toLocaleDateString('de-DE', { day:'numeric', month:'long', year:'numeric' })}</div>
+                        </div>
+                        <button class="btn-small btn-delete btn-icon" onclick="archiveEmployee('${t.employee_id}')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+                    </div>`).join('')}
+            </div>`;
+    } else {
+        archiveCard.style.display = 'none';
+    }
+
     // Geburtstage diesen Monat
     const thisMonth = new Date().getMonth() + 1;
     const birthdays = employees.filter(e => {
@@ -3127,6 +3157,35 @@ async function deleteTermination(id) {
     await db.from('planit_terminations').delete().eq('id', id);
     await loadTerminations();
     await loadTerminationBadge();
+}
+
+async function loadArchiveBadge() {
+    const today = new Date().toISOString().split('T')[0];
+    const { data } = await db
+        .from('planit_terminations')
+        .select('employee_id, employees_planit!planit_terminations_employee_id_fkey(name, is_active)')
+        .eq('user_id', adminSession.user.id)
+        .eq('status', 'approved')
+        .lte('approved_date', today);
+
+    const pending = (data || []).filter(t => t.employees_planit?.is_active === true);
+
+    const badge = document.getElementById('archive-badge');
+    if (badge) {
+        if (pending.length > 0) {
+            badge.textContent = pending.length;
+            badge.style.display = 'inline';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+}
+
+async function archiveEmployee(employeeId) {
+    await db.from('employees_planit').update({ is_active: false }).eq('id', employeeId);
+    await loadEmployees();
+    await loadTeam();
+    await loadArchiveBadge();
 }
 
 async function loadTerminationBadge() {
