@@ -3075,7 +3075,7 @@ function loadMehrBadge() {
     const badge = document.getElementById('mehr-badge');
     console.log('mehr-badge element:', badge);
     if (badge) {
-        const baseStyle = 'position:absolute; top:-4px; right:-6px; background:var(--color-danger); color:white; border-radius:50%; font-size:0.6rem; font-weight:700; min-width:14px; height:14px; line-height:14px; text-align:center; padding:0 2px;';
+        const baseStyle = 'position:absolute; top:-4px; right:-6px; z-index:10; background:var(--color-danger); color:white; border-radius:50%; font-size:0.6rem; font-weight:700; min-width:14px; height:14px; line-height:14px; text-align:center; padding:0 2px;';
         if (total > 0) {
             badge.textContent = total;
             badge.setAttribute('style', baseStyle + ' display:inline;');
