@@ -152,7 +152,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadSickLeaves(),
     ]);
     await Promise.all([loadRequestsBadge(), loadTerminationBadge(), loadInventurBadge()]);
-    loadMehrBadge();
+    setTimeout(() => loadMehrBadge(), 500);
 });
 
 function getBWHolidays(year) {
