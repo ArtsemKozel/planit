@@ -153,6 +153,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadRequestsBadge(),
         loadTerminationBadge(),
         loadInventurBadge(),
+        loadUrlaubBadge(),
         loadMehrBadge(),
     ]);
 });
@@ -3081,6 +3082,23 @@ async function loadMehrBadge() {
         console.log('mehr-badge nach set:', badge.style.display, badge.textContent);
     } else {
         badge.setAttribute('style', baseStyle + ' display:none;');
+    }
+}
+
+async function loadUrlaubBadge() {
+    const { data } = await db
+        .from('vacation_requests')
+        .select('id')
+        .eq('user_id', adminSession.user.id)
+        .eq('status', 'pending');
+
+    const badge = document.getElementById('urlaub-badge');
+    if (!badge) return;
+    if (data && data.length > 0) {
+        badge.textContent = data.length;
+        badge.style.display = 'inline';
+    } else {
+        badge.style.display = 'none';
     }
 }
 
