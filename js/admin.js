@@ -148,12 +148,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadDepartments(),
         loadAdminAvailability(),
         loadAdminVacationCalendar(),
-        loadRequestsBadge(),
-        loadInventurBadge(),
-        loadTerminationBadge(),
         loadArchiveBadge(),
         loadSickLeaves(),
     ]);
+    await Promise.all([loadRequestsBadge(), loadTerminationBadge(), loadInventurBadge()]);
+    loadMehrBadge();
 });
 
 function getBWHolidays(year) {
@@ -3094,7 +3093,6 @@ async function loadRequestsBadge() {
     } else {
         badge.style.display = 'none';
     }
-    loadMehrBadge();
 }
 
 async function loadTerminations() {
@@ -3256,7 +3254,6 @@ async function loadTerminationBadge() {
             badge.style.display = 'none';
         }
     }
-    loadMehrBadge();
 }
 
 async function loadInventurBadge() {
@@ -3272,7 +3269,6 @@ async function loadInventurBadge() {
     } else {
         badge.style.display = 'none';
     }
-    loadMehrBadge();
 }
 
 async function loadInventurSubmissions() {
