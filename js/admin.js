@@ -3075,8 +3075,13 @@ function loadMehrBadge() {
     const badge = document.getElementById('mehr-badge');
     console.log('mehr-badge element:', badge);
     if (badge) {
-        if (total > 0) { badge.textContent = total; badge.style.display = 'inline'; }
-        else { badge.style.display = 'none'; }
+        const baseStyle = 'position:absolute; top:-4px; right:-6px; background:var(--color-danger); color:white; border-radius:50%; font-size:0.6rem; font-weight:700; min-width:14px; height:14px; line-height:14px; text-align:center; padding:0 2px;';
+        if (total > 0) {
+            badge.textContent = total;
+            badge.setAttribute('style', baseStyle + ' display:inline;');
+        } else {
+            badge.setAttribute('style', baseStyle + ' display:none;');
+        }
     }
 }
 
