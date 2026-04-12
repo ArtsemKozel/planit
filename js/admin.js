@@ -3066,12 +3066,11 @@ async function rejectRequest(requestId) {
 
 async function loadMehrBadge() {
     const uid = adminSession.user.id;
-    const [{ data: terminations }, { data: vacations }, { data: inventur }] = await Promise.all([
+    const [{ data: terminations }, { data: inventur }] = await Promise.all([
         db.from('planit_terminations').select('id').eq('user_id', uid).eq('status', 'pending'),
-        db.from('vacation_requests').select('id').eq('user_id', uid).eq('status', 'pending'),
         db.from('planit_inventory_submissions').select('id').eq('user_id', uid),
     ]);
-    const total = (terminations?.length || 0) + (vacations?.length || 0) + (inventur?.length || 0);
+    const total = (terminations?.length || 0) + (inventur?.length || 0);
     console.log('mehr total:', total);
     const badge = document.getElementById('mehr-badge');
     if (!badge) return;
