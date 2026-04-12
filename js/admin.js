@@ -3138,6 +3138,12 @@ async function approveTermination(id) {
     const approvedDate = t?.requested_date || null;
     await db.from('planit_terminations').update({ status: 'approved', approved_date: approvedDate }).eq('id', id);
     if (approvedDate && t?.employee_id) {
+        // Phasen mit start_date > approved_date löschen (versehentlich angelegte)
+        await db.from('employment_phases')
+            .delete()
+            .eq('employee_id', t.employee_id)
+            .gt('start_date', approvedDate);
+        // Offene Phase schließen
         await db.from('employment_phases')
             .update({ end_date: approvedDate })
             .eq('employee_id', t.employee_id)
