@@ -3191,6 +3191,19 @@ async function deleteTermination(id) {
     }
     await loadTerminations();
     await loadTerminationBadge();
+
+    if (t?.employee_id) {
+        switchTab('team');
+        await loadTeam();
+        toggleTeamEmployee(t.employee_id);
+        const body = document.getElementById(`teambody-${t.employee_id}`);
+        if (body) {
+            const hint = document.createElement('div');
+            hint.style.cssText = 'background:#FFF3CD; border-radius:8px; padding:0.65rem 0.85rem; font-size:0.85rem; color:#856404; margin-bottom:0.75rem;';
+            hint.textContent = 'Bitte Beschäftigungsphasen prüfen und anpassen.';
+            body.prepend(hint);
+        }
+    }
 }
 
 async function loadArchiveBadge() {
