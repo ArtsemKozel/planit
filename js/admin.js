@@ -9,6 +9,7 @@ let planningMode = false;
 let availabilityCache = {};
 let urlaubYear = new Date().getFullYear();
 let vacationExplainData = {};
+let _terminationDates = {}; // { employee_id: requested_date }
 
 function _cutoffChangeHandler(e) {
     const input = e.target;
@@ -3515,7 +3516,7 @@ async function loadUrlaubsverwaltung() {
     container.innerHTML = '<div style="color:var(--color-text-light);">Wird geladen...</div>';
 
     // Frische Mitarbeiterdaten laden (inkl. carry_over_days/hours)
-    const [{ data: freshEmps }, { data: allPhases }, { data: vacations }, { data: allShifts }] = await Promise.all([
+    const [{ data: freshEmps }, { data: allPhases }, { data: vacations }, { data: allShifts }, { data: terminations }] = await Promise.all([
         db.from('employees_planit')
             .select('*')
             .eq('user_id', adminSession.user.id)
@@ -3536,8 +3537,15 @@ async function loadUrlaubsverwaltung() {
             .eq('user_id', adminSession.user.id)
             .gte('shift_date', `${year}-01-01`)
             .lte('shift_date', `${year}-12-31`)
-            .not('employee_id', 'is', null)
+            .not('employee_id', 'is', null),
+        db.from('planit_terminations')
+            .select('employee_id, requested_date')
+            .eq('user_id', adminSession.user.id)
+            .eq('status', 'approved'),
     ]);
+
+    _terminationDates = {};
+    (terminations || []).forEach(t => { _terminationDates[t.employee_id] = t.requested_date; });
 
     container.innerHTML = '';
     container.removeEventListener('change', _cutoffChangeHandler);
@@ -3549,7 +3557,8 @@ async function loadUrlaubsverwaltung() {
 
         // Urlaubskonto berechnen
         const empPhases = (allPhases || []).filter(p => p.employee_id === emp.id);
-        const account = calculateVacationAccount(emp, year, vacations || [], [], empPhases);
+        const terminationCutoff = _terminationDates[emp.id] || null;
+        const account = calculateVacationAccount(emp, year, vacations || [], [], empPhases, terminationCutoff);
         const empVacations = (vacations || []).filter(v => v.employee_id === emp.id).sort((a, b) => a.start_date.localeCompare(b.start_date));
         vacationExplainData[emp.id] = { emp, account, phases: empPhases, vacations: empVacations, year };
 
@@ -3597,8 +3606,8 @@ async function loadUrlaubsverwaltung() {
         // Konto-Übersicht
         body.innerHTML = `
             <div class="form-group">
-                <label>Anspruch bis</label>
-                <input type="date" id="cutoff-${emp.id}" value="${year}-12-31" data-empid="${emp.id}">
+                <label>Anspruch bis${terminationCutoff ? ' <span style="font-size:0.78rem; background:#E6F4E6; color:#2d7a2d; border-radius:6px; padding:1px 6px; vertical-align:middle;">Kündigung genehmigt</span>' : ''}</label>
+                <input type="date" id="cutoff-${emp.id}" value="${terminationCutoff || `${year}-12-31`}" data-empid="${emp.id}"${terminationCutoff ? ' disabled' : ''}>
             </div>
             <div id="account-boxes-${emp.id}">${buildAccountBoxesHtml(emp.id, account)}</div>
             ${empPhases.length > 0
@@ -3752,7 +3761,7 @@ function buildAccountBoxesHtml(empId, account) {
 function updateEmpAccount(empId) {
     const d = vacationExplainData[empId];
     if (!d) return;
-    const cutoff = document.getElementById(`cutoff-${empId}`)?.value || `${d.year}-12-31`;
+    const cutoff = _terminationDates[empId] || document.getElementById(`cutoff-${empId}`)?.value || `${d.year}-12-31`;
     const account = calculateVacationAccount(d.emp, d.year, d.vacations, [], d.phases, cutoff);
     vacationExplainData[empId].account = account;
     document.getElementById(`account-boxes-${empId}`).innerHTML = buildAccountBoxesHtml(empId, account);
