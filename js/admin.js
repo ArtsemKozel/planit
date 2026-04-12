@@ -154,7 +154,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadArchiveBadge(),
         loadSickLeaves(),
     ]);
-    loadMehrBadge();
 });
 
 function getBWHolidays(year) {
