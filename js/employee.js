@@ -436,7 +436,7 @@ async function loadVacationAccount() {
             .gte('start_date', `${_vacYear}-01-01`)
             .lte('start_date', `${_vacYear}-12-31`),
         db.from('planit_terminations')
-            .select('requested_date')
+            .select('approved_date')
             .eq('employee_id', currentEmployee.id)
             .eq('status', 'approved')
             .limit(1)
@@ -448,7 +448,7 @@ async function loadVacationAccount() {
     _vacRequests = requests || [];
 
     const cutoffEl = document.getElementById('vac-cutoff');
-    const terminationCutoff = termination?.requested_date || null;
+    const terminationCutoff = termination?.approved_date || null;
     if (terminationCutoff) {
         cutoffEl.value = terminationCutoff;
         cutoffEl.disabled = true;
