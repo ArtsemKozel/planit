@@ -7056,13 +7056,16 @@ async function loadHygiene() {
     }
 
     const inactiveHtml = `
-        <details style="margin-top:1.5rem;" ontoggle="this.querySelector('.hyg-inactive-arrow').textContent=this.open?'▼':'▶'">
-            <summary style="cursor:pointer; font-weight:700; font-size:1.1rem; color:var(--color-primary); padding:0.5rem 0; list-style:none; display:flex; justify-content:space-between; align-items:center;">
-                Ehemalige Mitarbeiter
-                <span class="hyg-inactive-arrow" style="font-size:0.85rem;">▶</span>
-            </summary>
-            ${inactiveContent}
-        </details>`;
+        <div style="margin-top:1.5rem;">
+            <div onclick="const b=document.getElementById('hygiene-inactive-body'); const open=b.style.display!=='none'; b.style.display=open?'none':'block'; this.querySelector('.hyg-inactive-arrow').textContent=open?'▶':'▼';"
+                 style="display:flex; justify-content:space-between; align-items:center; padding:0.75rem; background:#F5F5F5; border-radius:8px; cursor:pointer;">
+                <span style="font-weight:700; font-size:1.1rem; color:var(--color-primary);">Ehemalige Mitarbeiter</span>
+                <span class="hyg-inactive-arrow" style="font-size:0.85rem; color:var(--color-text-light);">▶</span>
+            </div>
+            <div id="hygiene-inactive-body" style="display:none; margin-top:0.5rem;">
+                ${inactiveContent}
+            </div>
+        </div>`;
 
     container.innerHTML = activeHtml + inactiveHtml;
 }
@@ -7082,7 +7085,7 @@ async function saveHygiene(employeeId) {
 async function saveHygieneLinks() {
     const erst = document.getElementById('hygiene-link-erst').value.trim() || null;
     const erneuerung = document.getElementById('hygiene-link-erneuerung').value.trim() || null;
-    const btn = document.querySelector('#hygiene-links-details button');
+    const btn = document.querySelector('#hygiene-links-body button');
     if (btn) { btn.disabled = true; btn.textContent = 'Speichert…'; }
 
     const { error } = await db.from('planit_restaurants')
@@ -7096,14 +7099,17 @@ async function saveHygieneLinks() {
         return;
     }
 
-    document.getElementById('hygiene-links-details').removeAttribute('open');
+    const body = document.getElementById('hygiene-links-body');
+    if (body) body.style.display = 'none';
+    const arrow = document.querySelector('.hyg-links-arrow');
+    if (arrow) arrow.textContent = '▶';
 
-    const summary = document.querySelector('#hygiene-links-details summary');
-    if (summary) {
+    const header = document.querySelector('.hyg-links-arrow')?.closest('div[style*="background:#F5F5F5"]');
+    if (header) {
         const msg = document.createElement('span');
         msg.textContent = ' ✓ Gespeichert';
-        msg.style.cssText = 'font-size:0.8rem; color:#155724; font-weight:500;';
-        summary.appendChild(msg);
+        msg.style.cssText = 'font-size:0.8rem; color:#155724; font-weight:500; margin-left:0.5rem;';
+        header.querySelector('span:first-child').appendChild(msg);
         setTimeout(() => msg.remove(), 2500);
     }
 }

@@ -605,12 +605,13 @@
             <div style="font-size:1.1rem; font-weight:700; color:var(--color-text); text-align:center;">Hygieneschutzbelehrung</div>
             <div></div>
         </div>
-        <details id="hygiene-links-details" style="margin-bottom:1rem;" ontoggle="this.querySelector('.hyg-links-arrow').textContent=this.open?'▼':'▶'">
-            <summary style="cursor:pointer; font-weight:700; font-size:1.1rem; color:var(--color-primary); padding:0.5rem 0; list-style:none; display:flex; justify-content:space-between; align-items:center;">
-                Links
-                <span class="hyg-links-arrow" style="font-size:0.85rem;">▶</span>
-            </summary>
-            <div style="padding-top:0.5rem;">
+        <div style="margin-bottom:1rem;">
+            <div onclick="const b=document.getElementById('hygiene-links-body'); const open=b.style.display!=='none'; b.style.display=open?'none':'block'; this.querySelector('.hyg-links-arrow').textContent=open?'▶':'▼';"
+                 style="display:flex; justify-content:space-between; align-items:center; padding:0.75rem; background:#F5F5F5; border-radius:8px; cursor:pointer;">
+                <span style="font-weight:700; font-size:1.1rem; color:var(--color-primary);">Links</span>
+                <span class="hyg-links-arrow" style="font-size:0.85rem; color:var(--color-text-light);">▶</span>
+            </div>
+            <div id="hygiene-links-body" style="display:none; padding:0.75rem 0 0.25rem;">
                 <div class="form-group">
                     <label>Link Erstbelehrung</label>
                     <input type="url" id="hygiene-link-erst" placeholder="https://…" style="width:100%;">
@@ -621,7 +622,7 @@
                 </div>
                 <button class="btn-primary" onclick="saveHygieneLinks()" style="padding:0.4rem 1rem; font-size:0.85rem;">Speichern</button>
             </div>
-        </details>
+        </div>
         <div id="hygiene-list">
             <div class="empty-state"><p>Lädt…</p></div>
         </div>
