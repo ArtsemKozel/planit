@@ -6983,7 +6983,7 @@ async function loadHygiene() {
                             <input type="date" id="hyg-erste-${emp.id}" value="${emp.hygiene_erste || ''}" style="width:100%; padding:0.4rem; font-size:0.85rem; border:1px solid #ddd; border-radius:6px;">
                         </div>
                         <div>
-                            <label style="font-size:0.75rem; color:var(--color-text-light); display:block; margin-bottom:0.25rem;">Letzte Erneuerung</label>
+                            <label style="font-size:0.75rem; color:var(--color-text-light); display:block; margin-bottom:0.25rem;">Letzte</label>
                             <input type="date" id="hyg-letzte-${emp.id}" value="${emp.hygiene_letzte || ''}" style="width:100%; padding:0.4rem; font-size:0.85rem; border:1px solid #ddd; border-radius:6px;">
                         </div>
                         <div>
