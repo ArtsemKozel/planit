@@ -6945,11 +6945,12 @@ async function loadHygiene() {
     }
 
     function statusBadge(naechste) {
-        if (!naechste) return '<span style="background:#ccc; color:#555; border-radius:10px; padding:0.1rem 0.5rem; font-size:0.75rem; font-weight:600;">Kein Datum</span>';
+        const s = 'width:18px; height:18px; display:inline-block; border-radius:50%; padding:2px; flex-shrink:0;';
+        if (!naechste) return `<span style="${s} background:#ccc;"><svg viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="3"><circle cx="12" cy="12" r="1"/><line x1="12" y1="6" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="18"/><line x1="12" y1="8" x2="12" y2="16"/></svg></span>`;
         const diff = (naechste - today) / (1000 * 60 * 60 * 24);
-        if (diff < 0)  return '<span style="background:var(--color-danger); color:white; border-radius:10px; padding:0.1rem 0.5rem; font-size:0.75rem; font-weight:600;">Abgelaufen</span>';
-        if (diff < 14) return '<span style="background:#FFF3CD; color:#856404; border-radius:10px; padding:0.1rem 0.5rem; font-size:0.75rem; font-weight:600;">Bald fällig</span>';
-        return '<span style="background:#D4EDDA; color:#155724; border-radius:10px; padding:0.1rem 0.5rem; font-size:0.75rem; font-weight:600;">Gültig</span>';
+        if (diff < 0)  return `<span style="${s} background:var(--color-danger);"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span>`;
+        if (diff < 14) return `<span style="${s} background:#f0ad4e;"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><line x1="12" y1="8" x2="12" y2="13"/><circle cx="12" cy="17" r="0.5" fill="white" stroke="white"/></svg></span>`;
+        return `<span style="${s} background:#28a745;"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>`;
     }
 
     const groups = {};
