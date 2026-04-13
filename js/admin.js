@@ -6922,7 +6922,7 @@ async function loadHygiene() {
     const container = document.getElementById('hygiene-list');
     container.innerHTML = '<div style="color:var(--color-text-light); font-size:0.9rem;">Lädt…</div>';
 
-    const [{ data }, { data: restaurant }] = await Promise.all([
+    const [{ data }, { data: restaurant }, { data: inactiveData }] = await Promise.all([
         db.from('employees_planit')
             .select('id, name, department, hygiene_erste, hygiene_letzte, hygiene_gueltig_monate')
             .eq('user_id', adminSession.user.id)
@@ -6932,6 +6932,11 @@ async function loadHygiene() {
             .select('hygiene_link_erst, hygiene_link_erneuerung')
             .eq('user_id', adminSession.user.id)
             .maybeSingle(),
+        db.from('employees_planit')
+            .select('id, name, department, hygiene_erste, hygiene_letzte, hygiene_gueltig_monate')
+            .eq('user_id', adminSession.user.id)
+            .eq('is_active', false)
+            .order('name'),
     ]);
 
     const erstInput = document.getElementById('hygiene-link-erst');
@@ -6974,7 +6979,7 @@ async function loadHygiene() {
         groups[dept].push(emp);
     }
 
-    container.innerHTML = Object.entries(groups).map(([dept, emps]) => {
+    const activeHtml = Object.entries(groups).map(([dept, emps]) => {
         const rows = emps.map(emp => {
             const monate = emp.hygiene_gueltig_monate ?? 12;
             const basisDatum = emp.hygiene_letzte || emp.hygiene_erste || null;
@@ -7019,6 +7024,42 @@ async function loadHygiene() {
             ${rows}
         </div>`;
     }).join('');
+
+    let inactiveHtml = '';
+    if (inactiveData && inactiveData.length > 0) {
+        const inactiveRows = inactiveData.map(emp => {
+            const monate = emp.hygiene_gueltig_monate ?? 12;
+            const basisDatum = emp.hygiene_letzte || emp.hygiene_erste || null;
+            const naechste = basisDatum ? addMonths(basisDatum, monate) : null;
+            const naechsteStr = naechste ? naechste.toISOString().split('T')[0] : null;
+            return `
+            <div style="border-bottom:1px solid #F0F0F0;">
+                <div class="hygiene-row" style="display:grid; gap:0.5rem; align-items:center; padding:0.6rem 0; font-size:0.85rem;">
+                    <div style="font-weight:600; color:var(--color-text-light);">${emp.name}</div>
+                    <div style="color:var(--color-text-light);">${fmtD(emp.hygiene_erste)}</div>
+                    <div style="color:var(--color-text-light);">${naechsteStr ? fmtD(naechsteStr) : '–'}</div>
+                    <div>${statusBadge(naechste)}</div>
+                    <div></div>
+                </div>
+            </div>`;
+        }).join('');
+
+        inactiveHtml = `
+        <details style="margin-top:1.5rem;">
+            <summary style="cursor:pointer; font-size:0.75rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.08em; padding:0.4rem 0; list-style:none; display:flex; justify-content:space-between; align-items:center;">
+                EHEMALIGE MITARBEITER
+                <span style="font-size:0.75rem;">▾</span>
+            </summary>
+            <div style="background:white; border-radius:12px; overflow:hidden; padding:0 0.75rem; margin-top:0.4rem;">
+                <div class="hygiene-row" style="display:grid; gap:0.5rem; padding:0.4rem 0; border-bottom:2px solid #F0F0F0; font-size:0.7rem; font-weight:700; color:var(--color-text-light);">
+                    <div>NAME</div><div>ERSTE</div><div>NÄCHSTE</div><div></div><div></div>
+                </div>
+                ${inactiveRows}
+            </div>
+        </details>`;
+    }
+
+    container.innerHTML = activeHtml + inactiveHtml;
 }
 
 async function saveHygiene(employeeId) {
