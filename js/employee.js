@@ -1546,6 +1546,12 @@ async function loadOverview() {
         return true;
     });
 
+    const { data: hygieneEmp } = await db
+        .from('employees_planit')
+        .select('hygiene_erste, hygiene_letzte, hygiene_gueltig_monate')
+        .eq('id', currentEmployee.id)
+        .maybeSingle();
+
     const openEl = document.getElementById('overview-open-list');
     openEl.innerHTML = '';
 
@@ -1567,6 +1573,41 @@ async function loadOverview() {
             `;
             openEl.appendChild(row);
         });
+    }
+
+    const hygieneCard = document.getElementById('hygiene-info-card');
+    const hygieneErste = hygieneEmp?.hygiene_erste || null;
+    const hygieneLetzte = hygieneEmp?.hygiene_letzte || null;
+    const hygieneMonate = hygieneEmp?.hygiene_gueltig_monate ?? 12;
+
+    if (hygieneErste || hygieneLetzte) {
+        const basis = hygieneLetzte || hygieneErste;
+        const naechste = new Date(basis + 'T00:00:00');
+        naechste.setMonth(naechste.getMonth() + hygieneMonate);
+        const naechsteStr = naechste.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
+        const todayMs = new Date(); todayMs.setHours(0,0,0,0);
+        const diff = (naechste - todayMs) / (1000 * 60 * 60 * 24);
+
+        let badgeBg, badgeColor, badgeText;
+        if (diff < 0) {
+            badgeBg = '#FFE8E8'; badgeColor = '#C0392B';
+            badgeText = 'Abgelaufen — bitte sofort erneuern';
+        } else if (diff < 14) {
+            badgeBg = '#FFF3CD'; badgeColor = '#856404';
+            badgeText = 'Bitte bald erneuern';
+        } else {
+            badgeBg = '#D4EDDA'; badgeColor = '#155724';
+            badgeText = 'Gültig';
+        }
+
+        hygieneCard.innerHTML = `
+            <div class="card" style="margin-bottom:1rem; margin-top:1rem;">
+                <div style="font-weight:700; font-size:0.95rem; margin-bottom:0.5rem;">Hygieneschutzbelehrung</div>
+                <div style="font-size:0.85rem; color:var(--color-text-light); margin-bottom:0.5rem;">Nächste Erneuerung: <strong>${naechsteStr}</strong></div>
+                <span style="font-size:0.8rem; font-weight:600; color:${badgeColor}; background:${badgeBg}; border-radius:6px; padding:0.2rem 0.55rem;">${badgeText}</span>
+            </div>`;
+    } else {
+        hygieneCard.innerHTML = '';
     }
 }
 
