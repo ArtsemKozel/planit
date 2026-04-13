@@ -7000,7 +7000,7 @@ async function loadHygiene() {
         <div style="font-size:0.75rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.08em; margin:1rem 0 0.4rem;">${dept.toUpperCase()}</div>
         <div style="background:white; border-radius:12px; overflow:hidden; padding:0 0.75rem;">
             <div style="display:grid; grid-template-columns:1fr 90px 90px 32px 24px; gap:0.5rem; padding:0.4rem 0; border-bottom:2px solid #F0F0F0; font-size:0.7rem; font-weight:700; color:var(--color-text-light);">
-                <div>NAME</div><div>ERSTBELEHRUNG</div><div>NÄCHSTE</div><div></div><div></div>
+                <div>NAME</div><div>ERSTE</div><div>NÄCHSTE</div><div></div><div></div>
             </div>
             ${rows}
         </div>`;
