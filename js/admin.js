@@ -7057,9 +7057,9 @@ async function loadHygiene() {
 
     const inactiveHtml = `
         <details style="margin-top:1.5rem;" ontoggle="this.querySelector('.hyg-inactive-arrow').textContent=this.open?'▼':'▶'">
-            <summary style="cursor:pointer; font-size:0.75rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.08em; padding:0.4rem 0; list-style:none; display:flex; justify-content:space-between; align-items:center;">
-                EHEMALIGE MITARBEITER
-                <span class="hyg-inactive-arrow" style="font-size:0.75rem;">▶</span>
+            <summary style="cursor:pointer; font-weight:700; font-size:1.1rem; color:var(--color-primary); padding:0.5rem 0; list-style:none; display:flex; justify-content:space-between; align-items:center;">
+                Ehemalige Mitarbeiter
+                <span class="hyg-inactive-arrow" style="font-size:0.85rem;">▶</span>
             </summary>
             ${inactiveContent}
         </details>`;
