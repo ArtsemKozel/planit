@@ -1616,18 +1616,24 @@ async function loadOverview() {
             actionBtn = `<a href="${linkErneuerung}" target="_blank" rel="noopener" style="display:inline-block; margin-top:0.75rem; padding:0.45rem 1rem; background:var(--color-primary); color:#fff; border-radius:8px; font-size:0.85rem; font-weight:600; text-decoration:none;">Jetzt erneuern</a>`;
         }
 
+        const showSubmit = diff < 14 || !hygieneErste;
+        const submitBtn = showSubmit
+            ? `<button onclick="openHygieneSubmitModal()" style="display:inline-block; margin-top:0.5rem; margin-left:${actionBtn ? '0.5rem' : '0'}; padding:0.45rem 1rem; background:transparent; color:var(--color-primary); border:1.5px solid var(--color-primary); border-radius:8px; font-size:0.85rem; font-weight:600; cursor:pointer;">Zertifikat einreichen</button>`
+            : '';
+
         hygieneCard.innerHTML = `
             <div class="card" style="margin-bottom:1rem; margin-top:1rem;">
                 <div style="font-weight:700; font-size:0.95rem; margin-bottom:0.5rem;">Hygieneschutzbelehrung</div>
                 <div style="font-size:0.85rem; color:var(--color-text-light); margin-bottom:0.5rem;">Nächste Erneuerung: <strong>${naechsteStr}</strong></div>
                 <span style="font-size:0.8rem; font-weight:600; color:${badgeColor}; background:${badgeBg}; border-radius:6px; padding:0.2rem 0.55rem;">${badgeText}</span>
-                ${actionBtn}
+                ${actionBtn}${submitBtn}
             </div>`;
     } else if (linkErst) {
         hygieneCard.innerHTML = `
             <div class="card" style="margin-bottom:1rem; margin-top:1rem;">
                 <div style="font-weight:700; font-size:0.95rem; margin-bottom:0.5rem;">Hygieneschutzbelehrung</div>
                 <a href="${linkErst}" target="_blank" rel="noopener" style="display:inline-block; margin-top:0.25rem; padding:0.45rem 1rem; background:var(--color-primary); color:#fff; border-radius:8px; font-size:0.85rem; font-weight:600; text-decoration:none;">Erstbelehrung</a>
+                <button onclick="openHygieneSubmitModal()" style="display:inline-block; margin-top:0.25rem; margin-left:0.5rem; padding:0.45rem 1rem; background:transparent; color:var(--color-primary); border:1.5px solid var(--color-primary); border-radius:8px; font-size:0.85rem; font-weight:600; cursor:pointer;">Zertifikat einreichen</button>
             </div>`;
     } else {
         hygieneCard.innerHTML = '';
@@ -1636,6 +1642,71 @@ async function loadOverview() {
 
 function changeOverviewMonth(dir) {
     overviewDate.setMonth(overviewDate.getMonth() + dir);
+    loadOverview();
+}
+
+function openHygieneSubmitModal() {
+    document.getElementById('hygiene-submit-date').value = '';
+    document.getElementById('hygiene-submit-file').value = '';
+    document.getElementById('hygiene-submit-error').style.display = 'none';
+    document.getElementById('hygiene-submit-modal').classList.add('active');
+}
+
+async function submitHygieneCertificate() {
+    const dateVal = document.getElementById('hygiene-submit-date').value;
+    const fileInput = document.getElementById('hygiene-submit-file');
+    const errorDiv = document.getElementById('hygiene-submit-error');
+    const btn = document.getElementById('hygiene-submit-btn');
+
+    errorDiv.style.display = 'none';
+
+    if (!dateVal) {
+        errorDiv.textContent = 'Bitte ein Datum angeben.';
+        errorDiv.style.display = 'block';
+        return;
+    }
+    if (!fileInput.files || fileInput.files.length === 0) {
+        errorDiv.textContent = 'Bitte eine Datei auswählen.';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    const file = fileInput.files[0];
+    const ext = file.name.split('.').pop();
+    const fileName = `${currentEmployee.user_id}/${currentEmployee.id}_${dateVal}.${ext}`;
+
+    btn.disabled = true;
+    btn.textContent = 'Lädt hoch…';
+
+    const { error: uploadError } = await db.storage
+        .from('hygiene-certificates')
+        .upload(fileName, file, { contentType: file.type, upsert: true });
+
+    if (uploadError) {
+        errorDiv.textContent = 'Upload fehlgeschlagen: ' + uploadError.message;
+        errorDiv.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Absenden';
+        return;
+    }
+
+    const { error: dbError } = await db.from('hygiene_submissions').insert({
+        employee_id: currentEmployee.id,
+        user_id: currentEmployee.user_id,
+        certificate_date: dateVal,
+        certificate_url: fileName,
+    });
+
+    btn.disabled = false;
+    btn.textContent = 'Absenden';
+
+    if (dbError) {
+        errorDiv.textContent = 'Fehler beim Speichern: ' + dbError.message;
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    document.getElementById('hygiene-submit-modal').classList.remove('active');
     loadOverview();
 }
 
