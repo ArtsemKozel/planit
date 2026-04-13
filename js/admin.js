@@ -154,6 +154,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadTerminationBadge(),
         loadInventurBadge(),
         loadUrlaubBadge(),
+        loadHygieneBadge(),
         loadMehrBadge(),
     ]);
 });
@@ -3079,11 +3080,22 @@ async function rejectRequest(requestId) {
 
 async function loadMehrBadge() {
     const uid = adminSession.user.id;
-    const [{ data: terminations }, { data: inventur }] = await Promise.all([
+    const [{ data: terminations }, { data: inventur }, { data: hygieneEmps }] = await Promise.all([
         db.from('planit_terminations').select('id').eq('user_id', uid).eq('status', 'pending'),
         db.from('planit_inventory_submissions').select('id').eq('user_id', uid),
+        db.from('employees_planit').select('hygiene_erste, hygiene_letzte, hygiene_gueltig_monate').eq('user_id', uid).eq('is_active', true),
     ]);
-    const total = (terminations?.length || 0) + (inventur?.length || 0);
+    const soon = new Date();
+    soon.setHours(0, 0, 0, 0);
+    soon.setDate(soon.getDate() + 14);
+    const hygieneCount = (hygieneEmps || []).filter(emp => {
+        const basis = emp.hygiene_letzte || emp.hygiene_erste;
+        if (!basis) return false;
+        const n = new Date(basis + 'T00:00:00');
+        n.setMonth(n.getMonth() + (emp.hygiene_gueltig_monate ?? 12));
+        return n <= soon;
+    }).length;
+    const total = (terminations?.length || 0) + (inventur?.length || 0) + hygieneCount;
     console.log('mehr total:', total);
     const badge = document.getElementById('mehr-badge');
     if (!badge) return;
@@ -3094,6 +3106,36 @@ async function loadMehrBadge() {
     } else {
         badge.style.display = 'none';
     }
+}
+
+async function loadHygieneBadge() {
+    const { data } = await db
+        .from('employees_planit')
+        .select('hygiene_erste, hygiene_letzte, hygiene_gueltig_monate')
+        .eq('user_id', adminSession.user.id)
+        .eq('is_active', true);
+
+    const soon = new Date();
+    soon.setHours(0, 0, 0, 0);
+    soon.setDate(soon.getDate() + 14);
+
+    const count = (data || []).filter(emp => {
+        const basis = emp.hygiene_letzte || emp.hygiene_erste;
+        if (!basis) return false;
+        const n = new Date(basis + 'T00:00:00');
+        n.setMonth(n.getMonth() + (emp.hygiene_gueltig_monate ?? 12));
+        return n <= soon;
+    }).length;
+
+    const badge = document.getElementById('hygiene-badge');
+    if (!badge) return;
+    if (count > 0) {
+        badge.textContent = count;
+        badge.style.display = 'inline';
+    } else {
+        badge.style.display = 'none';
+    }
+    await loadMehrBadge();
 }
 
 async function loadUrlaubBadge() {
