@@ -6938,6 +6938,7 @@ async function loadHygiene() {
             .eq('is_active', false)
             .order('name'),
     ]);
+    console.log('inaktive Mitarbeiter:', inactiveData?.length);
 
     const erstInput = document.getElementById('hygiene-link-erst');
     const erneuerungInput = document.getElementById('hygiene-link-erneuerung');
