@@ -6941,7 +6941,7 @@ async function loadHygiene() {
 
     function fmtD(dateStr) {
         if (!dateStr) return '–';
-        return new Date(dateStr + 'T00:00:00').toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        return new Date(dateStr + 'T00:00:00').toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
     }
 
     function statusBadge(naechste) {
