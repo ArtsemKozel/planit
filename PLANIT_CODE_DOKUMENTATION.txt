@@ -1,6 +1,6 @@
 PLANIT - CODE DOKUMENTATION
 ============================
-Datum: 6. April 2026
+Datum: 13. April 2026
 Zweck: Vollständige Code-Referenz für Claude Code (VS Code) und Claude Browser-Chat
 
 DATEI-ÜBERSICHT:
@@ -49,7 +49,12 @@ DOMContentLoaded            requireAdminSession(), loadEmployees() sequentiell,
                               loadAdminAvailability(),
                               loadAdminVacationCalendar(),
                               loadRequestsBadge(),
+                              loadTerminationBadge(),
                               loadInventurBadge(),
+                              loadUrlaubBadge(),
+                              loadHygieneBadge(),
+                              loadMehrBadge(),
+                              loadArchiveBadge(),
                               loadSickLeaves(),
                             ]) — alle parallel!
 
@@ -99,6 +104,8 @@ loadAvailabilityForWeek(days)  Lädt Verfügbarkeiten für alle Mitarbeiter + Wo
 openShiftModal(employeeId, dateStr, existingShift)
                             Öffnet shift-modal (classList.add('open'))
                             Füllt Felder vor; ruft populateDeptSelect() für shift-department
+                            actual_start_time / actual_end_time: Vorausfüllung mit
+                            start_time / end_time falls noch nicht gesetzt
 closeShiftModal()           Schließt shift-modal; setzt editShiftId = null
 submitShift()               Liest Formular, prüft Verfügbarkeit, ruft saveShift()
 saveShift(payload, repeat, weeks)
@@ -247,9 +254,48 @@ loadInventurSubmissions()   Badge-Zähler für eingereichte Inventuren
 loadInventurDelegation() / saveInventurDelegation()
 toggleDelegationSection()
 
+── MULTI-ABTEILUNG ───────────────────────────────────────────────────────────
+getEmpDepartments(emp)      Parst emp.departments (kommasepariert), fallback auf emp.department
+                            Gibt Array zurück; Trinkgeld-Sync nutzt Schicht-Department
+
+── KÜNDIGUNGEN ───────────────────────────────────────────────────────────────
+loadTerminations()          Lädt planit_terminations; rendert Liste mit Status
+approveTermination(id)      Status → 'approved', setzt approved_date,
+                            schließt employment_phase (end_date = approved_date)
+rejectTermination(id)       Status → 'rejected'
+deleteTermination(id)       Löscht Eintrag; öffnet employment_phase wieder (end_date = null)
+                            Ruft loadMehrBadge() + loadTerminationBadge() am Ende auf
+loadTerminationBadge()      Zählt pending planit_terminations → termination-badge
+                            (in nav-mehr Button)
+
+── HYGIENE ───────────────────────────────────────────────────────────────────
+loadHygiene()               Lädt aktive + inaktive employees_planit + planit_restaurants parallel
+                            Aktive: grupiert nach Abteilung, klappbare Zeilen (▶/▼),
+                              Bearbeitungsfelder (Erstbelehrung, Letzte, Gültig Monate) + Speichern
+                            Inaktive: div-basierter Toggle "Ehemalige Mitarbeiter",
+                              nur Anzeige (Name, Erste, Nächste, Status-Badge)
+                            Links-Block: div-Toggle "Links" mit hygiene-link-erst/-erneuerung
+saveHygiene(employeeId)     Update hygiene_erste, hygiene_letzte, hygiene_gueltig_monate
+                            Ruft loadHygiene() + loadHygieneBadge() auf
+saveHygieneLinks()          Update hygiene_link_erst/-erneuerung in planit_restaurants
+                            Direktes Update ohne vorheriges Select
+                            Bei Erfolg: Body zuklappen + "✓ Gespeichert" 2,5 Sek.
+loadHygieneBadge()          Zählt Mitarbeiter mit naechste ≤ today+14
+                            Setzt hygiene-badge, ruft loadMehrBadge()
+
 ── BADGES ────────────────────────────────────────────────────────────────────
 loadRequestsBadge()         Zählt pending vacation_requests + shift_swaps
 loadInventurBadge()         Zählt neue planit_inventory_submissions
+loadUrlaubBadge()           Zählt pending vacation_requests → urlaub-badge (nav)
+loadTerminationBadge()      Zählt pending planit_terminations → termination-badge
+loadHygieneBadge()          Zählt hygiene-Ablauf ≤ today+14 → hygiene-badge (Mehr-Tab)
+loadMehrBadge()             Fragt DB direkt ab (terminations + inventory + hygiene),
+                            summiert alle → mehr-badge; badge.style.display='inline'
+                            Kein DOM-Lesen → keine Race-Conditions
+
+── RESTAURANT-INFO ───────────────────────────────────────────────────────────
+loadRestaurantInfo()        Lädt planit_restaurants-Daten in Formular
+saveRestaurantInfo()        Update planit_restaurants für user_id
 
 ================================================================================
 JS/EMPLOYEE.JS — FUNKTIONEN NACH BEREICH
@@ -266,6 +312,14 @@ loadOverview()              3 Schichten: vergangene, nächste (Mitte), übernäc
                             Nächste: weißer Hintergrund, goldener Rahmen am Zeitfeld
                             Datum + Uhrzeit: #2C3E50
                             ▼/▲ Toggle "Alle anzeigen"
+                            Hygiene-Info-Box (#hygiene-info-card):
+                              - employees_planit + planit_restaurants parallel geladen
+                              - Status-Badge: grün/gelb/rot nach diff (Tage bis Ablauf)
+                              - "Erstbelehrung"-Link wenn !hygiene_erste + linkErst vorhanden
+                              - "Jetzt erneuern"-Link wenn diff < 14 + linkErneuerung vorhanden
+                              - Karte ohne Daten aber mit linkErst: nur Button, kein Badge
+openHygieneSubmitModal()    [ENTFERNT]
+submitHygieneCertificate()  [ENTFERNT]
 
 ── URLAUB ────────────────────────────────────────────────────────────────────
 loadVacations()             Lädt vacation_requests des Mitarbeiters
@@ -324,6 +378,8 @@ tab-inventur                Inventur (mit Sub-Tabs: inventur, bestellung)
 tab-inventur-config         Inventur-Einstellungen
 tab-mehr                    Weitere Einstellungen
 tab-urlaubsverwaltung       Urlaubskonto-Verwaltung
+tab-hygiene                 Hygieneschutzbelehrung (im Mehr-Bereich)
+tab-restaurant-info         Restaurant-Informationen (im Mehr-Bereich)
 
 ── SCHICHTPLAN ───────────────────────────────────────────────────────────────
 week-grid                   Wochenraster (CSS Grid)
@@ -402,12 +458,19 @@ CSS/STYLES.CSS — WICHTIGE KLASSEN
 .calendar-day-header        Mo/Di/Mi... Kopfzeile
 .avail-day                  Verfügbarkeits-Tag (position:relative für Dreieck-Overlay)
 
+── HYGIENE ────────────────────────────────────────────────────────────────────
+.hygiene-row                CSS Grid: 1fr 1fr 1fr 5% 5% (Name, Erste, Nächste, Badge, Pfeil)
+                            @media (max-width:600px): 1fr 80px 80px 5% 5%
+                            erste Spalte: overflow:hidden; white-space:nowrap; text-overflow:ellipsis
+
 ── SONSTIGE ──────────────────────────────────────────────────────────────────
 .empty-state                Zentrierter Platzhalter-Text
-.section-title              Abschnitts-Überschrift
+.section-title              Abschnitts-Überschrift (font-size:1.1rem, font-weight:700)
 .badge                      Rote Zahl für Benachrichtigungen
 .info-box-clickable         Admin: background #F5F5F5 (inline); Employee: background #FFFFFF (CSS)
                             Kein cursor:pointer
+summary::-webkit-details-marker { display:none } — global in styles.css
+summary { list-style:none } — global in styles.css
 
 ================================================================================
 WICHTIGE TECHNISCHE REGELN
@@ -423,7 +486,7 @@ WICHTIGE TECHNISCHE REGELN
 7.  updateShiftCell() nach Schicht-Änderung für einzelne Zelle
 8.  refreshHoursOverview() nach Schicht-Änderung für Stunden-Summen
 9.  tip_entries Unique: (user_id, entry_date)
-10. tip_hours Unique: (user_id, employee_id, work_date)
+10. tip_hours Unique: (user_id, employee_id, work_date, department)
 11. actual_break_minutes ?? break_minutes ?? 0 — NICHT ||, wegen Wert 0!
 12. Organiser: Container heißt tasks-archive-list (nicht archive-list)
 13. Trinkgeld: saveTrinkgeldResults() nach saveTrinkgeldHours()
@@ -439,6 +502,16 @@ WICHTIGE TECHNISCHE REGELN
 21. checkArbeitszeitWarnings: überspringen wenn actual_start_time || actual_end_time
 22. Verfügbarkeitskalender Urlaubsabfrage: lte start_date ≤ monthEnd + gte end_date ≥ monthStart
 23. Init: loadEmployees() sequentiell, dann alle anderen via Promise.all() parallel
+24. loadMehrBadge() fragt DB direkt ab — NICHT über DOM-Werte (Race-Condition-Schutz)
+25. badge.style.display = 'inline' / 'none' — NICHT setAttribute('style', ...)
+26. Kündigungen: approveTermination() schließt employment_phase (end_date = approved_date)
+    deleteTermination() öffnet employment_phase wieder (end_date = null)
+27. Urlaubskonto: approved_date aus planit_terminations wird als cutoffDate verwendet
+28. Hygiene-Karte in employee.html: auch ohne Belehrungsdatum rendern wenn linkErst vorhanden
+29. saveHygieneLinks(): direktes Update ohne Select; success = body zuklappen + ✓ Meldung
+30. div-Toggle Pattern für klappbare Blöcke im Hygiene-Tab (statt <details>/<summary>):
+    onclick="const b=...; const open=b.style.display!=='none'; b.style.display=open?'none':'block';
+    this.querySelector('.arrow').textContent=open?'▶':'▼';"
 
 ================================================================================
 GIT / DEPLOYMENT
@@ -447,5 +520,5 @@ Branch: main
 Remote: github.com/ArtsemKozel/planit
 Deployment: Cloudflare Pages (automatisch bei Push auf main)
 
-Letzter Commit: 0c42688
-Verfügbarkeitskalender: Dreieck-Markierung für Tage mit Kommentar
+Letzter Commit: 2b25320
+Hygiene-Tab: Links + Ehemalige Mitarbeiter als div-basierte Toggle-Blöcke

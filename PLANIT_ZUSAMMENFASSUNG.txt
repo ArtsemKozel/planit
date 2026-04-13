@@ -1,6 +1,6 @@
 PLANIT - ZUSAMMENFASSUNG FÜR NEUEN CHAT
 ========================================
-Datum: 6. April 2026
+Datum: 13. April 2026
 
 WAS WIR BAUEN:
 --------------
@@ -59,8 +59,10 @@ LOGIN-SYSTEM:
 DATENBANK-TABELLEN:
 -------------------
 1. employees_planit (id uuid, user_id, name, login_code, password_hash, department,
-   is_active, birthdate, vacation_days_per_year, is_apprentice, start_date,
-   hours_per_vacation_day, can_do_inventory boolean)
+   departments (kommasepariert, Multi-Abteilung), is_active, birthdate,
+   vacation_days_per_year, is_apprentice, start_date, hours_per_vacation_day,
+   can_do_inventory boolean,
+   hygiene_erste date, hygiene_letzte date, hygiene_gueltig_monate int)
 
 2. shifts (id, user_id, employee_id, shift_date, start_time, end_time, break_minutes,
    notes, is_open, open_note, department, handover_requested, handover_employee_id,
@@ -91,9 +93,11 @@ DATENBANK-TABELLEN:
 13. tip_entries (id, user_id, entry_date, amount_card, amount_cash)
     → Unique Constraint: (user_id, entry_date)
     → Alle Tage des Monats werden beim Laden automatisch angelegt (upsert)
-14. tip_hours (id, user_id, employee_id, work_date, minutes, start_time, end_time, break_minutes)
-    → Unique Constraint: (user_id, employee_id, work_date)
+14. tip_hours (id, user_id, employee_id, work_date, minutes, start_time, end_time,
+    break_minutes, department)
+    → Unique Constraint: (user_id, employee_id, work_date, department)
     → Wird automatisch aus shifts befüllt (Sync beim Laden + nach Schicht-Änderungen)
+    → department aus Schicht-Department (für Multi-Abteilung)
 15. tip_results (id, user_id, employee_id, month, amount_card, amount_cash)
 
 16. planit_suppliers, planit_inventory_items, planit_inventory_entries,
@@ -104,12 +108,19 @@ DATENBANK-TABELLEN:
     → Ersetzt hardcodierte Abteilungsnamen (Service, Küche, Bar)
     → Verwaltet im Team-Tab unter "ABTEILUNGEN"
 
-18. planit_restaurants (id, user_id, name, ...)
+18. planit_restaurants (id, user_id, name, hygiene_link_erst, hygiene_link_erneuerung, ...)
     → Wird bei Registrierung angelegt
+    → hygiene_link_erst / hygiene_link_erneuerung: Links für Belehrungsformulare
+
+19. planit_terminations (id, user_id, employee_id, requested_date, approved_date,
+    status, reason, pdf_url, street, zip, city)
+    → status: 'pending' | 'approved' | 'rejected'
+    → approved_date: wird als cutoffDate im Urlaubskonto verwendet
 
 SUPABASE STORAGE:
 -----------------
 - Bucket: vacation-pdfs (nicht public)
+- Bucket: termination-pdfs (public) — Kündigungs-PDFs
 
 WAS FERTIG IST:
 ---------------
@@ -205,6 +216,56 @@ WAS FERTIG IST:
    - Nächste Schicht: weißer Hintergrund, goldener Rahmen am Zeitfeld
    - ▼/▲ Toggle "Alle anzeigen"
    - Datum und Uhrzeit in #2C3E50
+   - Hygiene-Info-Box: zeigt Ablaufdatum + Status-Badge + "Erstbelehrung"/"Jetzt erneuern"-Link
+     → Karte auch ohne Belehrungsdatum wenn hygiene_link_erst vorhanden
+     → Links parallel aus planit_restaurants geladen
+
+✅ MULTI-ABTEILUNG:
+   - employees_planit.departments (kommasepariert)
+   - getEmpDepartments(emp): parst departments-Feld, fallback auf department
+   - Trinkgeld-Stunden nach Schicht-Department getrennt
+   - tip_hours.department mit Unique Constraint (user_id, employee_id, work_date, department)
+
+✅ KÜNDIGUNGSSYSTEM:
+   - Tabelle planit_terminations (pending/approved/rejected)
+   - employee.html: Formular mit Unterschrift (Canvas) + Vorschau-Modal + PDF-Download
+   - admin.html: Kündigungsliste mit Genehmigen / Ablehnen / Löschen / PDF-Button
+   - approveTermination(): setzt approved_date, schließt Beschäftigungsphase
+   - deleteTermination(): öffnet Beschäftigungsphase wieder
+   - Urlaubskonto: approved_date wird automatisch als cutoffDate verwendet
+   - Storage: termination-pdfs (public)
+
+✅ HYGIENESCHUTZBELEHRUNG:
+   - Felder in employees_planit: hygiene_erste, hygiene_letzte, hygiene_gueltig_monate
+   - Tab tab-hygiene im Mehr-Bereich (admin)
+   - loadHygiene(): grupiert nach Abteilung, klappbare Zeilen mit Bearbeitungsfeldern
+   - loadHygieneBadge(): zählt Mitarbeiter mit Ablauf ≤ heute+14
+   - "Ehemalige Mitarbeiter" klappbarer Block (nur Anzeige, kein Bearbeiten)
+   - Links-Block: hygiene_link_erst + hygiene_link_erneuerung in planit_restaurants
+   - employee.html: Info-Box mit Status-Badge + Aktions-Buttons in loadOverview()
+
+✅ BADGES:
+   - loadUrlaubBadge(): pending vacation_requests
+   - loadTerminationBadge(): pending planit_terminations
+   - loadHygieneBadge(): Mitarbeiter mit naechste ≤ today+14; ruft loadMehrBadge()
+   - loadMehrBadge(): fragt DB direkt ab (terminations + inventory + hygiene),
+     kein DOM-Lesen → keine Race-Conditions; badge.style.display = 'inline'
+
+✅ CSS MEDIA QUERY MOBILE:
+   - @media (max-width: 600px) für .hygiene-row: erste Spalte mit text-overflow:ellipsis
+   - summary::-webkit-details-marker { display:none } global
+
+✅ VERFÜGBARKEITSKALENDER ZOOM-BUG FIX (Admin):
+   - repeat(7, minmax(0, 1fr)) + min-width:0 auf .avail-day
+
+✅ SCHICHT-MODAL:
+   - actual_start_time / actual_end_time werden mit start_time / end_time vorausgefüllt
+     falls noch nicht gesetzt
+
+✅ RESTAURANT-INFO TAB (Admin):
+   - Tab im Mehr-Bereich
+   - loadRestaurantInfo() / saveRestaurantInfo()
+   - Daten in planit_restaurants
 
 SONSTIGE OFFENE FEATURES:
 --------------------------
@@ -228,7 +289,7 @@ WICHTIGE TECHNISCHE DETAILS:
 - Trinkgeld: saveTrinkgeldResults() nach jedem saveTrinkgeldHours()
 - Inventur: inventory_position für Inventur-Reihenfolge, order_position für Bestell-Reihenfolge
 - tip_entries Unique Constraint: user_id, entry_date
-- tip_hours Unique Constraint: user_id, employee_id, work_date
+- tip_hours Unique Constraint: user_id, employee_id, work_date, department
 - Trinkgeld-Sync: actual_break_minutes ?? break_minutes ?? 0 (nicht ||, wegen 0-Wert)
 - Stundenkonto-Toggle: <button> statt <div> für Mobile onclick-Kompatibilität
 - Schichtplan: korrigierte Schichten (actual_start_time gesetzt) → background #E8D4A0
