@@ -7032,17 +7032,28 @@ async function saveHygiene(employeeId) {
 async function saveHygieneLinks() {
     const erst = document.getElementById('hygiene-link-erst').value.trim() || null;
     const erneuerung = document.getElementById('hygiene-link-erneuerung').value.trim() || null;
-    const { data: existing } = await db
-        .from('planit_restaurants')
-        .select('id')
-        .eq('user_id', adminSession.user.id)
-        .maybeSingle();
-    if (existing) {
-        await db.from('planit_restaurants')
-            .update({ hygiene_link_erst: erst, hygiene_link_erneuerung: erneuerung })
-            .eq('user_id', adminSession.user.id);
-    } else {
-        await db.from('planit_restaurants')
-            .insert({ user_id: adminSession.user.id, hygiene_link_erst: erst, hygiene_link_erneuerung: erneuerung });
+    const btn = document.querySelector('#hygiene-links-details button');
+    if (btn) { btn.disabled = true; btn.textContent = 'Speichert…'; }
+
+    const { error } = await db.from('planit_restaurants')
+        .update({ hygiene_link_erst: erst, hygiene_link_erneuerung: erneuerung })
+        .eq('user_id', adminSession.user.id);
+
+    if (btn) { btn.disabled = false; btn.textContent = 'Speichern'; }
+
+    if (error) {
+        alert('Fehler beim Speichern: ' + error.message);
+        return;
+    }
+
+    document.getElementById('hygiene-links-details').removeAttribute('open');
+
+    const summary = document.querySelector('#hygiene-links-details summary');
+    if (summary) {
+        const msg = document.createElement('span');
+        msg.textContent = ' ✓ Gespeichert';
+        msg.style.cssText = 'font-size:0.8rem; color:#155724; font-weight:500;';
+        summary.appendChild(msg);
+        setTimeout(() => msg.remove(), 2500);
     }
 }
