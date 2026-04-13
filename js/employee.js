@@ -1648,14 +1648,12 @@ function changeOverviewMonth(dir) {
 
 function openHygieneSubmitModal() {
     document.getElementById('hygiene-submit-date').value = '';
-    document.getElementById('hygiene-submit-file').value = '';
     document.getElementById('hygiene-submit-error').style.display = 'none';
     document.getElementById('hygiene-submit-modal').classList.add('active');
 }
 
 async function submitHygieneCertificate() {
     const dateVal = document.getElementById('hygiene-submit-date').value;
-    const fileInput = document.getElementById('hygiene-submit-file');
     const errorDiv = document.getElementById('hygiene-submit-error');
     const btn = document.getElementById('hygiene-submit-btn');
 
@@ -1666,37 +1664,14 @@ async function submitHygieneCertificate() {
         errorDiv.style.display = 'block';
         return;
     }
-    if (!fileInput.files || fileInput.files.length === 0) {
-        errorDiv.textContent = 'Bitte eine Datei auswählen.';
-        errorDiv.style.display = 'block';
-        return;
-    }
-
-    const file = fileInput.files[0];
-    const ext = file.name.split('.').pop();
-    const fileName = `${currentEmployee.user_id}/${currentEmployee.id}_${dateVal}.${ext}`;
-    console.log('upload path:', fileName, 'user_id:', currentEmployee.user_id);
 
     btn.disabled = true;
-    btn.textContent = 'Lädt hoch…';
-
-    const { error: uploadError } = await db.storage
-        .from('hygiene-certificates')
-        .upload(fileName, file, { contentType: file.type, upsert: true });
-
-    if (uploadError) {
-        errorDiv.textContent = 'Upload fehlgeschlagen: ' + uploadError.message;
-        errorDiv.style.display = 'block';
-        btn.disabled = false;
-        btn.textContent = 'Absenden';
-        return;
-    }
+    btn.textContent = 'Speichert…';
 
     const { error: dbError } = await db.from('hygiene_submissions').insert({
         employee_id: currentEmployee.id,
         user_id: currentEmployee.user_id,
         certificate_date: dateVal,
-        certificate_url: fileName,
     });
 
     btn.disabled = false;
