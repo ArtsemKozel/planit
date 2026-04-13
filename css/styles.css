@@ -794,3 +794,20 @@ select {
     color: var(--color-text-light);
     user-select: none;
 }
+
+/* HYGIENE TAB */
+.hygiene-row {
+    grid-template-columns: 1fr 1fr 1fr 5% 5%;
+}
+
+@media (max-width: 600px) {
+    .hygiene-row {
+        grid-template-columns: 1fr 80px 80px 5% 5%;
+    }
+    .hygiene-row > div:first-child {
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        min-width: 0;
+    }
+}
