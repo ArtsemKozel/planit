@@ -215,6 +215,7 @@ function switchTab(tab) {
     if (tab === 'inventur-config') { loadInventurConfig(); loadInventurDelegation(); }
     if (tab === 'restaurant-info') loadRestaurantInfo();
     if (tab === 'terminations') loadTerminations();
+    if (tab === 'hygiene') loadHygiene();
     localStorage.setItem('planit_admin_tab', tab);
 }
 
@@ -6869,4 +6870,75 @@ async function moveInventurItem(supplierId, index, direction, type) {
     await db.from('planit_inventory_items').update({ [posField]: posA }).eq('id', items[swapIndex].id);
 
     loadInventurConfig();
+}
+
+async function loadHygiene() {
+    const container = document.getElementById('hygiene-list');
+    container.innerHTML = '<div style="color:var(--color-text-light); font-size:0.9rem;">Lädt…</div>';
+
+    const { data } = await db
+        .from('employees_planit')
+        .select('id, name, department, hygiene_erste, hygiene_letzte, hygiene_gueltig_monate')
+        .eq('user_id', adminSession.user.id)
+        .eq('is_active', true)
+        .order('name');
+
+    if (!data || data.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>Keine aktiven Mitarbeiter gefunden.</p></div>';
+        return;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    function addMonths(dateStr, months) {
+        const d = new Date(dateStr + 'T00:00:00');
+        d.setMonth(d.getMonth() + months);
+        return d;
+    }
+
+    function fmtD(dateStr) {
+        if (!dateStr) return '–';
+        return new Date(dateStr + 'T00:00:00').toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+
+    function statusBadge(naechste) {
+        if (!naechste) return '<span style="background:#ccc; color:#555; border-radius:10px; padding:0.1rem 0.5rem; font-size:0.75rem; font-weight:600;">Kein Datum</span>';
+        const diff = (naechste - today) / (1000 * 60 * 60 * 24);
+        if (diff < 0)  return '<span style="background:var(--color-danger); color:white; border-radius:10px; padding:0.1rem 0.5rem; font-size:0.75rem; font-weight:600;">Abgelaufen</span>';
+        if (diff < 14) return '<span style="background:#FFF3CD; color:#856404; border-radius:10px; padding:0.1rem 0.5rem; font-size:0.75rem; font-weight:600;">Bald fällig</span>';
+        return '<span style="background:#D4EDDA; color:#155724; border-radius:10px; padding:0.1rem 0.5rem; font-size:0.75rem; font-weight:600;">Gültig</span>';
+    }
+
+    // Nach Abteilung gruppieren
+    const groups = {};
+    for (const emp of data) {
+        const dept = emp.department || 'Allgemein';
+        if (!groups[dept]) groups[dept] = [];
+        groups[dept].push(emp);
+    }
+
+    container.innerHTML = Object.entries(groups).map(([dept, emps]) => {
+        const rows = emps.map(emp => {
+            const monate = emp.hygiene_gueltig_monate ?? 12;
+            const basisDatum = emp.hygiene_letzte || emp.hygiene_erste || null;
+            const naechste = basisDatum ? addMonths(basisDatum, monate) : null;
+            return `
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:0.5rem; align-items:center; padding:0.6rem 0; border-bottom:1px solid #F0F0F0; font-size:0.85rem;">
+                <div style="font-weight:600;">${emp.name}</div>
+                <div style="color:var(--color-text-light);">${fmtD(emp.hygiene_erste)}</div>
+                <div style="color:var(--color-text-light);">${naechste ? fmtD(naechste.toISOString().split('T')[0]) : '–'}</div>
+                <div>${statusBadge(naechste)}</div>
+            </div>`;
+        }).join('');
+
+        return `
+        <div style="font-size:0.75rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.08em; margin:1rem 0 0.4rem;">${dept.toUpperCase()}</div>
+        <div style="background:white; border-radius:12px; overflow:hidden; padding:0 0.75rem;">
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:0.5rem; padding:0.4rem 0; border-bottom:2px solid #F0F0F0; font-size:0.7rem; font-weight:700; color:var(--color-text-light);">
+                <div>NAME</div><div>ERSTBELEHRUNG</div><div>NÄCHSTE</div><div></div>
+            </div>
+            ${rows}
+        </div>`;
+    }).join('');
 }
