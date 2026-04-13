@@ -1608,6 +1608,7 @@ async function loadOverview() {
             badgeText = 'Gültig';
         }
 
+        console.log('hygiene:', hygieneErste, hygieneLetzte, linkErst, linkErneuerung);
         let actionBtn = '';
         if (!hygieneErste && linkErst) {
             actionBtn = `<a href="${linkErst}" target="_blank" rel="noopener" style="display:inline-block; margin-top:0.75rem; padding:0.45rem 1rem; background:var(--color-primary); color:#fff; border-radius:8px; font-size:0.85rem; font-weight:600; text-decoration:none;">Erstbelehrung</a>`;
