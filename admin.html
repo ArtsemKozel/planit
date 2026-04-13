@@ -605,6 +605,23 @@
             <div style="font-size:1.1rem; font-weight:700; color:var(--color-text); text-align:center;">Hygieneschutzbelehrung</div>
             <div></div>
         </div>
+        <details id="hygiene-links-details" style="margin-bottom:1rem;">
+            <summary style="cursor:pointer; font-weight:600; font-size:0.9rem; padding:0.5rem 0; list-style:none; display:flex; justify-content:space-between; align-items:center;">
+                Links
+                <span style="font-size:0.75rem; color:var(--color-text-light);">▾</span>
+            </summary>
+            <div style="padding-top:0.5rem;">
+                <div class="form-group">
+                    <label>Link Erstbelehrung</label>
+                    <input type="url" id="hygiene-link-erst" placeholder="https://…" style="width:100%;">
+                </div>
+                <div class="form-group">
+                    <label>Link Erneuerung</label>
+                    <input type="url" id="hygiene-link-erneuerung" placeholder="https://…" style="width:100%;">
+                </div>
+                <button class="btn-primary" onclick="saveHygieneLinks()" style="padding:0.4rem 1rem; font-size:0.85rem;">Speichern</button>
+            </div>
+        </details>
         <div id="hygiene-list">
             <div class="empty-state"><p>Lädt…</p></div>
         </div>

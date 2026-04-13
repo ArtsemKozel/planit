@@ -6918,12 +6918,22 @@ async function loadHygiene() {
     const container = document.getElementById('hygiene-list');
     container.innerHTML = '<div style="color:var(--color-text-light); font-size:0.9rem;">Lädt…</div>';
 
-    const { data } = await db
-        .from('employees_planit')
-        .select('id, name, department, hygiene_erste, hygiene_letzte, hygiene_gueltig_monate')
-        .eq('user_id', adminSession.user.id)
-        .eq('is_active', true)
-        .order('name');
+    const [{ data }, { data: restaurant }] = await Promise.all([
+        db.from('employees_planit')
+            .select('id, name, department, hygiene_erste, hygiene_letzte, hygiene_gueltig_monate')
+            .eq('user_id', adminSession.user.id)
+            .eq('is_active', true)
+            .order('name'),
+        db.from('planit_restaurants')
+            .select('hygiene_link_erst, hygiene_link_erneuerung')
+            .eq('user_id', adminSession.user.id)
+            .maybeSingle(),
+    ]);
+
+    const erstInput = document.getElementById('hygiene-link-erst');
+    const erneuerungInput = document.getElementById('hygiene-link-erneuerung');
+    if (erstInput) erstInput.value = restaurant?.hygiene_link_erst || '';
+    if (erneuerungInput) erneuerungInput.value = restaurant?.hygiene_link_erneuerung || '';
 
     if (!data || data.length === 0) {
         container.innerHTML = '<div class="empty-state"><p>Keine aktiven Mitarbeiter gefunden.</p></div>';
@@ -7017,4 +7027,22 @@ async function saveHygiene(employeeId) {
         hygiene_gueltig_monate: monate
     }).eq('id', employeeId);
     await Promise.all([loadHygiene(), loadHygieneBadge()]);
+}
+
+async function saveHygieneLinks() {
+    const erst = document.getElementById('hygiene-link-erst').value.trim() || null;
+    const erneuerung = document.getElementById('hygiene-link-erneuerung').value.trim() || null;
+    const { data: existing } = await db
+        .from('planit_restaurants')
+        .select('id')
+        .eq('user_id', adminSession.user.id)
+        .maybeSingle();
+    if (existing) {
+        await db.from('planit_restaurants')
+            .update({ hygiene_link_erst: erst, hygiene_link_erneuerung: erneuerung })
+            .eq('user_id', adminSession.user.id);
+    } else {
+        await db.from('planit_restaurants')
+            .insert({ user_id: adminSession.user.id, hygiene_link_erst: erst, hygiene_link_erneuerung: erneuerung });
+    }
 }
