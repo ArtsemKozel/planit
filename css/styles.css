@@ -19,6 +19,9 @@
     box-sizing: border-box;
 }
 
+summary::-webkit-details-marker { display: none; }
+summary { list-style: none; }
+
 body {
     background: var(--color-beige-light);
     color: var(--color-text);
