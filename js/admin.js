@@ -7026,7 +7026,7 @@ async function loadHygiene() {
         </div>`;
     }).join('');
 
-    let inactiveHtml = '';
+    let inactiveContent = '';
     if (inactiveData && inactiveData.length > 0) {
         const inactiveRows = inactiveData.map(emp => {
             const monate = emp.hygiene_gueltig_monate ?? 12;
@@ -7044,21 +7044,25 @@ async function loadHygiene() {
                 </div>
             </div>`;
         }).join('');
-
-        inactiveHtml = `
-        <details style="margin-top:1.5rem;">
-            <summary style="cursor:pointer; font-size:0.75rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.08em; padding:0.4rem 0; list-style:none; display:flex; justify-content:space-between; align-items:center;">
-                EHEMALIGE MITARBEITER
-                <span style="font-size:0.75rem;">▾</span>
-            </summary>
+        inactiveContent = `
             <div style="background:white; border-radius:12px; overflow:hidden; padding:0 0.75rem; margin-top:0.4rem;">
                 <div class="hygiene-row" style="display:grid; gap:0.5rem; padding:0.4rem 0; border-bottom:2px solid #F0F0F0; font-size:0.7rem; font-weight:700; color:var(--color-text-light);">
                     <div>NAME</div><div>ERSTE</div><div>NÄCHSTE</div><div></div><div></div>
                 </div>
                 ${inactiveRows}
-            </div>
-        </details>`;
+            </div>`;
+    } else {
+        inactiveContent = `<p style="font-size:0.85rem; color:var(--color-text-light); margin:0.5rem 0 0;">Keine ehemaligen Mitarbeiter</p>`;
     }
+
+    const inactiveHtml = `
+        <details style="margin-top:1.5rem;">
+            <summary style="cursor:pointer; font-size:0.75rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.08em; padding:0.4rem 0; list-style:none; display:flex; justify-content:space-between; align-items:center;">
+                EHEMALIGE MITARBEITER
+                <span style="font-size:0.75rem;">▾</span>
+            </summary>
+            ${inactiveContent}
+        </details>`;
 
     container.innerHTML = activeHtml + inactiveHtml;
 }
