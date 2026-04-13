@@ -1675,6 +1675,7 @@ async function submitHygieneCertificate() {
     const file = fileInput.files[0];
     const ext = file.name.split('.').pop();
     const fileName = `${currentEmployee.user_id}/${currentEmployee.id}_${dateVal}.${ext}`;
+    console.log('upload path:', fileName, 'user_id:', currentEmployee.user_id);
 
     btn.disabled = true;
     btn.textContent = 'Lädt hoch…';
