@@ -3175,6 +3175,7 @@ async function approveTermination(id) {
     }
     await loadTerminations();
     await loadTerminationBadge();
+    await loadMehrBadge();
 }
 
 async function rejectTermination(id) {
@@ -3182,6 +3183,7 @@ async function rejectTermination(id) {
     await db.from('planit_terminations').update({ status: 'rejected' }).eq('id', id);
     await loadTerminations();
     await loadTerminationBadge();
+    await loadMehrBadge();
 }
 
 async function downloadTerminationPdf(filePath) {
@@ -3215,6 +3217,7 @@ async function deleteTermination(id) {
     }
     await loadTerminations();
     await loadTerminationBadge();
+    await loadMehrBadge();
 
     if (t?.employee_id) {
         switchTab('team');
