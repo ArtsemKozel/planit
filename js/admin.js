@@ -6946,11 +6946,11 @@ async function loadHygiene() {
 
     function statusBadge(naechste) {
         const s = 'width:18px; height:18px; display:inline-block; border-radius:50%; padding:2px; flex-shrink:0;';
-        if (!naechste) return `<span style="${s} background:#ccc;"><svg viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="3"><circle cx="12" cy="12" r="1"/><line x1="12" y1="6" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="18"/><line x1="12" y1="8" x2="12" y2="16"/></svg></span>`;
+        if (!naechste) return `<span style="${s} background:#e2e3e5;"><svg viewBox="0 0 24 24" fill="none" stroke="#6c757d" stroke-width="3"><circle cx="12" cy="12" r="1"/><line x1="12" y1="6" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="18"/><line x1="12" y1="8" x2="12" y2="16"/></svg></span>`;
         const diff = (naechste - today) / (1000 * 60 * 60 * 24);
-        if (diff < 0)  return `<span style="${s} background:var(--color-danger);"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span>`;
-        if (diff < 14) return `<span style="${s} background:#f0ad4e;"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><line x1="12" y1="8" x2="12" y2="13"/><circle cx="12" cy="17" r="0.5" fill="white" stroke="white"/></svg></span>`;
-        return `<span style="${s} background:#28a745;"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>`;
+        if (diff < 0)  return `<span style="${s} background:#f8d7da;"><svg viewBox="0 0 24 24" fill="none" stroke="#dc3545" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span>`;
+        if (diff < 14) return `<span style="${s} background:#fff3cd;"><svg viewBox="0 0 24 24" fill="none" stroke="#856404" stroke-width="3"><line x1="12" y1="8" x2="12" y2="13"/><circle cx="12" cy="17" r="0.5" fill="#856404" stroke="#856404"/></svg></span>`;
+        return `<span style="${s} background:#d4edda;"><svg viewBox="0 0 24 24" fill="none" stroke="#28a745" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>`;
     }
 
     const groups = {};
