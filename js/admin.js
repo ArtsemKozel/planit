@@ -6969,7 +6969,7 @@ async function loadHygiene() {
             return `
             <div style="border-bottom:1px solid #F0F0F0;">
                 <div onclick="const b=this.nextElementSibling; const open=b.style.display!=='none'; b.style.display=open?'none':'block'; this.querySelector('.hyg-arrow').textContent=open?'▶':'▼';"
-                     style="display:grid; grid-template-columns:1fr 100px 100px 22px 16px; gap:0.5rem; align-items:center; padding:0.6rem 0; font-size:0.85rem; cursor:pointer;">
+                     style="display:grid; grid-template-columns:1fr 90px 90px 32px 24px; gap:0.5rem; align-items:center; padding:0.6rem 0; font-size:0.85rem; cursor:pointer;">
                     <div style="font-weight:600;">${emp.name}</div>
                     <div style="color:var(--color-text-light);">${fmtD(emp.hygiene_erste)}</div>
                     <div style="color:var(--color-text-light);">${naechsteStr ? fmtD(naechsteStr) : '–'}</div>
@@ -6999,7 +6999,7 @@ async function loadHygiene() {
         return `
         <div style="font-size:0.75rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.08em; margin:1rem 0 0.4rem;">${dept.toUpperCase()}</div>
         <div style="background:white; border-radius:12px; overflow:hidden; padding:0 0.75rem;">
-            <div style="display:grid; grid-template-columns:1fr 100px 100px 22px 16px; gap:0.5rem; padding:0.4rem 0; border-bottom:2px solid #F0F0F0; font-size:0.7rem; font-weight:700; color:var(--color-text-light);">
+            <div style="display:grid; grid-template-columns:1fr 90px 90px 32px 24px; gap:0.5rem; padding:0.4rem 0; border-bottom:2px solid #F0F0F0; font-size:0.7rem; font-weight:700; color:var(--color-text-light);">
                 <div>NAME</div><div>ERSTBELEHRUNG</div><div>NÄCHSTE</div><div></div><div></div>
             </div>
             ${rows}
