@@ -6966,43 +6966,60 @@ async function loadHygiene() {
             const basisDatum = emp.hygiene_letzte || emp.hygiene_erste || null;
             const naechste = basisDatum ? addMonths(basisDatum, monate) : null;
             const naechsteStr = naechste ? naechste.toISOString().split('T')[0] : null;
+            const detailId = `hyg-detail-${emp.id}`;
+            const arrowId = `hyg-arrow-${emp.id}`;
             return `
-            <div style="border-bottom:1px solid #F0F0F0;">
-                <div onclick="const b=this.nextElementSibling; const open=b.style.display!=='none'; b.style.display=open?'none':'block'; this.querySelector('.hyg-arrow').textContent=open?'▶':'▼';"
-                     style="display:grid; grid-template-columns:auto 100px 100px 32px 24px; gap:0.5rem; align-items:center; padding:0.6rem 0; font-size:0.85rem; cursor:pointer;">
-                    <div style="font-weight:600;">${emp.name}</div>
-                    <div style="color:var(--color-text-light);">${fmtD(emp.hygiene_erste)}</div>
-                    <div style="color:var(--color-text-light);">${naechsteStr ? fmtD(naechsteStr) : '–'}</div>
-                    <div>${statusBadge(naechste)}</div>
-                    <div class="hyg-arrow" style="color:var(--color-text-light); font-size:0.7rem; min-width:1rem; text-align:center;">▶</div>
-                </div>
-                <div style="display:none; padding:0.75rem 0 1rem;">
-                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.75rem; margin-bottom:0.75rem;">
-                        <div>
-                            <label style="font-size:0.75rem; color:var(--color-text-light); display:block; margin-bottom:0.25rem;">Erstbelehrung</label>
-                            <input type="date" id="hyg-erste-${emp.id}" value="${emp.hygiene_erste || ''}" style="width:100%; padding:0.4rem; font-size:0.85rem; border:1px solid #ddd; border-radius:6px;">
+                <tr onclick="const d=document.getElementById('${detailId}'); const open=d.style.display!=='none'; d.style.display=open?'none':'table-row'; document.getElementById('${arrowId}').textContent=open?'▶':'▼';"
+                    style="cursor:pointer; border-bottom:1px solid #F0F0F0;">
+                    <td style="padding:0.6rem 0; font-size:0.85rem; font-weight:600;">${emp.name}</td>
+                    <td style="padding:0.6rem 0; font-size:0.85rem; color:var(--color-text-light);">${fmtD(emp.hygiene_erste)}</td>
+                    <td style="padding:0.6rem 0; font-size:0.85rem; color:var(--color-text-light);">${naechsteStr ? fmtD(naechsteStr) : '–'}</td>
+                    <td style="padding:0.6rem 0;">${statusBadge(naechste)}</td>
+                    <td style="padding:0.6rem 0; text-align:center;"><span id="${arrowId}" style="color:var(--color-text-light); font-size:0.7rem;">▶</span></td>
+                </tr>
+                <tr id="${detailId}" style="display:none;">
+                    <td colspan="5" style="padding:0.75rem 0 1rem;">
+                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.75rem; margin-bottom:0.75rem;">
+                            <div>
+                                <label style="font-size:0.75rem; color:var(--color-text-light); display:block; margin-bottom:0.25rem;">Erstbelehrung</label>
+                                <input type="date" id="hyg-erste-${emp.id}" value="${emp.hygiene_erste || ''}" style="width:100%; padding:0.4rem; font-size:0.85rem; border:1px solid #ddd; border-radius:6px;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.75rem; color:var(--color-text-light); display:block; margin-bottom:0.25rem;">Letzte Erneuerung</label>
+                                <input type="date" id="hyg-letzte-${emp.id}" value="${emp.hygiene_letzte || ''}" style="width:100%; padding:0.4rem; font-size:0.85rem; border:1px solid #ddd; border-radius:6px;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.75rem; color:var(--color-text-light); display:block; margin-bottom:0.25rem;">Gültig (Monate)</label>
+                                <input type="number" id="hyg-monate-${emp.id}" value="${monate}" min="1" style="width:100%; padding:0.4rem; font-size:0.85rem; border:1px solid #ddd; border-radius:6px;">
+                            </div>
                         </div>
-                        <div>
-                            <label style="font-size:0.75rem; color:var(--color-text-light); display:block; margin-bottom:0.25rem;">Letzte Erneuerung</label>
-                            <input type="date" id="hyg-letzte-${emp.id}" value="${emp.hygiene_letzte || ''}" style="width:100%; padding:0.4rem; font-size:0.85rem; border:1px solid #ddd; border-radius:6px;">
-                        </div>
-                        <div>
-                            <label style="font-size:0.75rem; color:var(--color-text-light); display:block; margin-bottom:0.25rem;">Gültig (Monate)</label>
-                            <input type="number" id="hyg-monate-${emp.id}" value="${monate}" min="1" style="width:100%; padding:0.4rem; font-size:0.85rem; border:1px solid #ddd; border-radius:6px;">
-                        </div>
-                    </div>
-                    <button onclick="saveHygiene('${emp.id}')" class="btn-primary" style="padding:0.4rem 1rem; font-size:0.85rem;">Speichern</button>
-                </div>
-            </div>`;
+                        <button onclick="saveHygiene('${emp.id}')" class="btn-primary" style="padding:0.4rem 1rem; font-size:0.85rem;">Speichern</button>
+                    </td>
+                </tr>`;
         }).join('');
 
         return `
         <div style="font-size:0.75rem; font-weight:700; color:var(--color-text-light); letter-spacing:0.08em; margin:1rem 0 0.4rem;">${dept.toUpperCase()}</div>
         <div style="background:white; border-radius:12px; overflow:hidden; padding:0 0.75rem;">
-            <div style="display:grid; grid-template-columns:auto 100px 100px 32px 24px; gap:0.5rem; padding:0.4rem 0; border-bottom:2px solid #F0F0F0; font-size:0.7rem; font-weight:700; color:var(--color-text-light);">
-                <div>NAME</div><div>ERSTE</div><div>NÄCHSTE</div><div></div><div></div>
-            </div>
-            ${rows}
+            <table style="width:100%; border-collapse:collapse;">
+                <colgroup>
+                    <col>
+                    <col style="width:80px;">
+                    <col style="width:80px;">
+                    <col style="width:32px;">
+                    <col style="width:24px;">
+                </colgroup>
+                <thead>
+                    <tr style="border-bottom:2px solid #F0F0F0; font-size:0.7rem; font-weight:700; color:var(--color-text-light);">
+                        <th style="padding:0.4rem 0; text-align:left; font-weight:700;">NAME</th>
+                        <th style="padding:0.4rem 0; text-align:left; font-weight:700;">ERSTE</th>
+                        <th style="padding:0.4rem 0; text-align:left; font-weight:700;">NÄCHSTE</th>
+                        <th></th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
         </div>`;
     }).join('');
 }
