@@ -1595,6 +1595,7 @@ async function loadOverview() {
         const naechsteStr = naechste.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
         const todayMs = new Date(); todayMs.setHours(0,0,0,0);
         const diff = (naechste - todayMs) / (1000 * 60 * 60 * 24);
+        console.log('hygiene status:', diff, hygieneErste, hygieneLetzte);
 
         let badgeBg, badgeColor, badgeText;
         if (diff < 0) {
