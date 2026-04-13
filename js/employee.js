@@ -1585,6 +1585,9 @@ async function loadOverview() {
     const hygieneLetzte = hygieneEmp?.hygiene_letzte || null;
     const hygieneMonate = hygieneEmp?.hygiene_gueltig_monate ?? 12;
 
+    const linkErst = hygieneRestaurant?.hygiene_link_erst || null;
+    const linkErneuerung = hygieneRestaurant?.hygiene_link_erneuerung || null;
+
     if (hygieneErste || hygieneLetzte) {
         const basis = hygieneLetzte || hygieneErste;
         const naechste = new Date(basis + 'T00:00:00');
@@ -1605,9 +1608,6 @@ async function loadOverview() {
             badgeText = 'Gültig';
         }
 
-        const linkErst = hygieneRestaurant?.hygiene_link_erst || null;
-        const linkErneuerung = hygieneRestaurant?.hygiene_link_erneuerung || null;
-
         let actionBtn = '';
         if (!hygieneErste && linkErst) {
             actionBtn = `<a href="${linkErst}" target="_blank" rel="noopener" style="display:inline-block; margin-top:0.75rem; padding:0.45rem 1rem; background:var(--color-primary); color:#fff; border-radius:8px; font-size:0.85rem; font-weight:600; text-decoration:none;">Erstbelehrung</a>`;
@@ -1621,6 +1621,12 @@ async function loadOverview() {
                 <div style="font-size:0.85rem; color:var(--color-text-light); margin-bottom:0.5rem;">Nächste Erneuerung: <strong>${naechsteStr}</strong></div>
                 <span style="font-size:0.8rem; font-weight:600; color:${badgeColor}; background:${badgeBg}; border-radius:6px; padding:0.2rem 0.55rem;">${badgeText}</span>
                 ${actionBtn}
+            </div>`;
+    } else if (linkErst) {
+        hygieneCard.innerHTML = `
+            <div class="card" style="margin-bottom:1rem; margin-top:1rem;">
+                <div style="font-weight:700; font-size:0.95rem; margin-bottom:0.5rem;">Hygieneschutzbelehrung</div>
+                <a href="${linkErst}" target="_blank" rel="noopener" style="display:inline-block; margin-top:0.25rem; padding:0.45rem 1rem; background:var(--color-primary); color:#fff; border-radius:8px; font-size:0.85rem; font-weight:600; text-decoration:none;">Erstbelehrung</a>
             </div>`;
     } else {
         hygieneCard.innerHTML = '';
