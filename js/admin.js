@@ -6952,7 +6952,6 @@ async function loadHygiene() {
         return '<span style="background:#D4EDDA; color:#155724; border-radius:10px; padding:0.1rem 0.5rem; font-size:0.75rem; font-weight:600;">Gültig</span>';
     }
 
-    // Nach Abteilung gruppieren
     const groups = {};
     for (const emp of data) {
         const dept = emp.department || 'Allgemein';
@@ -6965,12 +6964,33 @@ async function loadHygiene() {
             const monate = emp.hygiene_gueltig_monate ?? 12;
             const basisDatum = emp.hygiene_letzte || emp.hygiene_erste || null;
             const naechste = basisDatum ? addMonths(basisDatum, monate) : null;
+            const naechsteStr = naechste ? naechste.toISOString().split('T')[0] : null;
             return `
-            <div style="display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:0.5rem; align-items:center; padding:0.6rem 0; border-bottom:1px solid #F0F0F0; font-size:0.85rem;">
-                <div style="font-weight:600;">${emp.name}</div>
-                <div style="color:var(--color-text-light);">${fmtD(emp.hygiene_erste)}</div>
-                <div style="color:var(--color-text-light);">${naechste ? fmtD(naechste.toISOString().split('T')[0]) : '–'}</div>
-                <div>${statusBadge(naechste)}</div>
+            <div style="border-bottom:1px solid #F0F0F0;">
+                <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'"
+                     style="display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:0.5rem; align-items:center; padding:0.6rem 0; font-size:0.85rem; cursor:pointer;">
+                    <div style="font-weight:600;">${emp.name}</div>
+                    <div style="color:var(--color-text-light);">${fmtD(emp.hygiene_erste)}</div>
+                    <div style="color:var(--color-text-light);">${naechsteStr ? fmtD(naechsteStr) : '–'}</div>
+                    <div>${statusBadge(naechste)}</div>
+                </div>
+                <div style="display:none; padding:0.75rem 0 1rem;">
+                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.75rem; margin-bottom:0.75rem;">
+                        <div>
+                            <label style="font-size:0.75rem; color:var(--color-text-light); display:block; margin-bottom:0.25rem;">Erstbelehrung</label>
+                            <input type="date" id="hyg-erste-${emp.id}" value="${emp.hygiene_erste || ''}" style="width:100%; padding:0.4rem; font-size:0.85rem; border:1px solid #ddd; border-radius:6px;">
+                        </div>
+                        <div>
+                            <label style="font-size:0.75rem; color:var(--color-text-light); display:block; margin-bottom:0.25rem;">Letzte Erneuerung</label>
+                            <input type="date" id="hyg-letzte-${emp.id}" value="${emp.hygiene_letzte || ''}" style="width:100%; padding:0.4rem; font-size:0.85rem; border:1px solid #ddd; border-radius:6px;">
+                        </div>
+                        <div>
+                            <label style="font-size:0.75rem; color:var(--color-text-light); display:block; margin-bottom:0.25rem;">Gültig (Monate)</label>
+                            <input type="number" id="hyg-monate-${emp.id}" value="${monate}" min="1" style="width:100%; padding:0.4rem; font-size:0.85rem; border:1px solid #ddd; border-radius:6px;">
+                        </div>
+                    </div>
+                    <button onclick="saveHygiene('${emp.id}')" class="btn-primary" style="padding:0.4rem 1rem; font-size:0.85rem;">Speichern</button>
+                </div>
             </div>`;
         }).join('');
 
@@ -6983,4 +7003,16 @@ async function loadHygiene() {
             ${rows}
         </div>`;
     }).join('');
+}
+
+async function saveHygiene(employeeId) {
+    const erste = document.getElementById(`hyg-erste-${employeeId}`).value || null;
+    const letzte = document.getElementById(`hyg-letzte-${employeeId}`).value || null;
+    const monate = parseInt(document.getElementById(`hyg-monate-${employeeId}`).value) || 12;
+    await db.from('employees_planit').update({
+        hygiene_erste: erste,
+        hygiene_letzte: letzte,
+        hygiene_gueltig_monate: monate
+    }).eq('id', employeeId);
+    await Promise.all([loadHygiene(), loadHygieneBadge()]);
 }
