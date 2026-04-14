@@ -1,0 +1,364 @@
+PLANIT × SHIFTIN — INTEGRATIONSANALYSE
+========================================
+Datum: 14. April 2026
+Zweck: Entscheidungsgrundlage welche ShiftIn-Features in PlanIt übernommen werden
+
+================================================================================
+1. MITARBEITERDATEN — TABELLENVERGLEICH
+================================================================================
+
+SHIFTIN: employees
+------------------
+id, user_id, name, pin, is_admin,
+employment_type,          ← VZ / TZ / Minijob / Azubi
+hourly_rate,              ← Stundenlohn
+monthly_hours,            ← Soll-Stunden pro Monat
+hire_date,                ← Eintrittsdatum
+end_date,                 ← Austrittsdatum
+vacation_hours_per_day    ← Urlaubsstunden pro Tag
+
+PLANIT: employees_planit
+------------------------
+id, user_id, name, login_code, password_hash,
+department,               ← Abteilung (PlanIt-spezifisch)
+departments,              ← Multi-Abteilung kommasepariert
+is_active,                ← aktiv/inaktiv
+birthdate,
+is_apprentice,
+start_date,               ← entspricht hire_date
+hours_per_vacation_day,   ← entspricht vacation_hours_per_day
+vacation_days_per_year,
+notice_period_weeks,
+hygiene_erste, hygiene_letzte, hygiene_gueltig_monate
+
+PLANIT: employment_phases (ergänzt employees_planit historisch)
+---------------------------------------------------------------
+id, employee_id, start_date, end_date,
+vacation_days_per_year, hours_per_vacation_day,
+carry_over_days, carry_over_hours
+
+FEHLENDE FELDER IN PLANIT (aus ShiftIn):
+- hourly_rate              → Stundenlohn — fehlt komplett, für Lohnabrechnung nötig
+- monthly_hours            → Soll-Stunden — fehlt, PlanIt kennt nur vacation_days
+- employment_type          → Beschäftigungsart (VZ/TZ/Mini/Azubi) — fehlt
+
+FAZIT: Für Lohnabrechnung müssen employees_planit um
+       hourly_rate, monthly_hours, employment_type erweitert werden.
+
+================================================================================
+2. ZEITERFASSUNG — KONZEPTVERGLEICH
+================================================================================
+
+SHIFTIN: Einstempel-Modell
+--------------------------
+Tabelle: time_entries
+  id, employee_id, employee_name, clock_in (timestamp), clock_out (timestamp)
+
+Tabelle: breaks
+  id, time_entry_id, employee_name, break_start (timestamp), break_end (timestamp)
+
+→ Mitarbeiter stempeln sich real-time ein/aus
+→ Pausen werden als eigene Einträge mit Start/End gespeichert
+→ Keine Vorab-Planung — reine Ist-Erfassung
+→ Admin kann manuell Einträge hinzufügen/bearbeiten
+
+PLANIT: Schichtplan-Modell
+--------------------------
+Tabelle: shifts
+  id, user_id, employee_id, shift_date, start_time, end_time, break_minutes,
+  actual_start_time, actual_end_time, actual_break_minutes,
+  department, is_open, notes, handover_requested, handover_employee_id
+
+→ Admin plant Schichten im Voraus (start_time/end_time)
+→ Ist-Zeiten optional nachträglich eintragbar (actual_*)
+→ Pause als Gesamtminuten (break_minutes), nicht als Start/End-Zeitstempel
+→ Abteilungs-Zuordnung, Schichttausch, offene Schichten
+
+KERNUNTERSCHIED:
+ShiftIn = reaktiv (Mitarbeiter stempeln) — für Zeitlohn-Betriebe
+PlanIt  = planerisch (Admin plant) — für Schichtbetriebe
+
+ÜBERLAPPUNG:
+- Beide erfassen Arbeitszeit + Pause
+- PlanIt actual_start_time/actual_end_time ähnelt clock_in/clock_out
+- PlanIt break_minutes ähnelt Summe der breaks in ShiftIn
+
+WAS ÜBERNOMMEN WERDEN KÖNNTE:
+- Clock-In/Out-Feature für Mitarbeiter (self-service Zeiterfassung)
+  → Neues Tab in employee.html
+  → Schreibt in shifts.actual_start_time / actual_end_time
+  → Oder: neue Tabelle clock_entries (separates Modul)
+- Pausen mit Start/End statt nur break_minutes
+  → Neue Tabelle breaks_planit (time_entry_id → shift_id, break_start, break_end)
+  → break_minutes bleibt für Rückwärtskompatibilität
+
+================================================================================
+3. ABWESENHEITEN — VERGLEICH
+================================================================================
+
+SHIFTIN: absences (ein Typ)
+---------------------------
+id, employee_id, absence_type ('Urlaub' | 'Krank' | 'Schule'),
+start_date, end_date, hours_per_day, total_hours, note, created_by
+
+→ Alle Abwesenheitstypen in einer Tabelle
+→ total_hours = hours_per_day × Tage (für Lohnabrechnung)
+
+PLANIT: getrennte Tabellen
+--------------------------
+sick_leaves:        id, user_id, employee_id, start_date, end_date
+vacation_requests:  id, user_id, employee_id, start_date, end_date,
+                    deducted_days, deducted_hours, status, type, payout_month
+
+→ Urlaub hat Genehmigungsworkflow (pending/approved/rejected)
+→ Krankmeldung ist einfacher, ohne Stunden
+→ Kein Schul-Abwesenheitstyp in PlanIt
+
+FEHLEND IN PLANIT:
+- Schul-Abwesenheit (Berufsschule für Azubis)
+- hours_per_day / total_hours auf Krankmeldungen (für Lohnabrechnung nötig)
+
+================================================================================
+4. LOHNABRECHNUNG — VERGLEICH
+================================================================================
+
+SHIFTIN: payroll.js — vollständige Lohnabrechnung
+--------------------------------------------------
+Berechnungen:
+  calculateWorkedHours(empId, start, end)
+    → Summiert (clock_out - clock_in) aus time_entries
+
+  calculateSickHours(empId, start, end)
+    → Summiert total_hours aus absences wo type='Krank'
+
+  calculateVacationHours(empId, start, end)
+    → Summiert total_hours aus absences wo type='Urlaub'
+
+  calculateNightHours(empId, start, end)
+    → Zählt Stunden zwischen 20:00 und 06:00 aus time_entries
+
+  calculateSundayHours(empId, start, end)
+    → Zählt Stunden an Sonntagen aus time_entries
+
+  calculateHolidayHours(empId, start, end)
+    → Zählt Stunden an Feiertagen (manuell vom Admin eingegeben)
+
+Zuschlag-Berechnung:
+  Nacht:      nightHours    × hourlyRate × (nightRate/100)
+  Sonntag:    sundayHours   × hourlyRate × (sundayRate/100)
+  Feiertag:   holidayHours  × hourlyRate × (holidayRate/100)
+  Überstunden: Max(0, gearbeitet + vormonatsSaldo - monthly_hours) × rate × (overtimeRate/100)
+
+Brutto-Berechnung:
+  Vollzeit (VZ/AZU): monthly_hours × hourly_rate  (festes Monatsgehalt)
+  Andere:            (workedHours + sickHours + vacationHours) × hourly_rate
+
+Überstunden-Saldo:
+  Tabelle: overtime_balance (employee_id, month, balance_hours)
+  → Saldo wird monatlich gespeichert und als Vormonat weitergerechnet
+
+Zusatzleistungen:
+  Prämie, VWL (vermögenswirksame Leistungen), Sachbezug — manuelle Eingabe
+
+PDF-Ausgabe (jsPDF):
+  Tabelle 1: Kernlohn (Name, AV-Art, Stundenlohn, Std, Brutto)
+  Tabelle 2: Zusatzleistungen (Prämie, VWL, Sachbezug) — optional
+  Tabelle 3: Zuschläge (Nacht/Sonntag/Feiertag/Überstunden) — optional
+  Tabelle 4: Gesamtpersonalkosten
+  Tabelle 5: Krankstunden-Detail — optional
+  → Spalten vom Admin wählbar (checkbox-basiert)
+
+Konfiguration:
+  adminState.allowanceRates: { night:25, sunday:50, holiday:125, overtime:25 } [%]
+  → Im Admin speicherbar
+
+PLANIT: kein Äquivalent
+------------------------
+PlanIt hat:
+  approved_hours (id, user_id, employee_id, month, approved_minutes)
+  actual_hours   (id, user_id, employee_id, month, actual_minutes, carry_over_minutes)
+  → Nur Stunden-Tracking für Übersicht, keine Lohn-Berechnung
+  → Keine Lohnabrechnung, keine Zuschläge, kein PDF
+
+FAZIT: Lohnabrechnung ist der größte fehlende Baustein in PlanIt.
+       ShiftIn's payroll.js könnte als Basis dienen, muss aber vollständig
+       an PlanIt's Datenstruktur angepasst werden (shifts statt time_entries etc.)
+
+================================================================================
+5. DATENBANKÜBERSCHNEIDUNGEN
+================================================================================
+
+IDENTISCH (gleiche Supabase-Instanz, getrennte Tabellen):
+----------------------------------------------------------
+PlanIt und ShiftIn teilen dieselbe Supabase-URL. Keine gemeinsamen Tabellen —
+beide Apps schreiben in getrennte Namensräume.
+
+KONZEPTIONELL ÄHNLICH:
+-----------------------
+ShiftIn               | PlanIt                    | Unterschied
+----------------------|---------------------------|---------------------------
+employees             | employees_planit          | PlanIt hat department, hygiene
+time_entries          | shifts (actual_*)         | PlanIt planerisch, ShiftIn reaktiv
+breaks                | shifts.break_minutes      | ShiftIn: Start/End; PlanIt: Minuten
+absences (Krank)      | sick_leaves               | PlanIt ohne Stunden
+absences (Urlaub)     | vacation_requests         | PlanIt mit Workflow
+absences (Schule)     | — fehlt —                 | nur in ShiftIn
+overtime_balance      | actual_hours.carry_over   | ähnliches Konzept, andere Struktur
+audit_logs            | planit_audit_log          | PlanIt-Tabelle existiert, wird nicht befüllt
+— fehlt —             | planit_departments        | nur in PlanIt
+— fehlt —             | planit_restaurants        | nur in PlanIt
+— fehlt —             | shifts (is_open, swaps)   | nur in PlanIt
+— fehlt —             | tip_* (6 Tabellen)        | nur in PlanIt
+— fehlt —             | planit_inventory_* (5)    | nur in PlanIt
+— fehlt —             | planit_terminations       | nur in PlanIt
+
+NUR IN SHIFTIN (fehlt in PlanIt):
+-----------------------------------
+- time_entries           → Einstempel-Zeitstempel
+- breaks                 → Pausen mit Start/End
+- overtime_balance       → Überstunden-Saldo
+- (keine allowance_rates-Tabelle — aktuell hardcoded in adminState)
+
+NUR IN PLANIT (nicht in ShiftIn):
+-----------------------------------
+- shifts                 → Schichtplanung
+- shift_swaps, shift_handovers, open_shift_requests
+- vacation_requests      → mit Genehmigungsworkflow
+- employment_phases      → Beschäftigungshistorie
+- planit_departments, planit_restaurants
+- tip_config, tip_departments, tip_hours, tip_entries, tip_results
+- planit_inventory_* (5 Tabellen)
+- planit_terminations
+- tasks, task_steps, task_templates, notes
+- approved_hours, actual_hours
+
+================================================================================
+6. ENTSCHEIDUNG: WAS ÜBERNEHMEN, WAS BLEIBT IN SHIFTIN
+================================================================================
+
+ÜBERNEHMEN IN PLANIT — Priorität 1 (sofort sinnvoll):
+-------------------------------------------------------
+□ employees_planit erweitern:
+    + hourly_rate         (decimal, Stundenlohn)
+    + monthly_hours       (decimal, Soll-Stunden/Monat)
+    + employment_type     (text: 'VZ'/'TZ'/'Minijob'/'Azubi')
+  → Voraussetzung für Lohnabrechnung; einfache DB-Migration
+
+□ sick_leaves erweitern:
+    + hours_per_day       (decimal, Stunden pro Krankheitstag)
+  → Für korrekte Lohnabrechnung bei Krankmeldungen
+
+□ Schul-Abwesenheit (Berufsschule):
+    → Neuer type-Wert 'Schule' in sick_leaves
+    → Relevant für Azubis
+
+□ Audit-Logging aktivieren:
+    → planit_audit_log existiert, fehlen nur logAuditEntry()-Aufrufe in admin.js
+    → Aufwand: ~1 Tag
+
+ÜBERNEHMEN IN PLANIT — Priorität 2 (mittelfristig):
+----------------------------------------------------
+□ Lohnabrechnung (payroll.js portieren):
+    Neue Tabellen:
+      + overtime_balance       (employee_id, month, balance_hours)
+      + allowance_rates        (user_id, night, sunday, holiday, overtime [%])
+    Anpassungen:
+      → calculateWorkedHours() liest aus shifts (actual_* oder geplant)
+      → calculateNightHours() / calculateSundayHours() aus shifts
+      → calculateHolidayHours() nutzt vorhandene getBWHolidays()-Funktion (existiert!)
+      → Brutto-Berechnung nutzt employees_planit.hourly_rate + monthly_hours
+    Neuer Tab: "Lohnabrechnung" in Mehr-Bereich (admin)
+    PDF via jsPDF (bereits im Projekt für Urlaubsanträge genutzt!)
+
+□ Clock-In/Out für Mitarbeiter:
+    → Schreibt in shifts.actual_start_time / actual_end_time
+    → Kein neues Schema nötig — bestehende actual_*-Felder verwenden
+    → Neuer Button/Tab in employee.html
+
+BLEIBT IN SHIFTIN (nicht übernehmen):
+--------------------------------------
+✗ Offline-Queue / Retry-Logik:
+    → Aufwand hoch, Nutzen für PlanIt-Zielgruppe gering
+    → PlanIt läuft im Restaurant-WLAN, selten offline
+
+✗ Mehrsprachigkeit:
+    → PlanIt ist explizit deutschsprachig, kein Bedarf
+
+✗ PIN-Login:
+    → PlanIt hat login_code + password_hash, ausreichend
+    → PIN wäre Regression (weniger sicher)
+
+✗ Eigenständige time_entries-Tabelle:
+    → PlanIt-Konzept (Schichtplan) ist überlegen
+    → actual_start_time/actual_end_time in shifts reicht aus
+
+================================================================================
+7. KONKRETER MIGRATIONSPLAN
+================================================================================
+
+PHASE 1 — Datenbankschema erweitern (1–2 Tage):
+  ALTER TABLE employees_planit
+    ADD COLUMN hourly_rate DECIMAL(8,2),
+    ADD COLUMN monthly_hours DECIMAL(6,2),
+    ADD COLUMN employment_type TEXT DEFAULT 'VZ';
+
+  ALTER TABLE sick_leaves
+    ADD COLUMN hours_per_day DECIMAL(4,2);
+
+  CREATE TABLE overtime_balance (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users,
+    employee_id UUID REFERENCES employees_planit(id),
+    month TEXT NOT NULL,           -- Format: 'YYYY-MM'
+    balance_hours DECIMAL(8,2) NOT NULL DEFAULT 0,
+    UNIQUE(user_id, employee_id, month)
+  );
+
+  CREATE TABLE allowance_rates (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users UNIQUE,
+    night_rate DECIMAL(5,2) DEFAULT 25,
+    sunday_rate DECIMAL(5,2) DEFAULT 50,
+    holiday_rate DECIMAL(5,2) DEFAULT 125,
+    overtime_rate DECIMAL(5,2) DEFAULT 25
+  );
+
+PHASE 2 — admin.js / admin.html erweitern (3–5 Tage):
+  - Mitarbeiter-Modal: hourly_rate, monthly_hours, employment_type Felder
+  - Kündigung: Lohnabrechnung bis Austrittsdatum einbeziehen
+  - Neuer Tab "Lohnabrechnung" im Mehr-Bereich
+  - Zuschlagssätze-Konfiguration (analog ShiftIn Einstellungen)
+
+PHASE 3 — payroll.js portieren (5–10 Tage):
+  - calculateWorkedHours() → aus shifts (actual_* priorisiert, fallback geplant)
+  - calculateNightHours()  → aus shifts actual_start/end timestamps
+  - getBWHolidays() existiert bereits in admin.js — wiederverwenden!
+  - Brutto, Überstunden, Saldo-Logik übernehmen
+  - PDF-Export via jsPDF (Bibliothek bereits eingebunden!)
+
+PHASE 4 — Clock-In/Out (2–3 Tage):
+  - employee.html: neuer "Jetzt einstempeln"-Button
+  - Schreibt actual_start_time beim Einloggen, actual_end_time beim Ausloggen
+  - Admin sieht Ist-Zeiten bereits im Schichtplan (gelb markiert)
+
+================================================================================
+8. FAZIT
+================================================================================
+
+ShiftIn ist technisch veraltet (Raw REST API, kein Supabase SDK, State-basiertes
+Full-Re-Rendering). PlanIt ist die überlegene Basis.
+
+Der einzige wirklich wertvolle Kern aus ShiftIn für PlanIt:
+→ Die LOHNABRECHNUNG (payroll.js) mit ihren Berechnungsformeln
+
+Alles andere (Clock-In/Out, Abwesenheitstypen, Audit-Log, Zuschlagskonfiguration)
+lässt sich in PlanIt einfacher neu bauen als aus ShiftIn zu portieren.
+
+Die gute Nachricht: PlanIt hat bereits alle Voraussetzungen:
+  ✅ jsPDF-Bibliothek eingebunden (für Lohn-PDFs)
+  ✅ getBWHolidays()-Funktion vorhanden (für Feiertags-Zuschläge)
+  ✅ actual_start_time / actual_end_time in shifts (für Nacht/Sonntags-Berechnung)
+  ✅ planit_audit_log-Tabelle existiert (nur befüllen)
+  ✅ Beschäftigungsphasen-System (für historische Lohnsätze)
+
+Geschätzter Gesamtaufwand für Lohnabrechnung in PlanIt: 2–3 Wochen
